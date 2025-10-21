@@ -111,17 +111,39 @@ def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
         if not any(row):
             continue
 
-        first_cell = row[0].lower()
+        normalized_row = [_normalize_header(cell) for cell in row]
+        first_cell = row[0].strip().lower()
+
+        if any("trade_history" in cell for cell in normalized_row) or "trade history" in first_cell:
+            section = "trade_history"
+            headers = None
+            header_candidates = set(normalized_row)
+            if "symbol" in header_candidates and (
+                "action" in header_candidates
+                or "qty" in header_candidates
+                or "quantity" in header_candidates
+            ):
+                headers = normalized_row
+            continue
+
         if first_cell.startswith("account "):
             section = "trade_history" if "trade history" in first_cell else None
             headers = None
             continue
 
         if section != "trade_history":
+            header_candidates = set(normalized_row)
+            if "symbol" in header_candidates and (
+                "action" in header_candidates
+                or "qty" in header_candidates
+                or "quantity" in header_candidates
+            ):
+                section = "trade_history"
+                headers = normalized_row
             continue
 
         if headers is None:
-            headers = [_normalize_header(cell) for cell in row]
+            headers = normalized_row
             continue
 
         data: Dict[str, str] = {}
