@@ -18,6 +18,13 @@
       </select>
     </label>
     <label class="block">
+      <span class="block text-sm text-neutral-400">Display weekends</span>
+      <select name="show_weekends" class="bg-neutral-800 rounded px-2 py-1 w-full">
+        <option value="false" {% if not cfg.ui.show_weekends %}selected{% endif %}>Hide</option>
+        <option value="true" {% if cfg.ui.show_weekends %}selected{% endif %}>Show</option>
+      </select>
+    </label>
+    <label class="block">
       <span class="block text-sm text-neutral-400">Default month view</span>
       <select name="default_view" class="bg-neutral-800 rounded px-2 py-1 w-full">
         <option value="latest" {% if cfg.view.default == 'latest' %}selected{% endif %}>Latest</option>

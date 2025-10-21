@@ -57,6 +57,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             day_key = d.strftime("%Y-%m-%d")
             ds = by_day.get(day_key)
             note_text = notes_by_day.get(day_key, "")
+            is_weekend = d.weekday() >= 5
             wk.append({
                 "date": d,
                 "in_month": (d.month == month),
@@ -64,11 +65,17 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "unrealized": float(ds.unrealized) if ds else 0.0,
                 "note": note_text,
                 "has_note": bool(note_text.strip()),
+                "is_weekend": is_weekend,
             })
             if d.month == month and ds:
                 week_total_realized += float(ds.realized)
                 week_total_unreal += float(ds.unrealized)
-        weeks.append({"days": wk, "week_realized": week_total_realized, "week_unrealized": week_total_unreal})
+        weeks.append({
+            "days": wk,
+            "week_realized": week_total_realized,
+            "week_unrealized": week_total_unreal,
+            "week_index": len(weeks) + 1,
+        })
 
     # Monthly totals
     month_realized = sum(float(r.realized) for r in q)

@@ -12,6 +12,7 @@ DEFAULT_CONFIG = {
     "ui": {
         "theme": "dark",
         "show_text": True,
+        "show_weekends": False,
         "highlight_weekends": True,
         "auto_dark_mode": True,
         "opacity_gain": 0.7,
