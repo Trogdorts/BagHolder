@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import date, datetime
 import calendar
 from app.core.database import get_session
-from app.core.models import DailySummary, Meta, NoteDaily
+from app.core.models import DailySummary, Meta, NoteDaily, Trade
 from app.core.utils import month_bounds
 
 router = APIRouter()
@@ -45,6 +45,23 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     )
     notes_by_day = {r.date: r.note for r in note_rows}
 
+    trade_rows = (
+        db.query(Trade)
+        .filter(Trade.date >= start, Trade.date <= end)
+        .order_by(Trade.date.asc(), Trade.id.asc())
+        .all()
+    )
+    trades_by_day = {}
+    for tr in trade_rows:
+        trades_by_day.setdefault(tr.date, []).append(
+            {
+                "symbol": tr.symbol,
+                "action": tr.action,
+                "qty": float(tr.qty),
+                "price": float(tr.price),
+            }
+        )
+
     # Calculate weekly aggregates inline
     cal = calendar.Calendar(firstweekday=0)  # Monday=0 or Sunday=6; we'll keep 0
     weeks = []
@@ -66,6 +83,8 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "note": note_text,
                 "has_note": bool(note_text.strip()),
                 "is_weekend": is_weekend,
+                "trades": trades_by_day.get(day_key, []),
+                "has_trades": bool(trades_by_day.get(day_key, [])),
             })
             if d.month == month and ds:
                 week_total_realized += float(ds.realized)
