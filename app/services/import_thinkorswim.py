@@ -16,6 +16,14 @@ TRADE_ACTION_MAP = {
 }
 
 
+_PLAINTEXT_TRADE_LINE_RE = re.compile(r"^\d{2}/\d{2}/\d{4}.*\b(BOT|SOLD)\b", re.IGNORECASE)
+_PLAINTEXT_TRADE_PATTERN = re.compile(
+    r"(?P<date>\d{2}/\d{2}/\d{4}).*?\b(?P<action>BOT|SOLD)\b\s+(?P<qty>[+-]?\d+)\s+"
+    r"(?P<symbol>[A-Z0-9.\s]+?)\s*@\s*(?P<price>[\d.,]+).*?(?P<amount>[-\d,]+\.\d{2})",
+    re.IGNORECASE,
+)
+
+
 def _canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
@@ -68,6 +76,15 @@ def _parse_float(value: Any) -> Optional[float]:
         return None
 
 
+def _decode_text_content(content: bytes) -> str:
+    for encoding in ("utf-8-sig", "utf-16", "utf-16le", "utf-16be"):
+        try:
+            return content.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return content.decode("utf-8", errors="ignore")
+
+
 _DATETIME_FORMATS = [
     "%m/%d/%Y %H:%M:%S",
     "%m/%d/%Y %H:%M",
@@ -97,8 +114,74 @@ def _parse_datetime_guess(text: Optional[str]) -> Optional[datetime]:
     return None
 
 
+def _parse_plaintext_statement(content: bytes) -> List[Dict[str, Any]]:
+    text = _decode_text_content(content)
+    if not text:
+        return []
+
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    trades: List[Tuple[datetime, int, Dict[str, Any]]] = []
+
+    for idx, line in enumerate(lines):
+        if not _PLAINTEXT_TRADE_LINE_RE.match(line):
+            continue
+        match = _PLAINTEXT_TRADE_PATTERN.search(line)
+        if not match:
+            continue
+
+        date_text = match.group("date")
+        try:
+            trade_date = datetime.strptime(date_text, "%m/%d/%Y")
+        except ValueError:
+            continue
+
+        action_raw = match.group("action").upper()
+        action = "BUY" if "BOT" in action_raw else "SELL"
+
+        qty = _parse_float(match.group("qty"))
+        price = _parse_float(match.group("price"))
+        amount_val = _parse_float(match.group("amount"))
+
+        if qty is None or abs(qty) < 1e-9:
+            continue
+        if price is None:
+            continue
+        if amount_val is None:
+            amount_val = abs(qty) * price
+
+        qty = abs(qty)
+        amount_signed = abs(amount_val) if action == "SELL" else -abs(amount_val)
+
+        raw_symbol = match.group("symbol") or ""
+        primary_symbol = raw_symbol.strip().upper().split()
+        symbol = primary_symbol[0] if primary_symbol else ""
+        symbol = re.sub(r"[^A-Z0-9.]+", "", symbol)
+        if not symbol:
+            symbol = _extract_symbol(raw_symbol)
+        if not symbol:
+            continue
+
+        trades.append(
+            (
+                trade_date,
+                idx,
+                {
+                    "date": trade_date.strftime("%Y-%m-%d"),
+                    "symbol": symbol,
+                    "action": action,
+                    "qty": qty,
+                    "price": price,
+                    "amount": amount_signed,
+                },
+            )
+        )
+
+    trades.sort(key=lambda item: (item[0], item[1]))
+    return [trade for _, _, trade in trades]
+
+
 def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
-    text = content.decode("utf-8-sig", errors="ignore")
+    text = _decode_text_content(content)
     delimiter = "\t" if text.count("\t") > text.count(",") else ","
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
 
@@ -300,7 +383,12 @@ def _parse_dataframe(content: bytes) -> List[Dict[str, Any]]:
 
 
 def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
+    plaintext_rows = _parse_plaintext_statement(content)
+    if plaintext_rows:
+        return plaintext_rows
+
     rows = _read_statement_rows(content)
     if rows:
         return rows
+
     return _parse_dataframe(content)

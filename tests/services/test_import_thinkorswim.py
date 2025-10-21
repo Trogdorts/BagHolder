@@ -65,3 +65,31 @@ def test_parse_simple_csv_without_section_heading():
             "amount": 1600.0,
         },
     ]
+
+
+def test_parse_plaintext_statement():
+    content = (
+        "10/21/2025 BOT +1 AAPL @190.00 -190.00 10,000.00\n"
+        "10/22/2025 SOLD -1 AAPL @192.50 192.50 10,192.50\n"
+    ).encode("utf-16")
+
+    rows = parse_thinkorswim_csv(content)
+
+    assert rows == [
+        {
+            "date": "2025-10-21",
+            "symbol": "AAPL",
+            "action": "BUY",
+            "qty": 1.0,
+            "price": 190.0,
+            "amount": -190.0,
+        },
+        {
+            "date": "2025-10-22",
+            "symbol": "AAPL",
+            "action": "SELL",
+            "qty": 1.0,
+            "price": 192.5,
+            "amount": 192.5,
+        },
+    ]
