@@ -22,16 +22,16 @@
         <input type="radio" name="choice_{{ conflict.date }}" value="existing" class="h-4 w-4" checked>
         <span class="text-sm font-semibold">Keep existing</span>
         <div class="text-xs text-neutral-300">
-          <div>Realized: {{ '%.2f'|format(conflict.existing.realized) }}</div>
-          <div>Unrealized: {{ '%.2f'|format(conflict.existing.unrealized) }}</div>
+          <div>Realized: {{ conflict.existing.realized|money }}</div>
+          <div>Unrealized: {{ conflict.existing.unrealized|money }}</div>
         </div>
       </label>
       <label class="flex cursor-pointer flex-col gap-1 rounded border border-blue-700 bg-blue-900/30 p-3">
         <input type="radio" name="choice_{{ conflict.date }}" value="new" class="h-4 w-4">
         <span class="text-sm font-semibold">Use imported values</span>
         <div class="text-xs text-neutral-200">
-          <div>Realized: {{ '%.2f'|format(conflict.new.realized) }}</div>
-          <div>Unrealized: {{ '%.2f'|format(conflict.new.unrealized) }}</div>
+          <div>Realized: {{ conflict.new.realized|money }}</div>
+          <div>Unrealized: {{ conflict.new.unrealized|money }}</div>
         </div>
       </label>
     </div>
