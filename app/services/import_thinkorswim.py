@@ -14,9 +14,66 @@ TRADE_ACTION_MAP = {
     "BUY": "BUY",
     "BOT": "BUY",
     "BTO": "BUY",
+    "BUY_TO_OPEN": "BUY",
+    "BUY_TO_CLOSE": "BUY",
+    "BUY_TO_COVER": "BUY",
+    "BOUGHT": "BUY",
     "SELL": "SELL",
     "SLD": "SELL",
     "STC": "SELL",
+    "SELL_TO_CLOSE": "SELL",
+    "SELL_TO_OPEN": "SELL",
+    "SOLD": "SELL",
+    "SELL_SHORT": "SELL",
+    "SELL_SHORT_TO_OPEN": "SELL",
+    "SELL_SHORT_TO_CLOSE": "SELL",
+}
+
+
+COLUMN_ALIASES = {
+    "trade_date": "date",
+    "trade_date_et": "date",
+    "transaction_date": "date",
+    "date_time": "date",
+    "time": "time",
+    "trade_time": "time",
+    "transaction_time": "time",
+    "exec_time": "time",
+    "exec_time_et": "time",
+    "execution_time": "time",
+    "execution_time_et": "time",
+    "order_time": "time",
+    "quantity": "qty",
+    "qty": "qty",
+    "quantity_executed": "qty",
+    "shares": "qty",
+    "trade_quantity": "qty",
+    "filled_quantity": "qty",
+    "instrument": "symbol",
+    "ticker_symbol": "symbol",
+    "underlying": "symbol",
+    "underlying_symbol": "symbol",
+    "symbol": "symbol",
+    "description": "description",
+    "side": "action",
+    "type": "action",
+    "trade_type": "action",
+    "transaction_type": "action",
+    "activity": "action",
+    "price": "price",
+    "trade_price": "price",
+    "execution_price": "price",
+    "fill_price": "price",
+    "avg_price": "price",
+    "average_price": "price",
+    "net_price": "price",
+    "amount": "amount",
+    "net_amount": "amount",
+    "trade_amount": "amount",
+    "trade_value": "amount",
+    "value": "amount",
+    "gross_amount": "amount",
+    "proceeds": "amount",
 }
 
 
@@ -30,26 +87,10 @@ _PLAINTEXT_TRADE_PATTERN = re.compile(
 
 def _canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
-    aliases = {
-        "trade_date": "date",
-        "date_time": "date",
-        "time": "time",
-        "instrument": "symbol",
-        "symbol": "symbol",
-        "description": "description",
-        "action": "action",
-        "quantity": "qty",
-        "qty": "qty",
-        "price": "price",
-        "amount": "amount",
-        "net_amount": "amount",
-        "proceeds": "amount",
-        "net_price": "price",
-        "realized_pl": "realized_pl",
-    }
-    renamed = {c: aliases.get(c, c) for c in df.columns}
-    df = df.rename(columns=renamed)
+    df.columns = [_normalize_header(c) for c in df.columns]
+    df.columns = [COLUMN_ALIASES.get(c, c) for c in df.columns]
+    # Drop duplicate columns that may result from aliasing (prefer the first occurrence)
+    df = df.loc[:, ~df.columns.duplicated()]
     return df
 
 
@@ -63,6 +104,30 @@ def _normalize_header(label: str) -> str:
     label = label.replace("#", "number")
     label = re.sub(r"[^a-z0-9]+", "_", label)
     return label.strip("_")
+
+
+def _normalize_action_label(text: Any) -> str:
+    label = (text or "").strip()
+    if not label:
+        return ""
+    label = label.upper()
+    label = label.replace("&", "AND")
+    label = re.sub(r"[^A-Z0-9]+", "_", label)
+    return label.strip("_")
+
+
+def _resolve_action(text: Any) -> Optional[str]:
+    normalized = _normalize_action_label(text)
+    if not normalized:
+        return None
+    action = TRADE_ACTION_MAP.get(normalized)
+    if action:
+        return action
+    if "BUY" in normalized:
+        return "BUY"
+    if "SELL" in normalized or "SLD" in normalized:
+        return "SELL"
+    return None
 
 
 def _parse_float(value: Any) -> Optional[float]:
@@ -184,121 +249,284 @@ def _parse_plaintext_statement(content: bytes) -> List[Dict[str, Any]]:
     return [trade for _, _, trade in trades]
 
 
-def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
-    text = _decode_text_content(content)
+def _looks_like_trade_header(headers: List[str]) -> bool:
+    header_set = {h for h in headers if h}
+    if not header_set:
+        return False
+
+    has_symbol = any(
+        key in header_set
+        for key in (
+            "symbol",
+            "instrument",
+            "description",
+            "underlying",
+            "underlying_symbol",
+        )
+    )
+    has_action = any(
+        key in header_set
+        for key in (
+            "action",
+            "type",
+            "trade_type",
+            "transaction_type",
+            "side",
+            "activity",
+        )
+    )
+    has_quantity = any(
+        key in header_set
+        for key in (
+            "qty",
+            "quantity",
+            "shares",
+            "trade_quantity",
+            "filled_quantity",
+        )
+    )
+    has_price_or_amount = any(
+        key in header_set
+        for key in (
+            "price",
+            "trade_price",
+            "execution_price",
+            "fill_price",
+            "avg_price",
+            "average_price",
+            "net_price",
+            "amount",
+            "net_amount",
+            "trade_amount",
+            "trade_value",
+            "value",
+            "gross_amount",
+            "proceeds",
+        )
+    )
+
+    return has_symbol and has_action and has_quantity and has_price_or_amount
+
+
+def _prepare_header_mappings(row: List[str]) -> List[Tuple[str, str]]:
+    mappings: List[Tuple[str, str]] = []
+    for cell in row:
+        normalized = _normalize_header(cell)
+        canonical = COLUMN_ALIASES.get(normalized, normalized)
+        mappings.append((canonical, normalized))
+    return mappings
+
+
+def _map_row_values(row: List[str], header_mappings: List[Tuple[str, str]]) -> Dict[str, str]:
+    values: Dict[str, str] = {}
+    for idx, raw_value in enumerate(row):
+        if idx >= len(header_mappings):
+            break
+        canonical, normalized = header_mappings[idx]
+        text = raw_value.strip()
+        if not text:
+            continue
+        if canonical:
+            values.setdefault(canonical, text)
+        if normalized and normalized != canonical:
+            values.setdefault(normalized, text)
+    return values
+
+
+def _parse_datetime_from_row(data: Dict[str, str]) -> Optional[datetime]:
+    date_candidates = [
+        data.get("trade_date"),
+        data.get("date"),
+        data.get("transaction_date"),
+        data.get("date_time"),
+    ]
+    time_candidates = [
+        data.get("time"),
+        data.get("trade_time"),
+        data.get("exec_time"),
+        data.get("execution_time"),
+        data.get("transaction_time"),
+        data.get("order_time"),
+    ]
+
+    for date_text in date_candidates:
+        for time_text in time_candidates:
+            if date_text and time_text:
+                dt = _parse_datetime_guess(f"{date_text} {time_text}")
+                if dt:
+                    return dt
+
+    for candidate in [*time_candidates, *date_candidates]:
+        dt = _parse_datetime_guess(candidate)
+        if dt:
+            return dt
+
+    for date_text in date_candidates:
+        if not date_text:
+            continue
+        try:
+            parsed = pd.to_datetime(date_text, errors="raise")
+        except Exception:  # pragma: no cover - defensive fallback
+            continue
+        if pd.isna(parsed):
+            continue
+        dt = parsed.to_pydatetime() if hasattr(parsed, "to_pydatetime") else parsed
+        if isinstance(dt, datetime):
+            return dt
+
+    return None
+
+
+def _iter_trade_blocks(text: str) -> Iterable[Tuple[List[Tuple[str, str]], List[List[str]]]]:
     delimiter = "\t" if text.count("\t") > text.count(",") else ","
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
 
-    rows_with_order: List[Tuple[datetime, int, Dict[str, Any]]] = []
-    section: Optional[str] = None
-    headers: Optional[List[str]] = None
+    header_mappings: Optional[List[Tuple[str, str]]] = None
+    rows: List[List[str]] = []
 
-    for index, raw_row in enumerate(reader):
+    def flush_current() -> Optional[Tuple[List[Tuple[str, str]], List[List[str]]]]:
+        nonlocal header_mappings, rows
+        if header_mappings and rows:
+            result = (header_mappings, rows)
+            header_mappings = None
+            rows = []
+            return result
+        header_mappings = None
+        rows = []
+        return None
+
+    for raw_row in reader:
         row = [cell.strip() for cell in raw_row]
         if not any(row):
+            flushed = flush_current()
+            if flushed:
+                yield flushed
             continue
 
-        normalized_row = [_normalize_header(cell) for cell in row]
-        first_cell = row[0].strip().lower()
-
-        if any("trade_history" in cell for cell in normalized_row) or "trade history" in first_cell:
-            section = "trade_history"
-            headers = None
-            header_candidates = set(normalized_row)
-            if "symbol" in header_candidates and (
-                "action" in header_candidates
-                or "qty" in header_candidates
-                or "quantity" in header_candidates
-            ):
-                headers = normalized_row
+        first_cell = row[0].strip().lower() if row else ""
+        if len(row) == 1 and (
+            "trade history" in first_cell
+            or first_cell.startswith("account ")
+            or "account statement" in first_cell
+        ):
+            flushed = flush_current()
+            if flushed:
+                yield flushed
             continue
 
-        if first_cell.startswith("account "):
-            section = "trade_history" if "trade history" in first_cell else None
-            headers = None
+        header_candidate = _prepare_header_mappings(row)
+        canonical_headers = [canonical for canonical, _ in header_candidate]
+        if _looks_like_trade_header(canonical_headers):
+            flushed = flush_current()
+            if flushed:
+                yield flushed
+            header_mappings = header_candidate
             continue
 
-        if section != "trade_history":
-            header_candidates = set(normalized_row)
-            if "symbol" in header_candidates and (
-                "action" in header_candidates
-                or "qty" in header_candidates
-                or "quantity" in header_candidates
-            ):
-                section = "trade_history"
-                headers = normalized_row
+        if header_mappings is None:
             continue
 
-        if headers is None:
-            headers = normalized_row
-            continue
+        rows.append(row)
 
-        data: Dict[str, str] = {}
-        for i, header in enumerate(headers):
-            if not header:
+    flushed = flush_current()
+    if flushed:
+        yield flushed
+
+
+def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
+    text = _decode_text_content(content)
+    if not text:
+        return []
+
+    rows_with_order: List[Tuple[datetime, int, Dict[str, Any]]] = []
+    order = 0
+
+    for header_mappings, data_rows in _iter_trade_blocks(text):
+        for row in data_rows:
+            data = _map_row_values(row, header_mappings)
+
+            symbol = data.get("symbol") or data.get("instrument")
+            description = data.get("description")
+            if not symbol and description:
+                symbol = _extract_symbol(description)
+            symbol = (symbol or "").strip().upper()
+
+            side_raw = (
+                data.get("action")
+                or data.get("side")
+                or data.get("type")
+                or data.get("trade_type")
+                or data.get("transaction_type")
+            )
+            action = _resolve_action(side_raw)
+
+            if not symbol or not action:
                 continue
-            if i < len(row):
-                data[header] = row[i].strip()
 
-        symbol = data.get("symbol", "") or data.get("instrument", "")
-        description = data.get("description", "")
-        side = data.get("side", data.get("action", "")).upper()
+            qty_val = _parse_float(
+                data.get("qty")
+                or data.get("quantity")
+                or data.get("shares")
+                or data.get("trade_quantity")
+                or data.get("filled_quantity")
+            )
+            if qty_val is None or abs(qty_val) < 1e-9:
+                continue
+            qty_val = abs(qty_val)
 
-        if not symbol:
-            symbol = _extract_symbol(description)
-        symbol = symbol.strip().upper()
-
-        if not symbol or not side:
-            continue
-
-        action = TRADE_ACTION_MAP.get(side)
-        if not action:
-            if "BUY" in side:
-                action = "BUY"
-            elif "SELL" in side:
-                action = "SELL"
-            else:
+            price_val = _parse_float(
+                data.get("price")
+                or data.get("trade_price")
+                or data.get("execution_price")
+                or data.get("fill_price")
+                or data.get("avg_price")
+                or data.get("average_price")
+                or data.get("net_price")
+            )
+            if price_val is None:
+                amount_guess = _parse_float(
+                    data.get("amount")
+                    or data.get("net_amount")
+                    or data.get("trade_amount")
+                    or data.get("trade_value")
+                    or data.get("value")
+                    or data.get("gross_amount")
+                    or data.get("proceeds")
+                )
+                if amount_guess is not None and abs(qty_val) > 1e-9:
+                    price_val = abs(amount_guess) / qty_val
+            if price_val is None:
                 continue
 
-        qty_val = _parse_float(data.get("qty") or data.get("quantity"))
-        if qty_val is None or abs(qty_val) < 1e-9:
-            continue
-        qty_val = abs(qty_val)
+            dt_exec = _parse_datetime_from_row(data)
+            if dt_exec is None:
+                continue
 
-        price_val = _parse_float(data.get("price"))
-        if price_val is None:
-            price_val = _parse_float(data.get("net_price"))
-        if price_val is None:
-            amount_guess = _parse_float(data.get("amount") or data.get("net_amount"))
-            if amount_guess is not None and abs(qty_val) > 1e-9:
-                price_val = abs(amount_guess) / qty_val
-        if price_val is None:
-            continue
+            day = dt_exec.strftime("%Y-%m-%d")
 
-        exec_time = data.get("exec_time") or data.get("time")
-        trade_date_text = data.get("trade_date") or data.get("date")
-        dt_exec = _parse_datetime_guess(exec_time)
-        if dt_exec is None:
-            dt_exec = _parse_datetime_guess(trade_date_text)
-        if dt_exec is None:
-            continue
+            amount_val = _parse_float(
+                data.get("amount")
+                or data.get("net_amount")
+                or data.get("trade_amount")
+                or data.get("trade_value")
+                or data.get("value")
+                or data.get("gross_amount")
+                or data.get("proceeds")
+            )
+            gross = abs(amount_val) if amount_val is not None else qty_val * price_val
+            amount = gross if action == "SELL" else -gross
 
-        day = dt_exec.strftime("%Y-%m-%d")
+            trade = {
+                "date": day,
+                "symbol": symbol,
+                "action": action,
+                "qty": qty_val,
+                "price": price_val,
+                "amount": amount,
+            }
 
-        amount_val = _parse_float(data.get("amount") or data.get("net_amount"))
-        gross = abs(amount_val) if amount_val is not None else qty_val * price_val
-        amount = gross if action == "SELL" else -gross
-
-        trade = {
-            "date": day,
-            "symbol": symbol,
-            "action": action,
-            "qty": qty_val,
-            "price": price_val,
-            "amount": amount,
-        }
-
-        rows_with_order.append((dt_exec, index, trade))
+            rows_with_order.append((dt_exec, order, trade))
+            order += 1
 
     rows_with_order.sort(key=lambda x: (x[0], x[1]))
     return [row for _, _, row in rows_with_order]
@@ -319,7 +547,8 @@ def _parse_dataframe(content: bytes) -> List[Dict[str, Any]]:
 
     rows: List[Tuple[datetime, int, Dict[str, Any]]] = []
     for idx, r in df.iterrows():
-        action = str(r.get("action", "")).upper().strip()
+        raw_action = r.get("action", "") or r.get("side", "") or r.get("type", "")
+        action = _resolve_action(raw_action)
         desc = str(r.get("description", "")).upper().strip()
 
         if not action and desc:
@@ -328,7 +557,7 @@ def _parse_dataframe(content: bytes) -> List[Dict[str, Any]]:
             elif any(token in desc for token in ("SOLD", "SLD", "STC")):
                 action = "SELL"
 
-        if action not in ("BUY", "SELL", "BOT", "SLD", "BTO", "STC"):
+        if not action:
             continue
 
         qty = r.get("qty", r.get("quantity", None))
@@ -352,7 +581,9 @@ def _parse_dataframe(content: bytes) -> List[Dict[str, Any]]:
         if not isinstance(dt_python, datetime):
             continue
 
-        norm_action = TRADE_ACTION_MAP.get(action, action)
+        norm_action = _resolve_action(action)
+        if not norm_action:
+            norm_action = action
 
         qty_f = _parse_float(qty)
         if qty_f is None:
@@ -367,7 +598,15 @@ def _parse_dataframe(content: bytes) -> List[Dict[str, Any]]:
         if price_f is None:
             continue
 
-        amount_val = _parse_float(amount)
+        amount_val = _parse_float(
+            amount
+            if amount is not None
+            else r.get("trade_amount", None)
+            or r.get("trade_value", None)
+            or r.get("value", None)
+            or r.get("gross_amount", None)
+            or r.get("proceeds", None)
+        )
         gross = abs(amount_val) if amount_val is not None else qty_f * price_f
         amount_signed = gross if norm_action == "SELL" else -gross
 
@@ -384,6 +623,29 @@ def _parse_dataframe(content: bytes) -> List[Dict[str, Any]]:
 
     rows.sort(key=lambda x: (x[0], x[1]))
     return [row for _, _, row in rows]
+
+
+def _deduplicate_trades(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not rows:
+        return []
+
+    seen = set()
+    unique_rows: List[Dict[str, Any]] = []
+    for trade in rows:
+        key = (
+            trade.get("date"),
+            (trade.get("symbol") or "").upper(),
+            (trade.get("action") or "").upper(),
+            round(float(trade.get("qty", 0.0)), 8),
+            round(float(trade.get("price", 0.0)), 8),
+            round(float(trade.get("amount", 0.0)), 8),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_rows.append(trade)
+
+    return unique_rows
 
 
 def _extract_trade_section(text: str) -> List[str]:
@@ -473,95 +735,144 @@ def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
     section_rows = _parse_statement_trade_lines(content)
     if section_rows:
         log.debug("Parsed %s trades from 'Account Trade History' section", len(section_rows))
-        return section_rows
+        return _deduplicate_trades(section_rows)
 
     plaintext_rows = _parse_plaintext_statement(content)
     if plaintext_rows:
-        return plaintext_rows
+        return _deduplicate_trades(plaintext_rows)
 
     rows = _read_statement_rows(content)
     if rows:
-        return rows
+        return _deduplicate_trades(rows)
 
-    return _parse_dataframe(content)
+    return _deduplicate_trades(_parse_dataframe(content))
+
+
+def _apply_trade_to_position(position: Dict[str, float], side: str, qty: float, price: float) -> float:
+    """Update an in-flight position with a trade and return realized P/L."""
+
+    realized = 0.0
+    shares = position.get("shares", 0.0)
+    avg_cost = position.get("avg_cost", 0.0)
+
+    if qty <= 0 or price is None:
+        position["shares"] = shares
+        position["avg_cost"] = avg_cost
+        return 0.0
+
+    def _reset_if_flat(s: float, cost: float) -> Tuple[float, float]:
+        return (0.0, 0.0) if abs(s) < 1e-9 else (s, cost)
+
+    if side == "BUY":
+        if shares < 0:
+            cover_qty = min(qty, -shares)
+            realized += (avg_cost - price) * cover_qty
+            shares += cover_qty
+            qty -= cover_qty
+            shares, avg_cost = _reset_if_flat(shares, avg_cost)
+
+        if qty > 0:
+            existing_long = max(shares, 0.0)
+            total_cost = avg_cost * existing_long + price * qty
+            shares += qty
+            if shares > 0:
+                avg_cost = total_cost / shares
+            shares, avg_cost = _reset_if_flat(shares, avg_cost)
+
+    elif side == "SELL":
+        if shares > 0:
+            sell_qty = min(qty, shares)
+            realized += (price - avg_cost) * sell_qty
+            shares -= sell_qty
+            qty -= sell_qty
+            shares, avg_cost = _reset_if_flat(shares, avg_cost)
+
+        if qty > 0:
+            existing_short = max(-shares, 0.0)
+            total_cost = avg_cost * existing_short + price * qty
+            shares -= qty
+            if shares < 0:
+                avg_cost = total_cost / (-shares)
+            shares, avg_cost = _reset_if_flat(shares, avg_cost)
+
+    position["shares"] = shares
+    position["avg_cost"] = avg_cost
+    return realized
+
+
+def _current_invested_total(positions: Dict[str, Dict[str, float]]) -> float:
+    invested = 0.0
+    for data in positions.values():
+        shares = data.get("shares", 0.0)
+        avg_cost = data.get("avg_cost", 0.0)
+        if abs(shares) < 1e-9 or abs(avg_cost) < 1e-9:
+            continue
+        invested += shares * avg_cost
+    return invested
 
 
 def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
+    empty_df = pd.DataFrame(
+        columns=[
+            "date",
+            "realized_pl",
+            "unrealized_pl",
+            "total_pl",
+            "cumulative_pl",
+        ]
+    )
+
     if not records:
-        return pd.DataFrame(
-            columns=[
-                "date",
-                "realized_pl",
-                "unrealized_pl",
-                "total_pl",
-                "cumulative_pl",
-            ]
-        )
+        return empty_df
 
     df = pd.DataFrame(records)
     if df.empty:
-        return pd.DataFrame(
-            columns=[
-                "date",
-                "realized_pl",
-                "unrealized_pl",
-                "total_pl",
-                "cumulative_pl",
-            ]
-        )
+        return empty_df
 
     if "date" not in df.columns or "side" not in df.columns:
         raise ValueError("records require 'date' and 'side' fields")
 
+    required = {"symbol", "quantity", "price"}
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise ValueError(f"records missing required fields: {', '.join(missing)}")
+
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"]).dt.date
     df["side"] = df["side"].str.upper()
+    df["symbol"] = df["symbol"].str.upper()
+
+    df = df.sort_values(["date"]).reset_index(drop=True)
 
     positions: Dict[str, Dict[str, float]] = {}
     daily_records: List[Dict[str, Any]] = []
 
-    for date_value, day_trades in df.sort_values("date").groupby("date"):
+    for date_value, day_trades in df.groupby("date", sort=True):
         realized_total = 0.0
 
-        for _, trade in day_trades.iterrows():
-            sym = trade["symbol"].upper()
-            side = trade["side"]
-            qty = float(trade["quantity"])
-            price = float(trade["price"])
-            pos = positions.setdefault(sym, {"shares": 0.0, "avg_cost": 0.0})
+        for trade in day_trades.itertuples(index=False):
+            side = trade.side
+            symbol = trade.symbol
+            qty = float(trade.quantity)
+            price = float(trade.price)
+            if qty <= 0 or price is None:
+                continue
 
-            if side == "BUY":
-                total_cost = pos["avg_cost"] * pos["shares"] + price * qty
-                pos["shares"] += qty
-                if pos["shares"]:
-                    pos["avg_cost"] = total_cost / pos["shares"]
-            elif side == "SELL":
-                shares_available = pos["shares"]
-                if shares_available > 0:
-                    sold = min(qty, shares_available)
-                    realized = (price - pos["avg_cost"]) * sold
-                    realized_total += realized
-                    pos["shares"] -= sold
-                    if pos["shares"] < 0:
-                        pos["shares"] = 0.0
+            if side not in {"BUY", "SELL"}:
+                continue
 
-        unrealized_total = 0.0
-        for sym, p in positions.items():
-            if p["shares"] > 0:
-                last_price = (
-                    day_trades.loc[day_trades["symbol"].str.upper() == sym, "price"].iloc[-1]
-                    if sym in day_trades["symbol"].str.upper().values
-                    else p["avg_cost"]
-                )
-                unrealized_total += (float(last_price) - p["avg_cost"]) * p["shares"]
+            position = positions.setdefault(symbol, {"shares": 0.0, "avg_cost": 0.0})
+            realized_total += _apply_trade_to_position(position, side, qty, price)
 
-        total_pl = realized_total + unrealized_total
+        invested_total = _current_invested_total(positions)
+        total_value = realized_total + invested_total
+
         daily_records.append(
             {
                 "date": date_value,
                 "realized_pl": round(realized_total, 2),
-                "unrealized_pl": round(unrealized_total, 2),
-                "total_pl": round(total_pl, 2),
+                "unrealized_pl": round(invested_total, 2),
+                "total_pl": round(total_value, 2),
             }
         )
 
