@@ -7,7 +7,7 @@ from contextlib import suppress
 
 from sqlalchemy.orm.session import close_all_sessions
 
-from app.core.database import SessionLocal, init_db
+from app.core.database import SessionLocal, dispose_engine, init_db
 from app.core.seed import ensure_seed
 
 
@@ -30,6 +30,10 @@ def clear_all_data(data_dir: str) -> None:
     if SessionLocal is not None:
         # Ensure any live sessions release their file handles before deletion.
         close_all_sessions()
+
+    # Dispose the active engine so SQLite releases the file handle before we
+    # attempt to remove the database file.
+    dispose_engine()
 
     if os.path.exists(db_path):
         with suppress(OSError):
