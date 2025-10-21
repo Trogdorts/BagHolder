@@ -69,7 +69,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     for week in month_days:
         wk = []
         week_total_realized = 0.0
-        week_total_unreal = 0.0
+        last_unrealized_value = None
         for d in week:
             day_key = d.strftime("%Y-%m-%d")
             ds = by_day.get(day_key)
@@ -88,11 +88,11 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             })
             if d.month == month and ds:
                 week_total_realized += float(ds.realized)
-                week_total_unreal += float(ds.unrealized)
+                last_unrealized_value = float(ds.unrealized)
         weeks.append({
             "days": wk,
             "week_realized": week_total_realized,
-            "week_unrealized": week_total_unreal,
+            "week_unrealized": last_unrealized_value if last_unrealized_value is not None else 0.0,
             "week_index": len(weeks) + 1,
         })
 
