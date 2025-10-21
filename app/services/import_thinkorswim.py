@@ -432,79 +432,48 @@ def _iter_trade_blocks(text: str) -> Iterable[Tuple[List[Tuple[str, str]], List[
     if flushed:
         yield flushed
 
+        canonical: Dict[str, str] = dict(data)
+        for key, value in data.items():
+            alias = COLUMN_ALIASES.get(key)
+            if alias:
+                if not canonical.get(alias):
+                    canonical[alias] = value
+        data = canonical
+
+        symbol = data.get("symbol", "") or data.get("instrument", "")
+        description = data.get("description", "")
+        side_raw = data.get("action") or data.get("side") or data.get("type")
+        action = _resolve_action(side_raw)
 
 def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
     text = _decode_text_content(content)
     if not text:
         return []
 
-    rows_with_order: List[Tuple[datetime, int, Dict[str, Any]]] = []
-    order = 0
+        if not symbol or not action:
+            continue
 
-    for header_mappings, data_rows in _iter_trade_blocks(text):
-        for row in data_rows:
-            data = _map_row_values(row, header_mappings)
+        qty_val = _parse_float(
+            data.get("qty")
+            or data.get("quantity")
+            or data.get("shares")
+            or data.get("trade_quantity")
+        )
+        if qty_val is None or abs(qty_val) < 1e-9:
+            continue
+        qty_val = abs(qty_val)
 
-            symbol = data.get("symbol") or data.get("instrument")
-            description = data.get("description")
-            if not symbol and description:
-                symbol = _extract_symbol(description)
-            symbol = (symbol or "").strip().upper()
-
-            side_raw = (
-                data.get("action")
-                or data.get("side")
-                or data.get("type")
-                or data.get("trade_type")
-                or data.get("transaction_type")
-            )
-            action = _resolve_action(side_raw)
-
-            if not symbol or not action:
-                continue
-
-            qty_val = _parse_float(
-                data.get("qty")
-                or data.get("quantity")
-                or data.get("shares")
-                or data.get("trade_quantity")
-                or data.get("filled_quantity")
-            )
-            if qty_val is None or abs(qty_val) < 1e-9:
-                continue
-            qty_val = abs(qty_val)
-
-            price_val = _parse_float(
-                data.get("price")
-                or data.get("trade_price")
-                or data.get("execution_price")
-                or data.get("fill_price")
-                or data.get("avg_price")
-                or data.get("average_price")
-                or data.get("net_price")
-            )
-            if price_val is None:
-                amount_guess = _parse_float(
-                    data.get("amount")
-                    or data.get("net_amount")
-                    or data.get("trade_amount")
-                    or data.get("trade_value")
-                    or data.get("value")
-                    or data.get("gross_amount")
-                    or data.get("proceeds")
-                )
-                if amount_guess is not None and abs(qty_val) > 1e-9:
-                    price_val = abs(amount_guess) / qty_val
-            if price_val is None:
-                continue
-
-            dt_exec = _parse_datetime_from_row(data)
-            if dt_exec is None:
-                continue
-
-            day = dt_exec.strftime("%Y-%m-%d")
-
-            amount_val = _parse_float(
+        price_val = _parse_float(
+            data.get("price")
+            or data.get("trade_price")
+            or data.get("execution_price")
+            or data.get("avg_price")
+            or data.get("average_price")
+        )
+        if price_val is None:
+            price_val = _parse_float(data.get("net_price"))
+        if price_val is None:
+            amount_guess = _parse_float(
                 data.get("amount")
                 or data.get("net_amount")
                 or data.get("trade_amount")
@@ -513,8 +482,39 @@ def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
                 or data.get("gross_amount")
                 or data.get("proceeds")
             )
-            gross = abs(amount_val) if amount_val is not None else qty_val * price_val
-            amount = gross if action == "SELL" else -gross
+            if amount_guess is not None and abs(qty_val) > 1e-9:
+                price_val = abs(amount_guess) / qty_val
+        if price_val is None:
+            continue
+
+        exec_time = (
+            data.get("time")
+            or data.get("exec_time")
+            or data.get("trade_time")
+            or data.get("transaction_time")
+            or data.get("execution_time")
+            or data.get("order_time")
+        )
+        trade_date_text = data.get("trade_date") or data.get("date")
+        dt_exec = _parse_datetime_guess(exec_time)
+        if dt_exec is None:
+            dt_exec = _parse_datetime_guess(trade_date_text)
+        if dt_exec is None:
+            continue
+
+            day = dt_exec.strftime("%Y-%m-%d")
+
+        amount_val = _parse_float(
+            data.get("amount")
+            or data.get("net_amount")
+            or data.get("trade_amount")
+            or data.get("trade_value")
+            or data.get("value")
+            or data.get("gross_amount")
+            or data.get("proceeds")
+        )
+        gross = abs(amount_val) if amount_val is not None else qty_val * price_val
+        amount = gross if action == "SELL" else -gross
 
             trade = {
                 "date": day,
@@ -746,69 +746,6 @@ def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
         return _deduplicate_trades(rows)
 
     return _deduplicate_trades(_parse_dataframe(content))
-
-
-def _apply_trade_to_position(position: Dict[str, float], side: str, qty: float, price: float) -> float:
-    """Update an in-flight position with a trade and return realized P/L."""
-
-    realized = 0.0
-    shares = position.get("shares", 0.0)
-    avg_cost = position.get("avg_cost", 0.0)
-
-    if qty <= 0 or price is None:
-        position["shares"] = shares
-        position["avg_cost"] = avg_cost
-        return 0.0
-
-    def _reset_if_flat(s: float, cost: float) -> Tuple[float, float]:
-        return (0.0, 0.0) if abs(s) < 1e-9 else (s, cost)
-
-    if side == "BUY":
-        if shares < 0:
-            cover_qty = min(qty, -shares)
-            realized += (avg_cost - price) * cover_qty
-            shares += cover_qty
-            qty -= cover_qty
-            shares, avg_cost = _reset_if_flat(shares, avg_cost)
-
-        if qty > 0:
-            existing_long = max(shares, 0.0)
-            total_cost = avg_cost * existing_long + price * qty
-            shares += qty
-            if shares > 0:
-                avg_cost = total_cost / shares
-            shares, avg_cost = _reset_if_flat(shares, avg_cost)
-
-    elif side == "SELL":
-        if shares > 0:
-            sell_qty = min(qty, shares)
-            realized += (price - avg_cost) * sell_qty
-            shares -= sell_qty
-            qty -= sell_qty
-            shares, avg_cost = _reset_if_flat(shares, avg_cost)
-
-        if qty > 0:
-            existing_short = max(-shares, 0.0)
-            total_cost = avg_cost * existing_short + price * qty
-            shares -= qty
-            if shares < 0:
-                avg_cost = total_cost / (-shares)
-            shares, avg_cost = _reset_if_flat(shares, avg_cost)
-
-    position["shares"] = shares
-    position["avg_cost"] = avg_cost
-    return realized
-
-
-def _current_invested_total(positions: Dict[str, Dict[str, float]]) -> float:
-    invested = 0.0
-    for data in positions.values():
-        shares = data.get("shares", 0.0)
-        avg_cost = data.get("avg_cost", 0.0)
-        if abs(shares) < 1e-9 or abs(avg_cost) < 1e-9:
-            continue
-        invested += shares * avg_cost
-    return invested
 
 
 def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
