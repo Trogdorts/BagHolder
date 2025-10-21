@@ -93,3 +93,64 @@ def test_parse_plaintext_statement():
             "amount": 192.5,
         },
     ]
+
+
+def test_parse_trade_history_with_alternate_headers():
+    content = """Account Statement,,,,,
+Account: 12345678,,,,,
+Trade History,,,,,
+Trade Date,Trade Time,Type,Instrument,Quantity,Trade Price,Trade Amount
+10/21/2025,14:32:00,Bought,NERV,200,8.8101,"-$1,762.02"
+10/21/2025,15:10:00,Sold,NERV,200,8.8101,"$1,762.02"
+""".encode("utf-8")
+
+    rows = parse_thinkorswim_csv(content)
+
+    assert rows == [
+        {
+            "date": "2025-10-21",
+            "symbol": "NERV",
+            "action": "BUY",
+            "qty": 200.0,
+            "price": 8.8101,
+            "amount": -1762.02,
+        },
+        {
+            "date": "2025-10-21",
+            "symbol": "NERV",
+            "action": "SELL",
+            "qty": 200.0,
+            "price": 8.8101,
+            "amount": 1762.02,
+        },
+    ]
+
+
+def test_parse_deduplicates_identical_rows():
+    content = """Trade Date,Action,Symbol,Qty,Price,Amount
+02/06/2024,BUY,MSFT,10,315.50,-3155.00
+02/06/2024,BUY,MSFT,10,315.50,-3155.00
+02/07/2024,SELL,MSFT,5,320.00,1600.00
+02/07/2024,SELL,MSFT,5,320.00,1600.00
+""".encode("utf-8")
+
+    rows = parse_thinkorswim_csv(content)
+
+    assert rows == [
+        {
+            "date": "2024-02-06",
+            "symbol": "MSFT",
+            "action": "BUY",
+            "qty": 10.0,
+            "price": 315.5,
+            "amount": -3155.0,
+        },
+        {
+            "date": "2024-02-07",
+            "symbol": "MSFT",
+            "action": "SELL",
+            "qty": 5.0,
+            "price": 320.0,
+            "amount": 1600.0,
+        },
+    ]
