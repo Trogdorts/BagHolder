@@ -31,8 +31,8 @@
 
       {% if cfg.ui.show_text %}
       <div class="mt-2 text-sm">
-        <div class="{{ 'text-green-400' if d.realized >= 0 else 'text-red-400' }}">Realized: {{ '%.2f'|format(d.realized) }}</div>
-        <div class="{{ 'text-green-400' if d.unrealized >= 0 else 'text-red-400' }}">Unreal: {{ '%.2f'|format(d.unrealized) }}</div>
+        <div class="{{ 'text-green-400' if d.realized > 0 else ('text-red-400' if d.realized < 0 else 'text-neutral-200') }}">Realized: {{ '%.2f'|format(d.realized) }}</div>
+        <div class="{{ 'text-green-400' if d.unrealized > 0 else ('text-red-400' if d.unrealized < 0 else 'text-neutral-200') }}">Unreal: {{ '%.2f'|format(d.unrealized) }}</div>
       </div>
       {% endif %}
 
@@ -56,8 +56,8 @@
     <h2 class="font-semibold">Weekly summaries</h2>
     {% for week in weeks %}
       <div class="relative rounded border border-neutral-800 p-3 bg-neutral-950">
-        <div class="text-sm">Realized: <span class="{{ 'text-green-400' if week.week_realized >=0 else 'text-red-400' }}">{{ '%.2f'|format(week.week_realized) }}</span></div>
-        <div class="text-sm">Unrealized: <span class="{{ 'text-green-400' if week.week_unrealized >=0 else 'text-red-400' }}">{{ '%.2f'|format(week.week_unrealized) }}</span></div>
+        <div class="text-sm">Realized: <span class="{{ 'text-green-400' if week.week_realized > 0 else ('text-red-400' if week.week_realized < 0 else 'text-neutral-200') }}">{{ '%.2f'|format(week.week_realized) }}</span></div>
+        <div class="text-sm">Unrealized: <span class="{{ 'text-green-400' if week.week_unrealized > 0 else ('text-red-400' if week.week_unrealized < 0 else 'text-neutral-200') }}">{{ '%.2f'|format(week.week_unrealized) }}</span></div>
         <a class="absolute top-1 right-1 icon-translucent" href="#" onclick="openWeeklyNote({{ year }}, {{ loop.index }}); return false;">
           <img src="/static/icons/note.svg" class="w-4 h-4" alt="w-note">
         </a>
@@ -66,8 +66,8 @@
   </div>
   <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative">
     <h2 class="font-semibold">Monthly summary</h2>
-    <div>Realized: <span class="{{ 'text-green-400' if month_realized >=0 else 'text-red-400' }}">{{ '%.2f'|format(month_realized) }}</span></div>
-    <div>Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized >=0 else 'text-red-400' }}">{{ '%.2f'|format(month_unrealized) }}</span></div>
+    <div>Realized: <span class="{{ 'text-green-400' if month_realized > 0 else ('text-red-400' if month_realized < 0 else 'text-neutral-200') }}">{{ '%.2f'|format(month_realized) }}</span></div>
+    <div>Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized > 0 else ('text-red-400' if month_unrealized < 0 else 'text-neutral-200') }}">{{ '%.2f'|format(month_unrealized) }}</span></div>
     <a class="absolute top-1 right-1 icon-translucent" href="#" onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
       <img src="/static/icons/note.svg" class="w-4 h-4" alt="m-note">
     </a>
