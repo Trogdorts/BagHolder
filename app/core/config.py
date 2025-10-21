@@ -17,6 +17,7 @@ DEFAULT_CONFIG = {
         "opacity_gain": 0.7,
         "opacity_loss": 0.7,
         "grid_transparency": 0.8,
+        "icon_color": "#6b7280",
     },
     "notes": {
         "enabled": True,

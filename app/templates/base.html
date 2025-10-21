@@ -1,5 +1,6 @@
 <!doctype html>
 {% set theme = (cfg.get('ui', {}) if cfg is defined else {}).get('theme', 'dark') %}
+{% set icon_color = (cfg.get('ui', {}) if cfg is defined else {}).get('icon_color', '#6b7280') %}
 <html lang="en" data-theme="{{ theme }}">
 <head>
   <meta charset="utf-8">
@@ -9,10 +10,19 @@
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script src="https://unpkg.com/alpinejs@3.x.x" defer></script>
   <style>
+    :root {
+      --action-icon-color: {{ icon_color }};
+    }
+
     .cell-bg-pos { background-color: rgba(0, 200, 83, 0.20); }
     .cell-bg-neg { background-color: rgba(213, 0, 0, 0.20); }
     .icon-translucent { opacity: 0.25; transition: opacity .2s ease; }
     .icon-translucent:hover { opacity: 0.9; }
+
+    .action-icon {
+      color: var(--action-icon-color);
+      fill: currentColor;
+    }
 
     [data-theme="dark"] {
       color-scheme: dark;
