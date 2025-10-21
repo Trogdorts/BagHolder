@@ -1,10 +1,14 @@
 import csv
 import io
+import logging
 import re
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
+
+log = logging.getLogger(__name__)
+
 
 TRADE_ACTION_MAP = {
     "BUY": "BUY",
@@ -382,7 +386,95 @@ def _parse_dataframe(content: bytes) -> List[Dict[str, Any]]:
     return [row for _, _, row in rows]
 
 
+def _extract_trade_section(text: str) -> List[str]:
+    lines = text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if "Account Trade History" in line:
+            start = i + 2
+            log.debug("Detected 'Account Trade History' section at line %s", i)
+            break
+    if start is None:
+        return []
+
+    section: List[str] = []
+    for line in lines[start:]:
+        if not line.strip() or "Equities" in line or "Profits" in line:
+            break
+        section.append(line.strip())
+    return section
+
+
+def _parse_trade_section(lines: Iterable[str]) -> pd.DataFrame:
+    reader = csv.reader(lines)
+    trades: List[Dict[str, Any]] = []
+    for row in reader:
+        if len(row) < 12:
+            continue
+        try:
+            dt = datetime.strptime(row[1].split(" ")[0], "%m/%d/%y").date()
+            side = row[3].strip().upper()
+            qty = abs(float(row[4]))
+            symbol = row[6].strip().upper()
+            price = float(row[10])
+        except Exception as exc:  # pragma: no cover - defensive parsing
+            log.debug("Skipping trade row %s due to %s", row, exc)
+            continue
+
+        if not symbol or side not in {"BUY", "SELL"}:
+            continue
+
+        trades.append(
+            {
+                "date": dt,
+                "side": side,
+                "symbol": symbol,
+                "quantity": qty,
+                "price": price,
+            }
+        )
+
+    return pd.DataFrame(trades)
+
+
+def _parse_statement_trade_lines(content: bytes) -> List[Dict[str, Any]]:
+    text = _decode_text_content(content)
+    if not text:
+        return []
+    lines = _extract_trade_section(text)
+    if not lines:
+        return []
+    df = _parse_trade_section(lines)
+    if df.empty:
+        return []
+
+    results: List[Dict[str, Any]] = []
+    for row in df.to_dict("records"):
+        day = row["date"].strftime("%Y-%m-%d")
+        side = row["side"].upper()
+        qty = float(row["quantity"])
+        price = float(row["price"])
+        amount = qty * price
+        amount_signed = amount if side == "SELL" else -amount
+        results.append(
+            {
+                "date": day,
+                "symbol": row["symbol"],
+                "action": side,
+                "qty": qty,
+                "price": price,
+                "amount": amount_signed,
+            }
+        )
+    return results
+
+
 def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
+    section_rows = _parse_statement_trade_lines(content)
+    if section_rows:
+        log.debug("Parsed %s trades from 'Account Trade History' section", len(section_rows))
+        return section_rows
+
     plaintext_rows = _parse_plaintext_statement(content)
     if plaintext_rows:
         return plaintext_rows
@@ -392,3 +484,87 @@ def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
         return rows
 
     return _parse_dataframe(content)
+
+
+def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
+    if not records:
+        return pd.DataFrame(
+            columns=[
+                "date",
+                "realized_pl",
+                "unrealized_pl",
+                "total_pl",
+                "cumulative_pl",
+            ]
+        )
+
+    df = pd.DataFrame(records)
+    if df.empty:
+        return pd.DataFrame(
+            columns=[
+                "date",
+                "realized_pl",
+                "unrealized_pl",
+                "total_pl",
+                "cumulative_pl",
+            ]
+        )
+
+    if "date" not in df.columns or "side" not in df.columns:
+        raise ValueError("records require 'date' and 'side' fields")
+
+    df = df.copy()
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+    df["side"] = df["side"].str.upper()
+
+    positions: Dict[str, Dict[str, float]] = {}
+    daily_records: List[Dict[str, Any]] = []
+
+    for date_value, day_trades in df.sort_values("date").groupby("date"):
+        realized_total = 0.0
+
+        for _, trade in day_trades.iterrows():
+            sym = trade["symbol"].upper()
+            side = trade["side"]
+            qty = float(trade["quantity"])
+            price = float(trade["price"])
+            pos = positions.setdefault(sym, {"shares": 0.0, "avg_cost": 0.0})
+
+            if side == "BUY":
+                total_cost = pos["avg_cost"] * pos["shares"] + price * qty
+                pos["shares"] += qty
+                if pos["shares"]:
+                    pos["avg_cost"] = total_cost / pos["shares"]
+            elif side == "SELL":
+                shares_available = pos["shares"]
+                if shares_available > 0:
+                    sold = min(qty, shares_available)
+                    realized = (price - pos["avg_cost"]) * sold
+                    realized_total += realized
+                    pos["shares"] -= sold
+                    if pos["shares"] < 0:
+                        pos["shares"] = 0.0
+
+        unrealized_total = 0.0
+        for sym, p in positions.items():
+            if p["shares"] > 0:
+                last_price = (
+                    day_trades.loc[day_trades["symbol"].str.upper() == sym, "price"].iloc[-1]
+                    if sym in day_trades["symbol"].str.upper().values
+                    else p["avg_cost"]
+                )
+                unrealized_total += (float(last_price) - p["avg_cost"]) * p["shares"]
+
+        total_pl = realized_total + unrealized_total
+        daily_records.append(
+            {
+                "date": date_value,
+                "realized_pl": round(realized_total, 2),
+                "unrealized_pl": round(unrealized_total, 2),
+                "total_pl": round(total_pl, 2),
+            }
+        )
+
+    daily_df = pd.DataFrame(daily_records)
+    daily_df["cumulative_pl"] = daily_df["total_pl"].cumsum()
+    return daily_df

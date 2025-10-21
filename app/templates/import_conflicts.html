@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Resolve daily summary conflicts</h1>
+<p class="mb-4 text-sm text-neutral-300">
+  {{ inserted }} new trade{{ '' if inserted == 1 else 's' }} imported. Some days already had values in the calendar.
+  Please choose which figures to keep for each conflicting date below.
+</p>
+<form action="/import/thinkorswim/conflicts" method="post" class="space-y-4">
+  {% for conflict in conflicts %}
+  <div class="rounded border border-neutral-800 bg-neutral-950 p-4">
+    <div class="mb-3 flex items-center justify-between text-sm text-neutral-300">
+      <span class="font-semibold text-neutral-100">{{ conflict.date }}</span>
+      {% if conflict.existing.updated_at %}
+      <span>Last updated: {{ conflict.existing.updated_at }}</span>
+      {% endif %}
+    </div>
+    <input type="hidden" name="date" value="{{ conflict.date }}">
+    <input type="hidden" name="new_realized_{{ conflict.date }}" value="{{ '%.2f'|format(conflict.new.realized) }}">
+    <input type="hidden" name="new_unrealized_{{ conflict.date }}" value="{{ '%.2f'|format(conflict.new.unrealized) }}">
+    <div class="grid gap-3 md:grid-cols-2">
+      <label class="flex cursor-pointer flex-col gap-1 rounded border border-neutral-800 bg-neutral-900 p-3">
+        <input type="radio" name="choice_{{ conflict.date }}" value="existing" class="h-4 w-4" checked>
+        <span class="text-sm font-semibold">Keep existing</span>
+        <div class="text-xs text-neutral-300">
+          <div>Realized: {{ '%.2f'|format(conflict.existing.realized) }}</div>
+          <div>Unrealized: {{ '%.2f'|format(conflict.existing.unrealized) }}</div>
+        </div>
+      </label>
+      <label class="flex cursor-pointer flex-col gap-1 rounded border border-blue-700 bg-blue-900/30 p-3">
+        <input type="radio" name="choice_{{ conflict.date }}" value="new" class="h-4 w-4">
+        <span class="text-sm font-semibold">Use imported values</span>
+        <div class="text-xs text-neutral-200">
+          <div>Realized: {{ '%.2f'|format(conflict.new.realized) }}</div>
+          <div>Unrealized: {{ '%.2f'|format(conflict.new.unrealized) }}</div>
+        </div>
+      </label>
+    </div>
+  </div>
+  {% endfor %}
+  <div class="flex justify-end gap-2">
+    <a href="/" class="rounded border border-neutral-700 px-4 py-2 text-sm">Cancel</a>
+    <button class="rounded bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-500">Save selections</button>
+  </div>
+</form>
+{% endblock %}
