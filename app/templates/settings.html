@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
 <h1 class="text-xl font-semibold mb-4">Settings</h1>
+{% if cleared %}
+  <div class="mb-4 rounded border border-green-800 bg-green-900/40 px-4 py-3 text-sm text-green-100">
+    All application data has been cleared.
+  </div>
+{% endif %}
 <form method="post" action="/settings" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800">
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
     <label class="block">
@@ -38,5 +43,16 @@
     </label>
   </div>
   <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Save</button>
+</form>
+
+<form method="post" action="/settings/clear-data" onsubmit="return confirm('This will delete all trades, summaries, and notes. Continue?');"
+      class="mt-6 space-y-3 rounded border border-red-900 bg-red-950/40 p-4">
+  <div>
+    <h2 class="text-lg font-semibold text-red-200">Danger zone</h2>
+    <p class="text-sm text-red-100/80">
+      Clearing data removes every imported trade, calculated summary, and saved note. This action cannot be undone.
+    </p>
+  </div>
+  <button class="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-500">Clear all data</button>
 </form>
 {% endblock %}

@@ -1,13 +1,19 @@
+import os
+
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
+
 from app.core.config import AppConfig
+from app.services.data_reset import clear_all_data
 
 router = APIRouter()
 
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
     cfg: AppConfig = request.app.state.config
-    return request.app.state.templates.TemplateResponse("settings.html", {"request": request, "cfg": cfg.raw})
+    cleared = request.query_params.get("cleared") is not None
+    context = {"request": request, "cfg": cfg.raw, "cleared": cleared}
+    return request.app.state.templates.TemplateResponse("settings.html", context)
 
 @router.post("/settings", response_class=HTMLResponse)
 def save_settings(request: Request,
@@ -29,3 +35,11 @@ def save_settings(request: Request,
     cfg.raw["ui"]["icon_color"] = icon_color
     cfg.save()
     return RedirectResponse(url="/settings", status_code=303)
+
+
+@router.post("/settings/clear-data", response_class=HTMLResponse)
+def clear_settings_data(request: Request):
+    cfg: AppConfig = request.app.state.config
+    data_dir = os.path.dirname(cfg.path) if cfg.path else os.environ.get("BAGHOLDER_DATA", "/app/data")
+    clear_all_data(data_dir)
+    return RedirectResponse(url="/settings?cleared=1", status_code=303)
