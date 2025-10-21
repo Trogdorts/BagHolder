@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="text-xl font-semibold mb-4">Settings</h1>
+<form method="post" action="/settings" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <label class="block">
+      <span class="block text-sm text-neutral-400">Theme</span>
+      <select name="theme" class="bg-neutral-800 rounded px-2 py-1 w-full">
+        <option value="dark" {% if cfg.ui.theme == 'dark' %}selected{% endif %}>Dark</option>
+        <option value="light" {% if cfg.ui.theme == 'light' %}selected{% endif %}>Light</option>
+      </select>
+    </label>
+    <label class="block">
+      <span class="block text-sm text-neutral-400">Show numbers inside cells</span>
+      <select name="show_text" class="bg-neutral-800 rounded px-2 py-1 w-full">
+        <option value="true" {% if cfg.ui.show_text %}selected{% endif %}>True</option>
+        <option value="false" {% if not cfg.ui.show_text %}selected{% endif %}>False</option>
+      </select>
+    </label>
+    <label class="block">
+      <span class="block text-sm text-neutral-400">Default month view</span>
+      <select name="default_view" class="bg-neutral-800 rounded px-2 py-1 w-full">
+        <option value="latest" {% if cfg.view.default == 'latest' %}selected{% endif %}>Latest</option>
+        <option value="last_viewed" {% if cfg.view.default == 'last_viewed' %}selected{% endif %}>Last Viewed</option>
+      </select>
+    </label>
+  </div>
+  <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Save</button>
+</form>
+{% endblock %}

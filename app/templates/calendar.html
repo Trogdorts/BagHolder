@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <div class="text-lg font-semibold">{{ year }}-{{ "%02d"|format(month) }}</div>
+  <div class="space-x-2">
+    {% set prev_year = (month == 1) and year-1 or year %}
+    {% set prev_month = (month == 1) and 12 or month-1 %}
+    {% set next_year = (month == 12) and year+1 or year %}
+    {% set next_month = (month == 12) and 1 or month+1 %}
+    <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Prev</a>
+    <a href="/calendar/{{ next_year }}/{{ next_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Next</a>
+  </div>
+</div>
+
+<div class="grid grid-cols-7 gap-2">
+  <div class="text-xs text-neutral-400">Mon</div>
+  <div class="text-xs text-neutral-400">Tue</div>
+  <div class="text-xs text-neutral-400">Wed</div>
+  <div class="text-xs text-neutral-400">Thu</div>
+  <div class="text-xs text-neutral-400">Fri</div>
+  <div class="text-xs text-neutral-400">Sat</div>
+  <div class="text-xs text-neutral-400">Sun</div>
+</div>
+
+<div class="grid grid-cols-7 gap-2 mt-2">
+{% for week in weeks %}
+  {% for d in week.days %}
+    {% set cls = (d.realized > 0) and 'cell-bg-pos' or (d.realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
+    <div class="relative h-28 rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }}">
+      <div class="text-xs text-neutral-400">{{ d.date.day }}</div>
+
+      {% if cfg.ui.show_text %}
+      <div class="mt-2 text-sm">
+        <div class="{{ 'text-green-400' if d.realized >= 0 else 'text-red-400' }}">Realized: {{ '%.2f'|format(d.realized) }}</div>
+        <div class="{{ 'text-green-400' if d.unrealized >= 0 else 'text-red-400' }}">Unreal: {{ '%.2f'|format(d.unrealized) }}</div>
+      </div>
+      {% endif %}
+
+      <!-- Gear icon for manual entry -->
+      <a class="absolute top-1 right-1 icon-translucent" href="#"
+         onclick="openManual('{{ d.date.strftime('%Y-%m-%d') }}', {{ d.realized }}, {{ d.unrealized }}); return false;">
+        <img src="/static/icons/gear.svg" class="w-4 h-4" alt="edit">
+      </a>
+      <!-- Note icon -->
+      <a class="absolute bottom-1 right-1 icon-translucent" href="#" onclick="openDailyNote('{{ d.date.strftime('%Y-%m-%d') }}'); return false;">
+        <img src="/static/icons/note.svg" class="w-4 h-4" alt="note">
+      </a>
+    </div>
+  {% endfor %}
+{% endfor %}
+</div>
+
+<!-- Weekly sidebar rendered as a simple list under calendar for simplicity -->
+<div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div class="space-y-2">
+    <h2 class="font-semibold">Weekly summaries</h2>
+    {% for week in weeks %}
+      <div class="relative rounded border border-neutral-800 p-3 bg-neutral-950">
+        <div class="text-sm">Realized: <span class="{{ 'text-green-400' if week.week_realized >=0 else 'text-red-400' }}">{{ '%.2f'|format(week.week_realized) }}</span></div>
+        <div class="text-sm">Unrealized: <span class="{{ 'text-green-400' if week.week_unrealized >=0 else 'text-red-400' }}">{{ '%.2f'|format(week.week_unrealized) }}</span></div>
+        <a class="absolute top-1 right-1 icon-translucent" href="#" onclick="openWeeklyNote({{ year }}, {{ loop.index }}); return false;">
+          <img src="/static/icons/note.svg" class="w-4 h-4" alt="w-note">
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+  <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative">
+    <h2 class="font-semibold">Monthly summary</h2>
+    <div>Realized: <span class="{{ 'text-green-400' if month_realized >=0 else 'text-red-400' }}">{{ '%.2f'|format(month_realized) }}</span></div>
+    <div>Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized >=0 else 'text-red-400' }}">{{ '%.2f'|format(month_unrealized) }}</span></div>
+    <a class="absolute top-1 right-1 icon-translucent" href="#" onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
+      <img src="/static/icons/note.svg" class="w-4 h-4" alt="m-note">
+    </a>
+  </div>
+</div>
+
+<!-- Modals -->
+<div id="modal" x-data="{open:false, title:'', body:'', save: null}" x-show="open" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center">
+  <div class="bg-neutral-950 border border-neutral-800 rounded p-4 w-full max-w-lg">
+    <h3 class="font-semibold mb-2" x-text="title"></h3>
+    <div x-html="body"></div>
+    <div class="mt-4 flex justify-end gap-2">
+      <button class="px-3 py-1 rounded border border-neutral-700" @click="open=false">Close</button>
+      <button class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500" @click="if (save) save()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openManual(dateStr, realized, unrealized) {
+  const modal = document.getElementById('modal').__x;
+  modal.$data.title = "Manual edit " + dateStr;
+  modal.$data.body = `
+    <form id="manual-form">
+      <label class="block mb-2 text-sm">Realized
+        <input type="number" step="0.01" name="realized" value="${realized}" class="w-full bg-neutral-800 rounded px-2 py-1">
+      </label>
+      <label class="block mb-2 text-sm">Unrealized (invested)
+        <input type="number" step="0.01" name="unrealized" value="${unrealized}" class="w-full bg-neutral-800 rounded px-2 py-1">
+      </label>
+    </form>`;
+  modal.$data.save = () => {
+    const form = document.getElementById('manual-form');
+    const fd = new FormData(form);
+    fetch('/api/daily/' + dateStr, { method:'POST', body: fd }).then(() => location.reload());
+  };
+  modal.$data.open = true;
+}
+
+function openDailyNote(dateStr) {
+  fetch('/api/notes/daily/' + dateStr).then(r => r.json()).then(js => {
+    const modal = document.getElementById('modal').__x;
+    modal.$data.title = "Daily note " + dateStr;
+    modal.$data.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.$data.save = () => {
+      const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
+      fetch('/api/notes/daily/' + dateStr, {method:'POST', body:fd}).then(() => modal.$data.open=false);
+    };
+    modal.$data.open = true;
+  });
+}
+
+function openWeeklyNote(year, week) {
+  fetch('/api/notes/weekly/' + year + '/' + week).then(r => r.json()).then(js => {
+    const modal = document.getElementById('modal').__x;
+    modal.$data.title = "Weekly note Y"+year+" W"+week;
+    modal.$data.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.$data.save = () => {
+      const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
+      fetch('/api/notes/weekly/' + year + '/' + week, {method:'POST', body:fd}).then(() => modal.$data.open=false);
+    };
+    modal.$data.open = true;
+  });
+}
+
+function openMonthlyNote(year, month) {
+  fetch('/api/notes/monthly/' + year + '/' + month).then(r => r.json()).then(js => {
+    const modal = document.getElementById('modal').__x;
+    modal.$data.title = "Monthly note " + year + "-" + String(month).padStart(2,'0');
+    modal.$data.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.$data.save = () => {
+      const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
+      fetch('/api/notes/monthly/' + year + '/' + month, {method:'POST', body:fd}).then(() => modal.$data.open=false);
+    };
+    modal.$data.open = true;
+  });
+}
+</script>
+{% endblock %}

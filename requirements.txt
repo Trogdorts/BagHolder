@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+jinja2
+sqlalchemy>=2.0
+pandas
+python-multipart
+pyyaml

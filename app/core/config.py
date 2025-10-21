@@ -1,0 +1,71 @@
+from __future__ import annotations
+import os, yaml
+from dataclasses import dataclass, field
+from typing import Any, Dict
+
+DEFAULT_CONFIG = {
+    "server": {"host": "0.0.0.0", "port": 8012, "data_folder": "/app/data"},
+    "ui": {
+        "theme": "dark",
+        "show_text": True,
+        "highlight_weekends": True,
+        "auto_dark_mode": True,
+        "opacity_gain": 0.7,
+        "opacity_loss": 0.7,
+        "grid_transparency": 0.8,
+    },
+    "notes": {
+        "enabled": True,
+        "icon_opacity": 0.25,
+        "icon_hover_opacity": 0.9,
+        "icon_has_note_color": "#80CBC4",
+        "autosave": True,
+        "max_length": 4000,
+    },
+    "import": {
+        "sources": ["thinkorswim"],
+        "auto_recalculate": True,
+        "backup_before_import": True,
+        "accepted_formats": [".csv"],
+    },
+    "view": {"default": "latest", "remember_last_view": True, "month_start_day": "monday"},
+    "backup": {"enable_auto_backup": True, "retention_days": 7},
+}
+
+@dataclass
+class AppConfig:
+    raw: Dict[str, Any] = field(default_factory=lambda: DEFAULT_CONFIG.copy())
+    path: str = ""
+
+    @classmethod
+    def load(cls, data_dir: str) -> "AppConfig":
+        os.makedirs(data_dir, exist_ok=True)
+        cfg_path = os.path.join(data_dir, "config.yaml")
+        if not os.path.exists(cfg_path):
+            with open(cfg_path, "w") as f:
+                yaml.safe_dump(DEFAULT_CONFIG, f, sort_keys=False)
+            return cls(raw=DEFAULT_CONFIG, path=cfg_path)
+        with open(cfg_path, "r") as f:
+            loaded = yaml.safe_load(f) or {}
+        # Merge defaults with loaded
+        def merge(d, u):
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    u[k] = merge(v, u.get(k, {}))
+                else:
+                    u.setdefault(k, v)
+            return u
+        merged = merge(DEFAULT_CONFIG, loaded or {})
+        with open(cfg_path, "w") as f:
+            yaml.safe_dump(merged, f, sort_keys=False)
+        return cls(raw=merged, path=cfg_path)
+
+    def save(self):
+        with open(self.path, "w") as f:
+            yaml.safe_dump(self.raw, f, sort_keys=False)
+
+    def get(self, *keys, default=None):
+        d = self.raw
+        for k in keys:
+            d = d.get(k, {} if default is None else default)
+        return d
