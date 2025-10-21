@@ -3,9 +3,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 import calendar
-from ..core.database import get_session
-from ..core.models import DailySummary, Meta
-from ..core.utils import month_bounds
+from app.core.database import get_session
+from app.core.models import DailySummary, Meta
+from app.core.utils import month_bounds
 
 router = APIRouter()
 
@@ -25,7 +25,7 @@ def home(request: Request, db: Session = Depends(get_session)):
 @router.get("/calendar/{year}/{month}", response_class=HTMLResponse)
 def calendar_view(year: int, month: int, request: Request, db: Session = Depends(get_session)):
     # Save last viewed month
-    from ..core.models import Meta
+    from app.core.models import Meta
     last = db.get(Meta, "last_viewed_month")
     if last:
         last.value = f"{year}-{month}"
@@ -75,7 +75,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
 
 @router.post("/api/daily/{date_str}")
 def overwrite_daily(date_str: str, realized: float = Form(...), unrealized: float = Form(...), db: Session = Depends(get_session)):
-    from ..core.models import DailySummary
+    from app.core.models import DailySummary
     now = datetime.utcnow().isoformat()
     ds = db.get(DailySummary, date_str)
     if ds:

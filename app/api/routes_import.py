@@ -1,10 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, Request, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import Session
-from ..core.database import get_session
-from ..core.models import Trade, DailySummary
-from ..services.import_thinkorswim import parse_thinkorswim_csv
-from ..services.calculations import Ledger
+from app.core.database import get_session
+from app.core.models import Trade, DailySummary
+from app.services.import_thinkorswim import parse_thinkorswim_csv
+from app.services.calculations import Ledger
 from datetime import datetime
 import os
 
