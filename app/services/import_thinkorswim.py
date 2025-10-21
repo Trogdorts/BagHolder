@@ -1,17 +1,24 @@
-import pandas as pd
-import io, re
+import csv
+import io
+import re
 from datetime import datetime
-from typing import Tuple, List, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
+
+import pandas as pd
 
 TRADE_ACTION_MAP = {
-    "BUY": "BUY", "BOT": "BUY", "BTO": "BUY",
-    "SELL": "SELL", "SLD": "SELL", "STC": "SELL",
+    "BUY": "BUY",
+    "BOT": "BUY",
+    "BTO": "BUY",
+    "SELL": "SELL",
+    "SLD": "SELL",
+    "STC": "SELL",
 }
+
 
 def _canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df.columns = [c.strip().lower().replace(' ', '_') for c in df.columns]
-    # Common aliases
+    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
     aliases = {
         "trade_date": "date",
         "date_time": "date",
@@ -24,83 +31,276 @@ def _canonicalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         "qty": "qty",
         "price": "price",
         "amount": "amount",
+        "net_amount": "amount",
         "proceeds": "amount",
+        "net_price": "price",
         "realized_pl": "realized_pl",
     }
-    for k, v in list(df.columns.map(lambda c: (c, aliases.get(c, c)))):
-        pass
     renamed = {c: aliases.get(c, c) for c in df.columns}
     df = df.rename(columns=renamed)
     return df
 
+
 def _extract_symbol(desc: str) -> str:
-    # TOS descriptions often like "Bought 100 XYZ @ 10.00"
     m = re.search(r"\b([A-Z]{1,6})(?:\s|$|\.)", desc or "")
     return m.group(1) if m else ""
 
-def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
-    df = pd.read_csv(io.BytesIO(content))
-    df = _canonicalize_columns(df)
 
-    # Try to identify trade rows
-    # Keep rows that have either action or description indicating buy/sell
-    rows = []
-    for _, r in df.iterrows():
+def _normalize_header(label: str) -> str:
+    label = (label or "").strip().lower()
+    label = label.replace("#", "number")
+    label = re.sub(r"[^a-z0-9]+", "_", label)
+    return label.strip("_")
+
+
+def _parse_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text in {"~", "-", "--"}:
+        return None
+    text = text.replace("$", "").replace(",", "")
+    if text.startswith("(") and text.endswith(")"):
+        text = f"-{text[1:-1]}"
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+_DATETIME_FORMATS = [
+    "%m/%d/%Y %H:%M:%S",
+    "%m/%d/%Y %H:%M",
+    "%m/%d/%Y %I:%M:%S %p",
+    "%m/%d/%Y %I:%M %p",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M",
+    "%Y-%m-%d",
+    "%m/%d/%Y",
+    "%m/%d/%y %H:%M:%S",
+    "%m/%d/%y %H:%M",
+    "%m/%d/%y",
+]
+
+
+def _parse_datetime_guess(text: Optional[str]) -> Optional[datetime]:
+    if not text:
+        return None
+    cleaned = re.sub(r"\b(ET|EST|EDT|CST|CDT|PST|PDT|MT|MDT|UTC|GMT)\b", "", text, flags=re.IGNORECASE)
+    cleaned = cleaned.strip().replace("T", " ")
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    for fmt in _DATETIME_FORMATS:
+        try:
+            return datetime.strptime(cleaned, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
+    text = content.decode("utf-8-sig", errors="ignore")
+    delimiter = "\t" if text.count("\t") > text.count(",") else ","
+    reader = csv.reader(io.StringIO(text), delimiter=delimiter)
+
+    rows_with_order: List[Tuple[datetime, int, Dict[str, Any]]] = []
+    section: Optional[str] = None
+    headers: Optional[List[str]] = None
+
+    for index, raw_row in enumerate(reader):
+        row = [cell.strip() for cell in raw_row]
+        if not any(row):
+            continue
+
+        normalized_row = [_normalize_header(cell) for cell in row]
+        first_cell = row[0].strip().lower()
+
+        if any("trade_history" in cell for cell in normalized_row) or "trade history" in first_cell:
+            section = "trade_history"
+            headers = None
+            header_candidates = set(normalized_row)
+            if "symbol" in header_candidates and (
+                "action" in header_candidates
+                or "qty" in header_candidates
+                or "quantity" in header_candidates
+            ):
+                headers = normalized_row
+            continue
+
+        if first_cell.startswith("account "):
+            section = "trade_history" if "trade history" in first_cell else None
+            headers = None
+            continue
+
+        if section != "trade_history":
+            header_candidates = set(normalized_row)
+            if "symbol" in header_candidates and (
+                "action" in header_candidates
+                or "qty" in header_candidates
+                or "quantity" in header_candidates
+            ):
+                section = "trade_history"
+                headers = normalized_row
+            continue
+
+        if headers is None:
+            headers = normalized_row
+            continue
+
+        data: Dict[str, str] = {}
+        for i, header in enumerate(headers):
+            if not header:
+                continue
+            if i < len(row):
+                data[header] = row[i].strip()
+
+        symbol = data.get("symbol", "") or data.get("instrument", "")
+        description = data.get("description", "")
+        side = data.get("side", data.get("action", "")).upper()
+
+        if not symbol:
+            symbol = _extract_symbol(description)
+        symbol = symbol.strip().upper()
+
+        if not symbol or not side:
+            continue
+
+        action = TRADE_ACTION_MAP.get(side)
+        if not action:
+            if "BUY" in side:
+                action = "BUY"
+            elif "SELL" in side:
+                action = "SELL"
+            else:
+                continue
+
+        qty_val = _parse_float(data.get("qty") or data.get("quantity"))
+        if qty_val is None or abs(qty_val) < 1e-9:
+            continue
+        qty_val = abs(qty_val)
+
+        price_val = _parse_float(data.get("price"))
+        if price_val is None:
+            price_val = _parse_float(data.get("net_price"))
+        if price_val is None:
+            amount_guess = _parse_float(data.get("amount") or data.get("net_amount"))
+            if amount_guess is not None and abs(qty_val) > 1e-9:
+                price_val = abs(amount_guess) / qty_val
+        if price_val is None:
+            continue
+
+        exec_time = data.get("exec_time") or data.get("time")
+        trade_date_text = data.get("trade_date") or data.get("date")
+        dt_exec = _parse_datetime_guess(exec_time)
+        if dt_exec is None:
+            dt_exec = _parse_datetime_guess(trade_date_text)
+        if dt_exec is None:
+            continue
+
+        day = dt_exec.strftime("%Y-%m-%d")
+
+        amount_val = _parse_float(data.get("amount") or data.get("net_amount"))
+        gross = abs(amount_val) if amount_val is not None else qty_val * price_val
+        amount = gross if action == "SELL" else -gross
+
+        trade = {
+            "date": day,
+            "symbol": symbol,
+            "action": action,
+            "qty": qty_val,
+            "price": price_val,
+            "amount": amount,
+        }
+
+        rows_with_order.append((dt_exec, index, trade))
+
+    rows_with_order.sort(key=lambda x: (x[0], x[1]))
+    return [row for _, _, row in rows_with_order]
+
+
+def _parse_dataframe(content: bytes) -> List[Dict[str, Any]]:
+    try:
+        df = pd.read_csv(io.BytesIO(content))
+    except Exception:
+        return []
+
+    if df.empty:
+        return []
+
+    df = _canonicalize_columns(df)
+    if "symbol" not in df.columns:
+        return []
+
+    rows: List[Tuple[datetime, int, Dict[str, Any]]] = []
+    for idx, r in df.iterrows():
         action = str(r.get("action", "")).upper().strip()
         desc = str(r.get("description", "")).upper().strip()
 
         if not action and desc:
-            if "BOUGHT" in desc or "BOT" in desc or "BTO" in desc:
+            if any(token in desc for token in ("BOUGHT", "BOT", "BTO")):
                 action = "BUY"
-            elif "SOLD" in desc or "SLD" in desc or "STC" in desc:
+            elif any(token in desc for token in ("SOLD", "SLD", "STC")):
                 action = "SELL"
 
         if action not in ("BUY", "SELL", "BOT", "SLD", "BTO", "STC"):
-            continue  # skip non-trade rows (fees, interest, etc.)
+            continue
 
         qty = r.get("qty", r.get("quantity", None))
-        price = r.get("price", None)
-        amount = r.get("amount", None)
+        price = r.get("price", r.get("net_price", None))
+        amount = r.get("amount", r.get("net_amount", None))
 
-        # Symbol resolution: prefer explicit, else parse description
         symbol = str(r.get("symbol", "")).strip().upper()
         if not symbol:
             symbol = _extract_symbol(desc)
+        if not symbol:
+            continue
 
-        # Date handling
-        date_val = r.get("date", None) or r.get("trade_date", None)
+        date_val = r.get("date", r.get("trade_date", None))
         if pd.isna(date_val):
             continue
         try:
-            # Support multiple formats
-            dt = pd.to_datetime(date_val).date()
+            dt = pd.to_datetime(date_val)
         except Exception:
             continue
+        dt_python = dt.to_pydatetime() if hasattr(dt, "to_pydatetime") else dt
+        if not isinstance(dt_python, datetime):
+            continue
 
-        # Normalize action
         norm_action = TRADE_ACTION_MAP.get(action, action)
 
-        try:
-            qty_f = float(qty)
-            price_f = float(price)
-        except Exception:
-            # If price missing, try to back out from amount/qty
-            try:
-                amount_f = float(str(amount).replace(",", ""))
-                qty_f = float(qty)
-                price_f = amount_f / qty_f if qty_f else 0.0
-            except Exception:
-                continue
+        qty_f = _parse_float(qty)
+        if qty_f is None:
+            continue
+        qty_f = abs(qty_f)
 
-        rows.append({
-            "date": dt.strftime("%Y-%m-%d"),
+        price_f = _parse_float(price)
+        if price_f is None:
+            amount_val = _parse_float(amount)
+            if amount_val is not None and qty_f:
+                price_f = abs(amount_val) / qty_f
+        if price_f is None:
+            continue
+
+        amount_val = _parse_float(amount)
+        gross = abs(amount_val) if amount_val is not None else qty_f * price_f
+        amount_signed = gross if norm_action == "SELL" else -gross
+
+        trade = {
+            "date": dt_python.strftime("%Y-%m-%d"),
             "symbol": symbol,
             "action": norm_action,
             "qty": qty_f,
             "price": price_f,
-            "amount": float(str(amount).replace(",", "")) if amount is not None and str(amount).strip() != "" else qty_f * price_f if norm_action=="SELL" else -qty_f * price_f,
-        })
+            "amount": amount_signed,
+        }
 
-    # Sort by date
-    rows.sort(key=lambda x: x["date"])
-    return rows
+        rows.append((dt_python, idx, trade))
+
+    rows.sort(key=lambda x: (x[0], x[1]))
+    return [row for _, _, row in rows]
+
+
+def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
+    rows = _read_statement_rows(content)
+    if rows:
+        return rows
+    return _parse_dataframe(content)

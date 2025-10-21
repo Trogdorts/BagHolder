@@ -31,19 +31,25 @@
 
       {% if cfg.ui.show_text %}
       <div class="mt-2 text-sm">
-        <div class="{{ 'text-green-400' if d.realized >= 0 else 'text-red-400' }}">Realized: {{ '%.2f'|format(d.realized) }}</div>
-        <div class="{{ 'text-green-400' if d.unrealized >= 0 else 'text-red-400' }}">Unreal: {{ '%.2f'|format(d.unrealized) }}</div>
+        <div class="{{ 'text-green-400' if d.realized > 0 else ('text-red-400' if d.realized < 0 else 'text-neutral-200') }}">Realized: {{ '%.2f'|format(d.realized) }}</div>
+        <div class="{{ 'text-green-400' if d.unrealized > 0 else ('text-red-400' if d.unrealized < 0 else 'text-neutral-200') }}">Unrealized: {{ '%.2f'|format(d.unrealized) }}</div>
       </div>
       {% endif %}
 
       <!-- Gear icon for manual entry -->
       <a class="absolute top-1 right-1 icon-translucent" href="#"
+         aria-label="Edit daily values"
          onclick="openManual('{{ d.date.strftime('%Y-%m-%d') }}', {{ d.realized }}, {{ d.unrealized }}); return false;">
-        <img src="/static/icons/gear.svg" class="w-4 h-4" alt="edit">
+        <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M19.14,12.94a7.43,7.43,0,0,0,.05-.94,7.43,7.43,0,0,0-.05-.94l2.11-1.65a.5.5,0,0,0,.12-.64l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.3,7.3,0,0,0-1.63-.94l-.38-2.65A.5.5,0,0,0,12.64,1H9.36a.5.5,0,0,0-.49.41L8.49,4.06a7.3,7.3,0,0,0-1.63.94l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.64L3.94,11.06a7.43,7.43,0,0,0-.05.94,7.43,7.43,0,0,0,.05.94L1.83,14.59a.5.5,0,0,0-.12.64l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.3,7.3,0,0,0,1.63.94l.38,2.65a.5.5,0,0,0,.49.41h3.28a.5.5,0,0,0,.49-.41l.38-2.65a7.3,7.3,0,0,0,1.63-.94l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.64Zm-7.14,2.56A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" fill="currentColor" />
+        </svg>
       </a>
       <!-- Note icon -->
-      <a class="absolute bottom-1 right-1 icon-translucent" href="#" onclick="openDailyNote('{{ d.date.strftime('%Y-%m-%d') }}'); return false;">
-        <img src="/static/icons/note.svg" class="w-4 h-4" alt="note">
+      <a class="absolute bottom-1 right-1 icon-translucent" href="#" aria-label="Add daily note"
+         onclick="openDailyNote('{{ d.date.strftime('%Y-%m-%d') }}'); return false;">
+        <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
+        </svg>
       </a>
     </div>
   {% endfor %}
@@ -56,26 +62,32 @@
     <h2 class="font-semibold">Weekly summaries</h2>
     {% for week in weeks %}
       <div class="relative rounded border border-neutral-800 p-3 bg-neutral-950">
-        <div class="text-sm">Realized: <span class="{{ 'text-green-400' if week.week_realized >=0 else 'text-red-400' }}">{{ '%.2f'|format(week.week_realized) }}</span></div>
-        <div class="text-sm">Unrealized: <span class="{{ 'text-green-400' if week.week_unrealized >=0 else 'text-red-400' }}">{{ '%.2f'|format(week.week_unrealized) }}</span></div>
-        <a class="absolute top-1 right-1 icon-translucent" href="#" onclick="openWeeklyNote({{ year }}, {{ loop.index }}); return false;">
-          <img src="/static/icons/note.svg" class="w-4 h-4" alt="w-note">
+        <div class="text-sm">Realized: <span class="{{ 'text-green-400' if week.week_realized > 0 else ('text-red-400' if week.week_realized < 0 else 'text-neutral-200') }}">{{ '%.2f'|format(week.week_realized) }}</span></div>
+        <div class="text-sm">Unrealized: <span class="{{ 'text-green-400' if week.week_unrealized > 0 else ('text-red-400' if week.week_unrealized < 0 else 'text-neutral-200') }}">{{ '%.2f'|format(week.week_unrealized) }}</span></div>
+        <a class="absolute top-1 right-1 icon-translucent" href="#" aria-label="Add weekly note"
+           onclick="openWeeklyNote({{ year }}, {{ loop.index }}); return false;">
+          <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
+          </svg>
         </a>
       </div>
     {% endfor %}
   </div>
   <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative">
     <h2 class="font-semibold">Monthly summary</h2>
-    <div>Realized: <span class="{{ 'text-green-400' if month_realized >=0 else 'text-red-400' }}">{{ '%.2f'|format(month_realized) }}</span></div>
-    <div>Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized >=0 else 'text-red-400' }}">{{ '%.2f'|format(month_unrealized) }}</span></div>
-    <a class="absolute top-1 right-1 icon-translucent" href="#" onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
-      <img src="/static/icons/note.svg" class="w-4 h-4" alt="m-note">
+    <div>Realized: <span class="{{ 'text-green-400' if month_realized > 0 else ('text-red-400' if month_realized < 0 else 'text-neutral-200') }}">{{ '%.2f'|format(month_realized) }}</span></div>
+    <div>Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized > 0 else ('text-red-400' if month_unrealized < 0 else 'text-neutral-200') }}">{{ '%.2f'|format(month_unrealized) }}</span></div>
+    <a class="absolute top-1 right-1 icon-translucent" href="#" aria-label="Add monthly note"
+       onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
+      <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
+      </svg>
     </a>
   </div>
 </div>
 
 <!-- Modals -->
-<div id="modal" x-data="{open:false, title:'', body:'', save: null}" x-show="open" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center">
+<div id="modal" x-data="{open:false, title:'', body:'', save: null}" x-init="window.modalController = $data" x-show="open" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center">
   <div class="bg-neutral-950 border border-neutral-800 rounded p-4 w-full max-w-lg">
     <h3 class="font-semibold mb-2" x-text="title"></h3>
     <div x-html="body"></div>
@@ -88,9 +100,10 @@
 
 <script>
 function openManual(dateStr, realized, unrealized) {
-  const modal = document.getElementById('modal').__x;
-  modal.$data.title = "Manual edit " + dateStr;
-  modal.$data.body = `
+  const modal = getModalController();
+  if (!modal) return;
+  modal.title = "Manual edit " + dateStr;
+  modal.body = `
     <form id="manual-form">
       <label class="block mb-2 text-sm">Realized
         <input type="number" step="0.01" name="realized" value="${realized}" class="w-full bg-neutral-800 rounded px-2 py-1">
@@ -99,51 +112,63 @@ function openManual(dateStr, realized, unrealized) {
         <input type="number" step="0.01" name="unrealized" value="${unrealized}" class="w-full bg-neutral-800 rounded px-2 py-1">
       </label>
     </form>`;
-  modal.$data.save = () => {
+  modal.save = () => {
     const form = document.getElementById('manual-form');
     const fd = new FormData(form);
     fetch('/api/daily/' + dateStr, { method:'POST', body: fd }).then(() => location.reload());
   };
-  modal.$data.open = true;
+  modal.open = true;
 }
 
 function openDailyNote(dateStr) {
   fetch('/api/notes/daily/' + dateStr).then(r => r.json()).then(js => {
-    const modal = document.getElementById('modal').__x;
-    modal.$data.title = "Daily note " + dateStr;
-    modal.$data.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
-    modal.$data.save = () => {
+    const modal = getModalController();
+    if (!modal) return;
+    modal.title = "Daily note " + dateStr;
+    modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.save = () => {
       const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
-      fetch('/api/notes/daily/' + dateStr, {method:'POST', body:fd}).then(() => modal.$data.open=false);
+      fetch('/api/notes/daily/' + dateStr, {method:'POST', body:fd}).then(() => modal.open=false);
     };
-    modal.$data.open = true;
+    modal.open = true;
   });
 }
 
 function openWeeklyNote(year, week) {
   fetch('/api/notes/weekly/' + year + '/' + week).then(r => r.json()).then(js => {
-    const modal = document.getElementById('modal').__x;
-    modal.$data.title = "Weekly note Y"+year+" W"+week;
-    modal.$data.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
-    modal.$data.save = () => {
+    const modal = getModalController();
+    if (!modal) return;
+    modal.title = "Weekly note Y"+year+" W"+week;
+    modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.save = () => {
       const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
-      fetch('/api/notes/weekly/' + year + '/' + week, {method:'POST', body:fd}).then(() => modal.$data.open=false);
+      fetch('/api/notes/weekly/' + year + '/' + week, {method:'POST', body:fd}).then(() => modal.open=false);
     };
-    modal.$data.open = true;
+    modal.open = true;
   });
 }
 
 function openMonthlyNote(year, month) {
   fetch('/api/notes/monthly/' + year + '/' + month).then(r => r.json()).then(js => {
-    const modal = document.getElementById('modal').__x;
-    modal.$data.title = "Monthly note " + year + "-" + String(month).padStart(2,'0');
-    modal.$data.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
-    modal.$data.save = () => {
+    const modal = getModalController();
+    if (!modal) return;
+    modal.title = "Monthly note " + year + "-" + String(month).padStart(2,'0');
+    modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.save = () => {
       const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
-      fetch('/api/notes/monthly/' + year + '/' + month, {method:'POST', body:fd}).then(() => modal.$data.open=false);
+      fetch('/api/notes/monthly/' + year + '/' + month, {method:'POST', body:fd}).then(() => modal.open=false);
     };
-    modal.$data.open = true;
+    modal.open = true;
   });
+}
+
+function getModalController() {
+  const modal = window.modalController;
+  if (!modal) {
+    console.error('Modal controller is not ready yet');
+    return null;
+  }
+  return modal;
 }
 </script>
 {% endblock %}

@@ -8,7 +8,11 @@ if __package__ in (None, ""):
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+import os
+import sys
 
+if __package__ in {None, ""}:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.core.config import AppConfig
 from app.core.seed import ensure_seed
 from app.core.database import init_db
@@ -23,7 +27,9 @@ def create_app():
 
     app = FastAPI(title="BagHolder")
     app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
-    app.state.templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+    templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+    templates.env.globals["cfg"] = cfg.raw
+    app.state.templates = templates
     app.state.config = cfg
 
     from app.api.routes_import import router as import_router

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from ..core.models import NoteDaily, NoteWeekly, NoteMonthly
+from app.core.models import NoteDaily, NoteWeekly, NoteMonthly
 from datetime import datetime
 
 def set_daily_note(db: Session, date_str: str, note: str):

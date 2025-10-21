@@ -1,8 +1,8 @@
 import os, time
 from datetime import datetime
 from sqlalchemy import select
-from .database import init_db
-from .models import Base, Meta
+from app.core.database import init_db
+from app.core.models import Base, Meta
 
 def ensure_seed(db_path: str):
     engine, _ = init_db(db_path)

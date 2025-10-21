@@ -1,8 +1,15 @@
 from fastapi import APIRouter, Request, Form, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from ..core.database import get_session
-from ..services.notes_manager import set_daily_note, get_daily_note, set_weekly_note, get_weekly_note, set_monthly_note, get_monthly_note
+from app.core.database import get_session
+from app.services.notes_manager import (
+    set_daily_note,
+    get_daily_note,
+    set_weekly_note,
+    get_weekly_note,
+    set_monthly_note,
+    get_monthly_note,
+)
 
 router = APIRouter()
 
