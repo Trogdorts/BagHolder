@@ -75,7 +75,7 @@
 </div>
 
 <!-- Modals -->
-<div id="modal" x-data="{open:false, title:'', body:'', save: null}" x-show="open" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center">
+<div id="modal" x-data="{open:false, title:'', body:'', save: null}" x-init="window.modalController = $data" x-show="open" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center">
   <div class="bg-neutral-950 border border-neutral-800 rounded p-4 w-full max-w-lg">
     <h3 class="font-semibold mb-2" x-text="title"></h3>
     <div x-html="body"></div>
@@ -88,9 +88,10 @@
 
 <script>
 function openManual(dateStr, realized, unrealized) {
-  const modal = document.getElementById('modal').__x;
-  modal.$data.title = "Manual edit " + dateStr;
-  modal.$data.body = `
+  const modal = getModalController();
+  if (!modal) return;
+  modal.title = "Manual edit " + dateStr;
+  modal.body = `
     <form id="manual-form">
       <label class="block mb-2 text-sm">Realized
         <input type="number" step="0.01" name="realized" value="${realized}" class="w-full bg-neutral-800 rounded px-2 py-1">
@@ -99,51 +100,63 @@ function openManual(dateStr, realized, unrealized) {
         <input type="number" step="0.01" name="unrealized" value="${unrealized}" class="w-full bg-neutral-800 rounded px-2 py-1">
       </label>
     </form>`;
-  modal.$data.save = () => {
+  modal.save = () => {
     const form = document.getElementById('manual-form');
     const fd = new FormData(form);
     fetch('/api/daily/' + dateStr, { method:'POST', body: fd }).then(() => location.reload());
   };
-  modal.$data.open = true;
+  modal.open = true;
 }
 
 function openDailyNote(dateStr) {
   fetch('/api/notes/daily/' + dateStr).then(r => r.json()).then(js => {
-    const modal = document.getElementById('modal').__x;
-    modal.$data.title = "Daily note " + dateStr;
-    modal.$data.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
-    modal.$data.save = () => {
+    const modal = getModalController();
+    if (!modal) return;
+    modal.title = "Daily note " + dateStr;
+    modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.save = () => {
       const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
-      fetch('/api/notes/daily/' + dateStr, {method:'POST', body:fd}).then(() => modal.$data.open=false);
+      fetch('/api/notes/daily/' + dateStr, {method:'POST', body:fd}).then(() => modal.open=false);
     };
-    modal.$data.open = true;
+    modal.open = true;
   });
 }
 
 function openWeeklyNote(year, week) {
   fetch('/api/notes/weekly/' + year + '/' + week).then(r => r.json()).then(js => {
-    const modal = document.getElementById('modal').__x;
-    modal.$data.title = "Weekly note Y"+year+" W"+week;
-    modal.$data.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
-    modal.$data.save = () => {
+    const modal = getModalController();
+    if (!modal) return;
+    modal.title = "Weekly note Y"+year+" W"+week;
+    modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.save = () => {
       const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
-      fetch('/api/notes/weekly/' + year + '/' + week, {method:'POST', body:fd}).then(() => modal.$data.open=false);
+      fetch('/api/notes/weekly/' + year + '/' + week, {method:'POST', body:fd}).then(() => modal.open=false);
     };
-    modal.$data.open = true;
+    modal.open = true;
   });
 }
 
 function openMonthlyNote(year, month) {
   fetch('/api/notes/monthly/' + year + '/' + month).then(r => r.json()).then(js => {
-    const modal = document.getElementById('modal').__x;
-    modal.$data.title = "Monthly note " + year + "-" + String(month).padStart(2,'0');
-    modal.$data.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
-    modal.$data.save = () => {
+    const modal = getModalController();
+    if (!modal) return;
+    modal.title = "Monthly note " + year + "-" + String(month).padStart(2,'0');
+    modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.save = () => {
       const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
-      fetch('/api/notes/monthly/' + year + '/' + month, {method:'POST', body:fd}).then(() => modal.$data.open=false);
+      fetch('/api/notes/monthly/' + year + '/' + month, {method:'POST', body:fd}).then(() => modal.open=false);
     };
-    modal.$data.open = true;
+    modal.open = true;
   });
+}
+
+function getModalController() {
+  const modal = window.modalController;
+  if (!modal) {
+    console.error('Modal controller is not ready yet');
+    return null;
+  }
+  return modal;
 }
 </script>
 {% endblock %}
