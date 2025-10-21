@@ -34,12 +34,13 @@
         <div class="flex items-center gap-1 text-xs text-neutral-400">
           <span>{{ d.date.day }}</span>
           {% if d.has_trades %}
-          <div class="relative group cursor-default">
+          <div x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" class="relative cursor-default">
             <svg class="h-4 w-4 text-sky-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M7 6h11l-1.5-1.5L18 3l4 4-4 4-1.5-1.5L18 8H7a2 2 0 0 0-2 2v2H3V10a4 4 0 0 1 4-4zm10 12H6l1.5 1.5L6 21l-4-4 4-4 1.5 1.5L6 15h11a2 2 0 0 0 2-2v-2h2v2a4 4 0 0 1-4 4z" />
             </svg>
             <span class="sr-only">Trades recorded</span>
-            <div class="absolute left-0 top-5 z-20 hidden max-h-48 max-w-md overflow-auto rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg group-hover:block w-fit">
+            <div class="absolute left-0 top-5 z-20 hidden rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit"
+                 x-show="open" @mouseenter="open = true">
               <div class="mb-1 font-semibold text-neutral-200">Trades</div>
               <ul class="space-y-1">
                 {% for trade in d.trades %}
@@ -67,12 +68,13 @@
           </svg>
         </a>
         {% if d.has_note %}
-        <div class="absolute bottom-1 left-1 group cursor-default">
+        <div x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" class="absolute bottom-1 left-1 cursor-default">
           <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
           </svg>
           <span class="sr-only">Daily note available</span>
-          <div class="absolute bottom-6 left-0 z-20 hidden max-h-48 max-w-md overflow-auto whitespace-pre-line rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg group-hover:block w-fit">
+          <div class="absolute bottom-6 left-0 z-20 hidden whitespace-pre-line rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit"
+               x-show="open" @mouseenter="open = true">
             {{ d.note | e }}
           </div>
         </div>
