@@ -1,5 +1,9 @@
 from __future__ import annotations
-import os, yaml
+
+import copy
+import os
+
+import yaml
 from dataclasses import dataclass, field
 from typing import Any, Dict
 
@@ -34,7 +38,7 @@ DEFAULT_CONFIG = {
 
 @dataclass
 class AppConfig:
-    raw: Dict[str, Any] = field(default_factory=lambda: DEFAULT_CONFIG.copy())
+    raw: Dict[str, Any] = field(default_factory=lambda: copy.deepcopy(DEFAULT_CONFIG))
     path: str = ""
 
     @classmethod
@@ -44,7 +48,7 @@ class AppConfig:
         if not os.path.exists(cfg_path):
             with open(cfg_path, "w") as f:
                 yaml.safe_dump(DEFAULT_CONFIG, f, sort_keys=False)
-            return cls(raw=DEFAULT_CONFIG, path=cfg_path)
+            return cls(raw=copy.deepcopy(DEFAULT_CONFIG), path=cfg_path)
         with open(cfg_path, "r") as f:
             loaded = yaml.safe_load(f) or {}
         # Merge defaults with loaded
@@ -53,9 +57,9 @@ class AppConfig:
                 if isinstance(v, dict):
                     u[k] = merge(v, u.get(k, {}))
                 else:
-                    u.setdefault(k, v)
+                    u.setdefault(k, copy.deepcopy(v))
             return u
-        merged = merge(DEFAULT_CONFIG, loaded or {})
+        merged = merge(copy.deepcopy(DEFAULT_CONFIG), loaded or {})
         with open(cfg_path, "w") as f:
             yaml.safe_dump(merged, f, sort_keys=False)
         return cls(raw=merged, path=cfg_path)

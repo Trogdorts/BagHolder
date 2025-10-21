@@ -1,10 +1,13 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
 import os
+from typing import Generator, Optional
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 Base = declarative_base()
 _engine = None
-SessionLocal = None
+SessionLocal: Optional[sessionmaker] = None
+
 
 def init_db(db_path: str):
     global _engine, SessionLocal
@@ -13,5 +16,12 @@ def init_db(db_path: str):
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
     return _engine, SessionLocal
 
-def get_session():
-    return SessionLocal()
+
+def get_session() -> Generator[Session, None, None]:
+    if SessionLocal is None:
+        raise RuntimeError("Database session factory is not initialized")
+    db: Session = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
