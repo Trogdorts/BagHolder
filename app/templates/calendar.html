@@ -39,7 +39,7 @@
               <path d="M7 6h11l-1.5-1.5L18 3l4 4-4 4-1.5-1.5L18 8H7a2 2 0 0 0-2 2v2H3V10a4 4 0 0 1 4-4zm10 12H6l1.5 1.5L6 21l-4-4 4-4 1.5 1.5L6 15h11a2 2 0 0 0 2-2v-2h2v2a4 4 0 0 1-4 4z" />
             </svg>
             <span class="sr-only">Trades recorded</span>
-            <div class="absolute left-0 top-5 z-20 hidden w-48 max-h-48 overflow-auto rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg group-hover:block">
+            <div class="absolute left-0 top-5 z-20 hidden max-h-48 max-w-md overflow-auto rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg group-hover:block w-fit">
               <div class="mb-1 font-semibold text-neutral-200">Trades</div>
               <ul class="space-y-1">
                 {% for trade in d.trades %}
@@ -72,7 +72,7 @@
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
           </svg>
           <span class="sr-only">Daily note available</span>
-          <div class="absolute bottom-6 left-0 z-20 hidden w-48 max-h-48 overflow-auto whitespace-pre-line rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg group-hover:block">
+          <div class="absolute bottom-6 left-0 z-20 hidden max-h-48 max-w-md overflow-auto whitespace-pre-line rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg group-hover:block w-fit">
             {{ d.note | e }}
           </div>
         </div>
