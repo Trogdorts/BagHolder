@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="en" x-data="{theme: 'dark'}" :class="theme === 'dark' ? 'dark' : ''">
+{% set theme = (cfg.get('ui', {}) if cfg is defined else {}).get('theme', 'dark') %}
+<html lang="en" data-theme="{{ theme }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -12,6 +13,63 @@
     .cell-bg-neg { background-color: rgba(213, 0, 0, 0.20); }
     .icon-translucent { opacity: 0.25; transition: opacity .2s ease; }
     .icon-translucent:hover { opacity: 0.9; }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+    }
+
+    [data-theme="light"] {
+      color-scheme: light;
+    }
+
+    [data-theme="light"] body {
+      background-color: #f8fafc !important;
+      color: #1f2937 !important;
+    }
+
+    [data-theme="light"] .bg-neutral-950,
+    [data-theme="light"] .bg-neutral-900,
+    [data-theme="light"] .bg-neutral-800 {
+      background-color: #ffffff !important;
+    }
+
+    [data-theme="light"] .border-neutral-900,
+    [data-theme="light"] .border-neutral-800,
+    [data-theme="light"] .border-neutral-700 {
+      border-color: #d1d5db !important;
+    }
+
+    [data-theme="light"] .text-neutral-100,
+    [data-theme="light"] .text-neutral-200 {
+      color: #111827 !important;
+    }
+
+    [data-theme="light"] .text-neutral-300 {
+      color: #4b5563 !important;
+    }
+
+    [data-theme="light"] .text-neutral-400,
+    [data-theme="light"] .text-neutral-500 {
+      color: #6b7280 !important;
+    }
+
+    [data-theme="light"] .hover\:bg-neutral-800:hover,
+    [data-theme="light"] .hover\:bg-neutral-900:hover {
+      background-color: #e5e7eb !important;
+    }
+
+    [data-theme="light"] .file\:bg-neutral-800::file-selector-button {
+      background-color: #e5e7eb !important;
+      color: #1f2937 !important;
+    }
+
+    [data-theme="light"] .file\:text-neutral-200::file-selector-button {
+      color: #1f2937 !important;
+    }
+
+    [data-theme="light"] .hover\:file\:bg-neutral-700:hover::file-selector-button {
+      background-color: #d1d5db !important;
+    }
   </style>
 </head>
 <body class="min-h-screen bg-neutral-900 text-neutral-100">
