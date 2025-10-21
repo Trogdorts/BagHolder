@@ -25,3 +25,20 @@ def get_session() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def dispose_engine() -> None:
+    """Dispose the active SQLAlchemy engine and clear the session factory.
+
+    SQLite holds file handles open until the engine is disposed, which prevents
+    deleting the database file on Windows. Explicitly disposing the engine makes
+    sure the next call to :func:`init_db` recreates a fresh connection.
+    """
+
+    global _engine, SessionLocal
+
+    if _engine is not None:
+        _engine.dispose()
+        _engine = None
+
+    SessionLocal = None
