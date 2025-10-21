@@ -5,7 +5,14 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from app.services.import_thinkorswim import parse_thinkorswim_csv
+from datetime import date
+
+import pytest
+
+from app.services.import_thinkorswim import (
+    compute_daily_pnl_records,
+    parse_thinkorswim_csv,
+)
 
 
 def test_parse_statement_trade_history_section():

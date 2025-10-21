@@ -249,61 +249,188 @@ def _parse_plaintext_statement(content: bytes) -> List[Dict[str, Any]]:
     return [trade for _, _, trade in trades]
 
 
-def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
-    text = _decode_text_content(content)
+def _looks_like_trade_header(headers: List[str]) -> bool:
+    header_set = {h for h in headers if h}
+    if not header_set:
+        return False
+
+    has_symbol = any(
+        key in header_set
+        for key in (
+            "symbol",
+            "instrument",
+            "description",
+            "underlying",
+            "underlying_symbol",
+        )
+    )
+    has_action = any(
+        key in header_set
+        for key in (
+            "action",
+            "type",
+            "trade_type",
+            "transaction_type",
+            "side",
+            "activity",
+        )
+    )
+    has_quantity = any(
+        key in header_set
+        for key in (
+            "qty",
+            "quantity",
+            "shares",
+            "trade_quantity",
+            "filled_quantity",
+        )
+    )
+    has_price_or_amount = any(
+        key in header_set
+        for key in (
+            "price",
+            "trade_price",
+            "execution_price",
+            "fill_price",
+            "avg_price",
+            "average_price",
+            "net_price",
+            "amount",
+            "net_amount",
+            "trade_amount",
+            "trade_value",
+            "value",
+            "gross_amount",
+            "proceeds",
+        )
+    )
+
+    return has_symbol and has_action and has_quantity and has_price_or_amount
+
+
+def _prepare_header_mappings(row: List[str]) -> List[Tuple[str, str]]:
+    mappings: List[Tuple[str, str]] = []
+    for cell in row:
+        normalized = _normalize_header(cell)
+        canonical = COLUMN_ALIASES.get(normalized, normalized)
+        mappings.append((canonical, normalized))
+    return mappings
+
+
+def _map_row_values(row: List[str], header_mappings: List[Tuple[str, str]]) -> Dict[str, str]:
+    values: Dict[str, str] = {}
+    for idx, raw_value in enumerate(row):
+        if idx >= len(header_mappings):
+            break
+        canonical, normalized = header_mappings[idx]
+        text = raw_value.strip()
+        if not text:
+            continue
+        if canonical:
+            values.setdefault(canonical, text)
+        if normalized and normalized != canonical:
+            values.setdefault(normalized, text)
+    return values
+
+
+def _parse_datetime_from_row(data: Dict[str, str]) -> Optional[datetime]:
+    date_candidates = [
+        data.get("trade_date"),
+        data.get("date"),
+        data.get("transaction_date"),
+        data.get("date_time"),
+    ]
+    time_candidates = [
+        data.get("time"),
+        data.get("trade_time"),
+        data.get("exec_time"),
+        data.get("execution_time"),
+        data.get("transaction_time"),
+        data.get("order_time"),
+    ]
+
+    for date_text in date_candidates:
+        for time_text in time_candidates:
+            if date_text and time_text:
+                dt = _parse_datetime_guess(f"{date_text} {time_text}")
+                if dt:
+                    return dt
+
+    for candidate in [*time_candidates, *date_candidates]:
+        dt = _parse_datetime_guess(candidate)
+        if dt:
+            return dt
+
+    for date_text in date_candidates:
+        if not date_text:
+            continue
+        try:
+            parsed = pd.to_datetime(date_text, errors="raise")
+        except Exception:  # pragma: no cover - defensive fallback
+            continue
+        if pd.isna(parsed):
+            continue
+        dt = parsed.to_pydatetime() if hasattr(parsed, "to_pydatetime") else parsed
+        if isinstance(dt, datetime):
+            return dt
+
+    return None
+
+
+def _iter_trade_blocks(text: str) -> Iterable[Tuple[List[Tuple[str, str]], List[List[str]]]]:
     delimiter = "\t" if text.count("\t") > text.count(",") else ","
     reader = csv.reader(io.StringIO(text), delimiter=delimiter)
 
-    rows_with_order: List[Tuple[datetime, int, Dict[str, Any]]] = []
-    section: Optional[str] = None
-    headers: Optional[List[str]] = None
+    header_mappings: Optional[List[Tuple[str, str]]] = None
+    rows: List[List[str]] = []
 
-    for index, raw_row in enumerate(reader):
+    def flush_current() -> Optional[Tuple[List[Tuple[str, str]], List[List[str]]]]:
+        nonlocal header_mappings, rows
+        if header_mappings and rows:
+            result = (header_mappings, rows)
+            header_mappings = None
+            rows = []
+            return result
+        header_mappings = None
+        rows = []
+        return None
+
+    for raw_row in reader:
         row = [cell.strip() for cell in raw_row]
         if not any(row):
+            flushed = flush_current()
+            if flushed:
+                yield flushed
             continue
 
-        normalized_row = [_normalize_header(cell) for cell in row]
-        first_cell = row[0].strip().lower()
-
-        if any("trade_history" in cell for cell in normalized_row) or "trade history" in first_cell:
-            section = "trade_history"
-            headers = None
-            header_candidates = set(normalized_row)
-            if "symbol" in header_candidates and (
-                "action" in header_candidates
-                or "qty" in header_candidates
-                or "quantity" in header_candidates
-            ):
-                headers = normalized_row
+        first_cell = row[0].strip().lower() if row else ""
+        if len(row) == 1 and (
+            "trade history" in first_cell
+            or first_cell.startswith("account ")
+            or "account statement" in first_cell
+        ):
+            flushed = flush_current()
+            if flushed:
+                yield flushed
             continue
 
-        if first_cell.startswith("account "):
-            section = "trade_history" if "trade history" in first_cell else None
-            headers = None
+        header_candidate = _prepare_header_mappings(row)
+        canonical_headers = [canonical for canonical, _ in header_candidate]
+        if _looks_like_trade_header(canonical_headers):
+            flushed = flush_current()
+            if flushed:
+                yield flushed
+            header_mappings = header_candidate
             continue
 
-        if section != "trade_history":
-            header_candidates = set(normalized_row)
-            if "symbol" in header_candidates and (
-                "action" in header_candidates
-                or "qty" in header_candidates
-                or "quantity" in header_candidates
-            ):
-                section = "trade_history"
-                headers = normalized_row
+        if header_mappings is None:
             continue
 
-        if headers is None:
-            headers = normalized_row
-            continue
+        rows.append(row)
 
-        data: Dict[str, str] = {}
-        for i, header in enumerate(headers):
-            if not header:
-                continue
-            if i < len(row):
-                data[header] = row[i].strip()
+    flushed = flush_current()
+    if flushed:
+        yield flushed
 
         canonical: Dict[str, str] = dict(data)
         for key, value in data.items():
@@ -318,9 +445,10 @@ def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
         side_raw = data.get("action") or data.get("side") or data.get("type")
         action = _resolve_action(side_raw)
 
-        if not symbol:
-            symbol = _extract_symbol(description)
-        symbol = symbol.strip().upper()
+def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
+    text = _decode_text_content(content)
+    if not text:
+        return []
 
         if not symbol or not action:
             continue
@@ -374,7 +502,7 @@ def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
         if dt_exec is None:
             continue
 
-        day = dt_exec.strftime("%Y-%m-%d")
+            day = dt_exec.strftime("%Y-%m-%d")
 
         amount_val = _parse_float(
             data.get("amount")
@@ -388,16 +516,17 @@ def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
         gross = abs(amount_val) if amount_val is not None else qty_val * price_val
         amount = gross if action == "SELL" else -gross
 
-        trade = {
-            "date": day,
-            "symbol": symbol,
-            "action": action,
-            "qty": qty_val,
-            "price": price_val,
-            "amount": amount,
-        }
+            trade = {
+                "date": day,
+                "symbol": symbol,
+                "action": action,
+                "qty": qty_val,
+                "price": price_val,
+                "amount": amount,
+            }
 
-        rows_with_order.append((dt_exec, index, trade))
+            rows_with_order.append((dt_exec, order, trade))
+            order += 1
 
     rows_with_order.sort(key=lambda x: (x[0], x[1]))
     return [row for _, _, row in rows_with_order]
@@ -620,81 +749,67 @@ def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
 
 
 def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
+    empty_df = pd.DataFrame(
+        columns=[
+            "date",
+            "realized_pl",
+            "unrealized_pl",
+            "total_pl",
+            "cumulative_pl",
+        ]
+    )
+
     if not records:
-        return pd.DataFrame(
-            columns=[
-                "date",
-                "realized_pl",
-                "unrealized_pl",
-                "total_pl",
-                "cumulative_pl",
-            ]
-        )
+        return empty_df
 
     df = pd.DataFrame(records)
     if df.empty:
-        return pd.DataFrame(
-            columns=[
-                "date",
-                "realized_pl",
-                "unrealized_pl",
-                "total_pl",
-                "cumulative_pl",
-            ]
-        )
+        return empty_df
 
     if "date" not in df.columns or "side" not in df.columns:
         raise ValueError("records require 'date' and 'side' fields")
 
+    required = {"symbol", "quantity", "price"}
+    missing = sorted(required - set(df.columns))
+    if missing:
+        raise ValueError(f"records missing required fields: {', '.join(missing)}")
+
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"]).dt.date
     df["side"] = df["side"].str.upper()
+    df["symbol"] = df["symbol"].str.upper()
+
+    df = df.sort_values(["date"]).reset_index(drop=True)
 
     positions: Dict[str, Dict[str, float]] = {}
     daily_records: List[Dict[str, Any]] = []
 
-    for date_value, day_trades in df.sort_values("date").groupby("date"):
+    for date_value, day_trades in df.groupby("date", sort=True):
         realized_total = 0.0
 
-        for _, trade in day_trades.iterrows():
-            sym = trade["symbol"].upper()
-            side = trade["side"]
-            qty = float(trade["quantity"])
-            price = float(trade["price"])
-            pos = positions.setdefault(sym, {"shares": 0.0, "avg_cost": 0.0})
+        for trade in day_trades.itertuples(index=False):
+            side = trade.side
+            symbol = trade.symbol
+            qty = float(trade.quantity)
+            price = float(trade.price)
+            if qty <= 0 or price is None:
+                continue
 
-            if side == "BUY":
-                total_cost = pos["avg_cost"] * pos["shares"] + price * qty
-                pos["shares"] += qty
-                if pos["shares"]:
-                    pos["avg_cost"] = total_cost / pos["shares"]
-            elif side == "SELL":
-                shares_available = pos["shares"]
-                if shares_available > 0:
-                    sold = min(qty, shares_available)
-                    realized = (price - pos["avg_cost"]) * sold
-                    realized_total += realized
-                    pos["shares"] -= sold
-                    if pos["shares"] < 0:
-                        pos["shares"] = 0.0
+            if side not in {"BUY", "SELL"}:
+                continue
 
-        unrealized_total = 0.0
-        for sym, p in positions.items():
-            if p["shares"] > 0:
-                last_price = (
-                    day_trades.loc[day_trades["symbol"].str.upper() == sym, "price"].iloc[-1]
-                    if sym in day_trades["symbol"].str.upper().values
-                    else p["avg_cost"]
-                )
-                unrealized_total += (float(last_price) - p["avg_cost"]) * p["shares"]
+            position = positions.setdefault(symbol, {"shares": 0.0, "avg_cost": 0.0})
+            realized_total += _apply_trade_to_position(position, side, qty, price)
 
-        total_pl = realized_total + unrealized_total
+        invested_total = _current_invested_total(positions)
+        total_value = realized_total + invested_total
+
         daily_records.append(
             {
                 "date": date_value,
                 "realized_pl": round(realized_total, 2),
-                "unrealized_pl": round(unrealized_total, 2),
-                "total_pl": round(total_pl, 2),
+                "unrealized_pl": round(invested_total, 2),
+                "total_pl": round(total_value, 2),
             }
         )
 
