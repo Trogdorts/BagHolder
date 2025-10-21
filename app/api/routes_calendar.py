@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import date, datetime
 import calendar
 from app.core.database import get_session
-from app.core.models import DailySummary, Meta
+from app.core.models import DailySummary, Meta, NoteDaily
 from app.core.utils import month_bounds
 
 router = APIRouter()
@@ -38,6 +38,13 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     q = db.query(DailySummary).filter(DailySummary.date >= start, DailySummary.date <= end).all()
     by_day = {r.date: r for r in q}
 
+    note_rows = (
+        db.query(NoteDaily)
+        .filter(NoteDaily.date >= start, NoteDaily.date <= end)
+        .all()
+    )
+    notes_by_day = {r.date: r.note for r in note_rows}
+
     # Calculate weekly aggregates inline
     cal = calendar.Calendar(firstweekday=0)  # Monday=0 or Sunday=6; we'll keep 0
     weeks = []
@@ -47,12 +54,16 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         week_total_realized = 0.0
         week_total_unreal = 0.0
         for d in week:
-            ds = by_day.get(d.strftime("%Y-%m-%d"))
+            day_key = d.strftime("%Y-%m-%d")
+            ds = by_day.get(day_key)
+            note_text = notes_by_day.get(day_key, "")
             wk.append({
                 "date": d,
                 "in_month": (d.month == month),
                 "realized": float(ds.realized) if ds else 0.0,
-                "unrealized": float(ds.unrealized) if ds else 0.0
+                "unrealized": float(ds.unrealized) if ds else 0.0,
+                "note": note_text,
+                "has_note": bool(note_text.strip()),
             })
             if d.month == month and ds:
                 week_total_realized += float(ds.realized)
