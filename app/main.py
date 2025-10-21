@@ -5,6 +5,8 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -28,6 +30,18 @@ def create_app():
     app = FastAPI(title="BagHolder")
     app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
     templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+
+    def format_money(value):
+        try:
+            number = Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return "$0.00"
+
+        quantized = number.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        sign = "-" if quantized < 0 else ""
+        return f"{sign}${abs(quantized):,.2f}"
+
+    templates.env.filters["money"] = format_money
     templates.env.globals["cfg"] = cfg.raw
     app.state.templates = templates
     app.state.config = cfg
