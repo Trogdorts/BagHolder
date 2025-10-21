@@ -1,10 +1,17 @@
+import os
+import sys
+from pathlib import Path
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import os
-from .core.config import AppConfig
-from .core.seed import ensure_seed
-from .core.database import init_db
+
+from app.core.config import AppConfig
+from app.core.seed import ensure_seed
+from app.core.database import init_db
 
 def create_app():
     data_dir = os.environ.get("BAGHOLDER_DATA", "/app/data")
@@ -19,11 +26,11 @@ def create_app():
     app.state.templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
     app.state.config = cfg
 
-    from .api.routes_import import router as import_router
-    from .api.routes_calendar import router as calendar_router
-    from .api.routes_settings import router as settings_router
-    from .api.routes_notes import router as notes_router
-    from .api.routes_stats import router as stats_router
+    from app.api.routes_import import router as import_router
+    from app.api.routes_calendar import router as calendar_router
+    from app.api.routes_settings import router as settings_router
+    from app.api.routes_notes import router as notes_router
+    from app.api.routes_stats import router as stats_router
 
     app.include_router(calendar_router)
     app.include_router(import_router)
