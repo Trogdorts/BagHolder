@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from ..core.database import get_session
-from ..core.models import DailySummary
-from ..services.summaries import group_by_week
+from app.core.database import get_session
+from app.core.models import DailySummary
+from app.services.summaries import group_by_week
 
 router = APIRouter()
 

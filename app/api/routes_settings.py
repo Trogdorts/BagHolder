@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
-from ..core.config import AppConfig
+from app.core.config import AppConfig
 
 router = APIRouter()
 
