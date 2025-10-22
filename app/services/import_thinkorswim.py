@@ -775,6 +775,80 @@ def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
     return _deduplicate_trades(_parse_dataframe(content))
 
 
+def _apply_trade_to_position(
+    position: Dict[str, float], side: str, qty: float, price: float
+) -> float:
+    """Apply a trade to an in-memory position and return realized P/L."""
+
+    shares = float(position.get("shares", 0.0) or 0.0)
+    avg_cost = float(position.get("avg_cost", 0.0) or 0.0)
+    realized = 0.0
+
+    if side == "BUY":
+        remaining = qty
+
+        if shares < 0:
+            cover_qty = min(remaining, -shares)
+            realized += (avg_cost - price) * cover_qty
+            shares += cover_qty
+            remaining -= cover_qty
+            if shares == 0:
+                avg_cost = 0.0
+
+        if remaining > 0:
+            cost_basis = avg_cost * shares if shares > 0 else 0.0
+            cost_basis += price * remaining
+            shares += remaining
+            avg_cost = cost_basis / shares if shares else 0.0
+
+    elif side == "SELL":
+        remaining = qty
+
+        if shares > 0:
+            sell_qty = min(remaining, shares)
+            realized += (price - avg_cost) * sell_qty
+            shares -= sell_qty
+            remaining -= sell_qty
+            if shares == 0:
+                avg_cost = 0.0
+
+        if remaining > 0:
+            short_shares = -shares if shares < 0 else 0.0
+            total_proceeds = avg_cost * short_shares if short_shares else 0.0
+            total_proceeds += price * remaining
+            short_shares += remaining
+            if short_shares:
+                avg_cost = total_proceeds / short_shares
+                shares = -short_shares
+
+    position["shares"] = shares
+    position["avg_cost"] = avg_cost
+    position["last_price"] = price
+
+    return realized
+
+
+def _current_invested_total(positions: Dict[str, Dict[str, float]]) -> float:
+    """Calculate unrealized P/L for the current open positions."""
+
+    total = 0.0
+    for position in positions.values():
+        shares = float(position.get("shares", 0.0) or 0.0)
+        if not shares:
+            continue
+
+        avg_cost = float(position.get("avg_cost", 0.0) or 0.0)
+        last_price = position.get("last_price")
+        last_price = float(last_price) if last_price is not None else avg_cost
+
+        if shares > 0:
+            total += (last_price - avg_cost) * shares
+        else:
+            total += (avg_cost - last_price) * (-shares)
+
+    return total
+
+
 def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
     empty_df = pd.DataFrame(
         columns=[
@@ -825,7 +899,9 @@ def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
             if side not in {"BUY", "SELL"}:
                 continue
 
-            position = positions.setdefault(symbol, {"shares": 0.0, "avg_cost": 0.0})
+            position = positions.setdefault(
+                symbol, {"shares": 0.0, "avg_cost": 0.0, "last_price": None}
+            )
             realized_total += _apply_trade_to_position(position, side, qty, price)
 
         invested_total = _current_invested_total(positions)
