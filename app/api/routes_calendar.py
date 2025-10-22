@@ -126,6 +126,8 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     month_realized = sum(float(r.realized) for r in q)
     month_unrealized = sum(float(r.unrealized) for r in q)
 
+    today = date.today()
+
     ctx = {
         "request": request,
         "year": year, "month": month,
@@ -135,6 +137,8 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "cfg": request.app.state.config.raw,
         "export_default_start": start,
         "export_default_end": end,
+        "current_year": today.year,
+        "current_month": today.month,
     }
     return request.app.state.templates.TemplateResponse("calendar.html", ctx)
 
