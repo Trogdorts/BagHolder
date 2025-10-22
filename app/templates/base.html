@@ -93,6 +93,9 @@
       <div class="ml-auto flex items-center gap-4 text-sm">
         <a href="/import" class="hover:underline">Import</a>
         <a href="/settings" class="hover:underline">Settings</a>
+        <button type="button" id="dev-reload" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition">
+          Reload app
+        </button>
         <span class="text-neutral-500">Port 8012</span>
       </div>
     </div>
@@ -103,5 +106,40 @@
 
   <!-- Modal container -->
   <div id="modal-root"></div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const reloadButton = document.getElementById('dev-reload');
+      if (!reloadButton) {
+        return;
+      }
+
+      const defaultText = reloadButton.textContent.trim() || 'Reload app';
+
+      reloadButton.addEventListener('click', async () => {
+        reloadButton.disabled = true;
+        reloadButton.classList.add('opacity-70');
+        reloadButton.textContent = 'Reloading…';
+
+        try {
+          const response = await fetch('/dev/reload', { method: 'POST' });
+          if (!response.ok) {
+            throw new Error(`Unexpected status ${response.status}`);
+          }
+        } catch (error) {
+          console.error('Failed to reload application state', error);
+          reloadButton.disabled = false;
+          reloadButton.classList.remove('opacity-70');
+          reloadButton.textContent = 'Reload failed';
+          setTimeout(() => {
+            reloadButton.textContent = defaultText;
+          }, 2000);
+          return;
+        }
+
+        window.location.reload();
+      });
+    });
+  </script>
 </body>
 </html>
