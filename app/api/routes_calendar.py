@@ -186,6 +186,17 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     month_realized = sum(float(r.realized) for r in q)
     month_unrealized = sum(float(r.unrealized) for r in q)
 
+    # Yearly totals
+    year_start = f"{year:04d}-01-01"
+    year_end = f"{year:04d}-12-31"
+    year_rows = (
+        db.query(DailySummary)
+        .filter(DailySummary.date >= year_start, DailySummary.date <= year_end)
+        .all()
+    )
+    year_realized = sum(float(r.realized) for r in year_rows)
+    year_unrealized = sum(float(r.unrealized) for r in year_rows)
+
     today = date.today()
 
     ctx = {
@@ -194,6 +205,8 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "weeks": weeks,
         "month_realized": month_realized,
         "month_unrealized": month_unrealized,
+        "year_realized": year_realized,
+        "year_unrealized": year_unrealized,
         "cfg": request.app.state.config.raw,
         "export_default_start": start,
         "export_default_end": end,

@@ -163,19 +163,28 @@
 {% endfor %}
 </div>
 
-<div class="mt-6 max-w-md">
-  <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative">
-    <h2 class="font-semibold">Monthly summary</h2>
-    <div>Realized: <span class="{{ 'text-green-400' if month_realized > 0 else ('text-red-400' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span></div>
-    <div x-show="showUnrealized" x-cloak>
-      Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized > 0 else ('text-red-400' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
+<div class="mt-6 max-w-3xl">
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative">
+      <h2 class="font-semibold">Monthly summary</h2>
+      <div>Realized: <span class="{{ 'text-green-400' if month_realized > 0 else ('text-red-400' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span></div>
+      <div x-show="showUnrealized" x-cloak>
+        Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized > 0 else ('text-red-400' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
+      </div>
+      <a class="absolute top-1 right-1 icon-translucent z-10" href="#" aria-label="Add monthly note"
+         onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
+        <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
+        </svg>
+      </a>
     </div>
-    <a class="absolute top-1 right-1 icon-translucent z-10" href="#" aria-label="Add monthly note"
-       onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
-      <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
-      </svg>
-    </a>
+    <div class="rounded border border-neutral-800 p-3 bg-neutral-950">
+      <h2 class="font-semibold">Yearly summary</h2>
+      <div>Realized: <span class="{{ 'text-green-400' if year_realized > 0 else ('text-red-400' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
+      <div x-show="showUnrealized" x-cloak>
+        Unrealized (invested): <span class="{{ 'text-green-400' if year_unrealized > 0 else ('text-red-400' if year_unrealized < 0 else 'text-neutral-200') }}">{{ year_unrealized|money }}</span>
+      </div>
+    </div>
   </div>
 </div>
 
