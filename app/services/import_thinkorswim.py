@@ -432,48 +432,95 @@ def _iter_trade_blocks(text: str) -> Iterable[Tuple[List[Tuple[str, str]], List[
     if flushed:
         yield flushed
 
-        canonical: Dict[str, str] = dict(data)
-        for key, value in data.items():
-            alias = COLUMN_ALIASES.get(key)
-            if alias:
-                if not canonical.get(alias):
-                    canonical[alias] = value
-        data = canonical
-
-        symbol = data.get("symbol", "") or data.get("instrument", "")
-        description = data.get("description", "")
-        side_raw = data.get("action") or data.get("side") or data.get("type")
-        action = _resolve_action(side_raw)
 
 def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
     text = _decode_text_content(content)
     if not text:
         return []
 
-        if not symbol or not action:
-            continue
+    rows_with_order: List[Tuple[datetime, int, Dict[str, Any]]] = []
+    order = 0
 
-        qty_val = _parse_float(
-            data.get("qty")
-            or data.get("quantity")
-            or data.get("shares")
-            or data.get("trade_quantity")
-        )
-        if qty_val is None or abs(qty_val) < 1e-9:
-            continue
-        qty_val = abs(qty_val)
+    for header_mappings, rows in _iter_trade_blocks(text):
+        for row in rows:
+            data = _map_row_values(row, header_mappings)
 
-        price_val = _parse_float(
-            data.get("price")
-            or data.get("trade_price")
-            or data.get("execution_price")
-            or data.get("avg_price")
-            or data.get("average_price")
-        )
-        if price_val is None:
-            price_val = _parse_float(data.get("net_price"))
-        if price_val is None:
-            amount_guess = _parse_float(
+            canonical: Dict[str, str] = dict(data)
+            for key, value in data.items():
+                alias = COLUMN_ALIASES.get(key)
+                if alias and not canonical.get(alias):
+                    canonical[alias] = value
+            data = canonical
+
+            symbol = (data.get("symbol", "") or data.get("instrument", "")).strip().upper()
+            description = data.get("description", "")
+            if not symbol and description:
+                symbol = _extract_symbol(description)
+            side_raw = data.get("action") or data.get("side") or data.get("type")
+            action = _resolve_action(side_raw)
+
+            if not action and description:
+                desc_upper = description.upper()
+                if any(token in desc_upper for token in ("BOUGHT", "BOT", "BTO")):
+                    action = "BUY"
+                elif any(token in desc_upper for token in ("SOLD", "SLD", "STC")):
+                    action = "SELL"
+
+            if not symbol or not action:
+                continue
+
+            qty_val = _parse_float(
+                data.get("qty")
+                or data.get("quantity")
+                or data.get("shares")
+                or data.get("trade_quantity")
+            )
+            if qty_val is None or abs(qty_val) < 1e-9:
+                continue
+            qty_val = abs(qty_val)
+
+            price_val = _parse_float(
+                data.get("price")
+                or data.get("trade_price")
+                or data.get("execution_price")
+                or data.get("avg_price")
+                or data.get("average_price")
+            )
+            if price_val is None:
+                price_val = _parse_float(data.get("net_price"))
+            if price_val is None:
+                amount_guess = _parse_float(
+                    data.get("amount")
+                    or data.get("net_amount")
+                    or data.get("trade_amount")
+                    or data.get("trade_value")
+                    or data.get("value")
+                    or data.get("gross_amount")
+                    or data.get("proceeds")
+                )
+                if amount_guess is not None and abs(qty_val) > 1e-9:
+                    price_val = abs(amount_guess) / qty_val
+            if price_val is None:
+                continue
+
+            exec_time = (
+                data.get("time")
+                or data.get("exec_time")
+                or data.get("trade_time")
+                or data.get("transaction_time")
+                or data.get("execution_time")
+                or data.get("order_time")
+            )
+            trade_date_text = data.get("trade_date") or data.get("date")
+            dt_exec = _parse_datetime_guess(exec_time)
+            if dt_exec is None:
+                dt_exec = _parse_datetime_guess(trade_date_text)
+            if dt_exec is None:
+                continue
+
+            day = dt_exec.strftime("%Y-%m-%d")
+
+            amount_val = _parse_float(
                 data.get("amount")
                 or data.get("net_amount")
                 or data.get("trade_amount")
@@ -482,39 +529,8 @@ def _read_statement_rows(content: bytes) -> List[Dict[str, Any]]:
                 or data.get("gross_amount")
                 or data.get("proceeds")
             )
-            if amount_guess is not None and abs(qty_val) > 1e-9:
-                price_val = abs(amount_guess) / qty_val
-        if price_val is None:
-            continue
-
-        exec_time = (
-            data.get("time")
-            or data.get("exec_time")
-            or data.get("trade_time")
-            or data.get("transaction_time")
-            or data.get("execution_time")
-            or data.get("order_time")
-        )
-        trade_date_text = data.get("trade_date") or data.get("date")
-        dt_exec = _parse_datetime_guess(exec_time)
-        if dt_exec is None:
-            dt_exec = _parse_datetime_guess(trade_date_text)
-        if dt_exec is None:
-            continue
-
-            day = dt_exec.strftime("%Y-%m-%d")
-
-        amount_val = _parse_float(
-            data.get("amount")
-            or data.get("net_amount")
-            or data.get("trade_amount")
-            or data.get("trade_value")
-            or data.get("value")
-            or data.get("gross_amount")
-            or data.get("proceeds")
-        )
-        gross = abs(amount_val) if amount_val is not None else qty_val * price_val
-        amount = gross if action == "SELL" else -gross
+            gross = abs(amount_val) if amount_val is not None else qty_val * price_val
+            amount = gross if action == "SELL" else -gross
 
             trade = {
                 "date": day,
