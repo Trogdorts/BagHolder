@@ -2,7 +2,29 @@
 {% block content %}
 {% set ui_cfg = cfg.get('ui', {}) %}
 {% set show_unrealized_default = ui_cfg.get('show_unrealized', True) %}
-<div x-data="{ showUnrealized: {{ 'true' if show_unrealized_default else 'false' }}, exportOpen: false }" class="space-y-4">
+<div x-data="{
+        showUnrealized: {{ 'true' if show_unrealized_default else 'false' }},
+        exportOpen: false,
+        init() {
+          try {
+            const storage = window.localStorage;
+            if (!storage) {
+              return;
+            }
+
+            const stored = storage.getItem('bagholder:showUnrealized');
+            if (stored !== null) {
+              this.showUnrealized = stored === 'true';
+            }
+
+            this.$watch('showUnrealized', (value) => {
+              storage.setItem('bagholder:showUnrealized', value ? 'true' : 'false');
+            });
+          } catch (error) {
+            console.warn('Unable to persist showUnrealized preference', error);
+          }
+        }
+      }" class="space-y-4">
 <div class="flex items-center justify-between">
   <div class="text-lg font-semibold">{{ year }}-{{ "%02d"|format(month) }}</div>
   <div class="flex items-center gap-2 flex-wrap justify-end" @keydown.escape.window="exportOpen = false">
