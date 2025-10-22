@@ -2,7 +2,7 @@ import csv
 import io
 from bisect import bisect_right
 from datetime import date, datetime, timedelta
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Request, Form, Depends, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
@@ -11,8 +11,48 @@ import calendar
 from app.core.database import get_session
 from app.core.models import DailySummary, Meta, NoteDaily, Trade
 from app.core.utils import month_bounds
+from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter()
+
+
+class TradeUpdate(BaseModel):
+    id: Optional[int] = None
+    symbol: str
+    action: str
+    qty: float
+    price: float
+
+    @field_validator("symbol")
+    @classmethod
+    def normalize_symbol(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if not normalized:
+            raise ValueError("Symbol is required")
+        return normalized
+
+    @field_validator("action")
+    @classmethod
+    def validate_action(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if normalized not in {"BUY", "SELL"}:
+            raise ValueError("Action must be BUY or SELL")
+        return normalized
+
+    @field_validator("qty", "price", mode="before")
+    @classmethod
+    def validate_positive(cls, value: float) -> float:
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:  # pragma: no cover - validation guard
+            raise ValueError("Must be a number") from exc
+        if number <= 0:
+            raise ValueError("Must be greater than zero")
+        return number
+
+
+class TradeUpdatePayload(BaseModel):
+    trades: List[TradeUpdate] = Field(default_factory=list)
 
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_session)):
@@ -118,6 +158,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     for tr in trade_rows:
         trades_by_day.setdefault(tr.date, []).append(
             {
+                "id": tr.id,
                 "symbol": tr.symbol,
                 "action": tr.action,
                 "qty": float(tr.qty),
@@ -216,6 +257,84 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "current_month": today.month,
     }
     return request.app.state.templates.TemplateResponse("calendar.html", ctx)
+
+
+@router.get("/api/trades/{date_str}")
+def get_trades_for_day(date_str: str, db: Session = Depends(get_session)):
+    trades = (
+        db.query(Trade)
+        .filter(Trade.date == date_str)
+        .order_by(Trade.id.asc())
+        .all()
+    )
+    return {
+        "trades": [
+            {
+                "id": trade.id,
+                "symbol": trade.symbol,
+                "action": trade.action,
+                "qty": float(trade.qty),
+                "price": float(trade.price),
+            }
+            for trade in trades
+        ]
+    }
+
+
+@router.post("/api/trades/{date_str}")
+def save_trades_for_day(
+    date_str: str,
+    payload: TradeUpdatePayload,
+    db: Session = Depends(get_session),
+):
+    existing = (
+        db.query(Trade)
+        .filter(Trade.date == date_str)
+        .order_by(Trade.id.asc())
+        .all()
+    )
+    existing_map = {trade.id: trade for trade in existing}
+    seen_ids = set()
+
+    for trade_update in payload.trades:
+        trade = None
+        if trade_update.id is not None:
+            trade = existing_map.get(trade_update.id)
+            if trade is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Trade {trade_update.id} was not found for {date_str}.",
+                )
+            seen_ids.add(trade_update.id)
+
+        amount = trade_update.qty * trade_update.price
+        signed_amount = amount if trade_update.action == "SELL" else -amount
+
+        if trade is not None:
+            trade.symbol = trade_update.symbol
+            trade.action = trade_update.action
+            trade.qty = trade_update.qty
+            trade.price = trade_update.price
+            trade.amount = signed_amount
+        else:
+            db.add(
+                Trade(
+                    date=date_str,
+                    symbol=trade_update.symbol,
+                    action=trade_update.action,
+                    qty=trade_update.qty,
+                    price=trade_update.price,
+                    amount=signed_amount,
+                )
+            )
+
+    for trade in existing:
+        if trade.id not in seen_ids:
+            db.delete(trade)
+
+    db.commit()
+    return {"ok": True}
+
 
 @router.post("/api/daily/{date_str}")
 def overwrite_daily(date_str: str, realized: float = Form(...), unrealized: float = Form(...), db: Session = Depends(get_session)):
