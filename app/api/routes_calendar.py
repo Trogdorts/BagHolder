@@ -38,6 +38,16 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     q = db.query(DailySummary).filter(DailySummary.date >= start, DailySummary.date <= end).all()
     by_day = {r.date: r for r in q}
 
+    # Determine the unrealized value to carry forward for days without trades.
+    prev_summary = (
+        db.query(DailySummary)
+        .filter(DailySummary.date < start)
+        .order_by(DailySummary.date.desc())
+        .first()
+    )
+    running_unrealized = float(prev_summary.unrealized) if prev_summary else 0.0
+    has_running_unrealized = prev_summary is not None
+
     note_rows = (
         db.query(NoteDaily)
         .filter(NoteDaily.date >= start, NoteDaily.date <= end)
@@ -75,11 +85,19 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             ds = by_day.get(day_key)
             note_text = notes_by_day.get(day_key, "")
             is_weekend = d.weekday() >= 5
+            if ds:
+                running_unrealized = float(ds.unrealized)
+                has_running_unrealized = True
+                day_unrealized = running_unrealized
+            elif d.month == month and has_running_unrealized:
+                day_unrealized = running_unrealized
+            else:
+                day_unrealized = 0.0
             wk.append({
                 "date": d,
                 "in_month": (d.month == month),
                 "realized": float(ds.realized) if ds else 0.0,
-                "unrealized": float(ds.unrealized) if ds else 0.0,
+                "unrealized": day_unrealized,
                 "note": note_text,
                 "has_note": bool(note_text.strip()),
                 "is_weekend": is_weekend,
@@ -88,7 +106,11 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             })
             if d.month == month and ds:
                 week_total_realized += float(ds.realized)
-                last_unrealized_value = float(ds.unrealized)
+            if d.month == month:
+                if ds:
+                    last_unrealized_value = float(ds.unrealized)
+                elif has_running_unrealized:
+                    last_unrealized_value = day_unrealized
         weeks.append({
             "days": wk,
             "week_realized": week_total_realized,
