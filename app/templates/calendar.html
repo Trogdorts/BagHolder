@@ -11,6 +11,7 @@
     {% set next_year = (month == 12) and year+1 or year %}
     {% set next_month = (month == 12) and 1 or month+1 %}
     <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Prev</a>
+    <a href="/calendar/{{ current_year }}/{{ current_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Home</a>
     <a href="/calendar/{{ next_year }}/{{ next_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Next</a>
     <div class="relative">
       <button type="button"
