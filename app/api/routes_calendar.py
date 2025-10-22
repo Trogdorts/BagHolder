@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 import calendar
 from app.core.database import get_session
-from app.core.models import DailySummary, Meta, NoteDaily, Trade
+from app.core.models import DailySummary, Meta, NoteDaily, NoteWeekly, Trade
 from app.core.utils import month_bounds
 from pydantic import BaseModel, Field, field_validator
 
@@ -227,6 +227,17 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             "week_unrealized": last_unrealized_value if last_unrealized_value is not None else 0.0,
             "week_index": len(weeks) + 1,
         })
+
+    weekly_note_rows = (
+        db.query(NoteWeekly)
+        .filter(NoteWeekly.year == year)
+        .all()
+    )
+    weekly_notes = {row.week: row.note for row in weekly_note_rows}
+    for week_entry in weeks:
+        note_text = weekly_notes.get(week_entry["week_index"], "")
+        week_entry["note"] = note_text
+        week_entry["has_note"] = bool(note_text.strip())
 
     # Monthly totals
     month_realized = sum(float(r.realized) for r in q)
