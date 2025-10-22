@@ -103,60 +103,19 @@
         <div class="flex items-center gap-1 text-xs text-neutral-400">
           <span>{{ d.date.day }}</span>
           {% if d.has_trades %}
-          <div x-data="{
-                 open: false,
-                 closeTimer: null,
-                 openPanel() {
-                   this.open = true;
-                   this.cancelClose();
-                 },
-                 scheduleClose() {
-                   this.cancelClose();
-                   this.closeTimer = setTimeout(() => {
-                     this.open = false;
-                     this.closeTimer = null;
-                   }, 120);
-                 },
-                 cancelClose() {
-                   if (this.closeTimer) {
-                     clearTimeout(this.closeTimer);
-                     this.closeTimer = null;
-                   }
-                 },
-                 togglePanel() {
-                   if (this.open) {
-                     this.open = false;
-                     this.cancelClose();
-                   } else {
-                     this.openPanel();
-                   }
-                 }
-               }"
-               class="relative cursor-pointer"
-               role="button"
-               tabindex="0"
-               @mouseenter="openPanel()"
-               @mouseleave="scheduleClose()"
-               @click="togglePanel()"
-               @click.outside="open = false; cancelClose()"
-               @focus="openPanel()"
-               @blur="scheduleClose()"
-               @keydown.enter.prevent="togglePanel()"
-               @keydown.space.prevent="togglePanel()">
-            <svg class="h-4 w-4 text-sky-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M7 6h11l-1.5-1.5L18 3l4 4-4 4-1.5-1.5L18 8H7a2 2 0 0 0-2 2v2H3V10a4 4 0 0 1 4-4zm10 12H6l1.5 1.5L6 21l-4-4 4-4 1.5 1.5L6 15h11a2 2 0 0 0 2-2v-2h2v2a4 4 0 0 1-4 4z" />
+          <button type="button"
+                  class="relative inline-flex items-center justify-center rounded-full bg-emerald-900/20 p-1 text-emerald-400 hover:bg-emerald-800/30 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  onclick="openTrades('{{ d.date.strftime('%Y-%m-%d') }}'); return false;"
+                  aria-label="View trades">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4c1.933 0 3.5.895 3.5 2s-1.567 2-3.5 2H9.5m2.5-4V2m0 6v4m0 0c-1.933 0-3.5.895-3.5 2s1.567 2 3.5 2h2.5m-2.5-4v4m0 4v-2m0 0c1.933 0 3.5-.895 3.5-2s-1.567-2-3.5-2H9.5" />
             </svg>
-            <span class="sr-only">Trades recorded</span>
-            <div class="absolute left-0 top-5 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit"
-                 x-show="open" x-cloak @mouseenter="cancelClose()" @mouseleave="scheduleClose()">
-              <div class="mb-1 font-semibold text-neutral-200">Trades</div>
-              <ul class="space-y-1">
-                {% for trade in d.trades %}
-                <li>{{ trade.action }} {{ '%.2f'|format(trade.qty) }} {{ trade.symbol }} @ {{ trade.price|money }}</li>
-                {% endfor %}
-              </ul>
-            </div>
-          </div>
+            <span class="sr-only">View trades</span>
+            {% set trade_count = d.trades|length %}
+            {% if trade_count %}
+            <span class="absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-emerald-400 text-neutral-900 text-[10px] font-semibold px-1 text-center">{{ trade_count }}</span>
+            {% endif %}
+          </button>
           {% endif %}
         </div>
 
@@ -252,7 +211,7 @@
 
 <!-- Modals -->
 <div id="modal" x-data="{open:false, title:'', body:'', save: null}" x-init="window.modalController = $data" x-show="open" x-cloak class="fixed inset-0 bg-black/60 flex items-center justify-center">
-  <div class="bg-neutral-950 border border-neutral-800 rounded p-4 w-full max-w-lg">
+  <div class="bg-neutral-950 border border-neutral-800 rounded p-4 w-full max-w-3xl">
     <h3 class="font-semibold mb-2" x-text="title"></h3>
     <div x-html="body"></div>
     <div class="mt-4 flex justify-end gap-2">
@@ -263,6 +222,257 @@
 </div>
 
 <script>
+function openTrades(dateStr) {
+  fetch('/api/trades/' + dateStr)
+    .then(response => {
+      if (!response.ok) {
+        return response.json().catch(() => ({})).then(data => {
+          const message = data && data.detail ? data.detail : 'Failed to load trades.';
+          throw new Error(message);
+        });
+      }
+      return response.json();
+    })
+    .then(js => {
+      const modal = getModalController();
+      if (!modal) return;
+      modal.title = 'Trades ' + dateStr;
+      modal.body = createTradeEditorHTML();
+      modal.save = () => saveTrades(dateStr);
+      modal.open = true;
+      setTimeout(() => setupTradeEditor(js.trades || []), 0);
+    })
+    .catch(err => {
+      const modal = getModalController();
+      if (!modal) return;
+      modal.title = 'Trades ' + dateStr;
+      modal.body = `<p class="text-sm text-red-400">${err.message || 'Failed to load trades.'}</p>`;
+      modal.save = null;
+      modal.open = true;
+    });
+}
+
+function createTradeEditorHTML() {
+  return `
+    <div id="trade-editor" class="space-y-3">
+      <p id="trade-error" class="text-sm text-red-400 hidden"></p>
+      <div id="trade-empty-message" class="text-sm text-neutral-400 hidden">No trades recorded for this date.</div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm text-left text-neutral-200 border border-neutral-800">
+          <thead class="bg-neutral-900 text-neutral-400">
+            <tr>
+              <th class="px-2 py-1 border border-neutral-800">Action</th>
+              <th class="px-2 py-1 border border-neutral-800">Symbol</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right">Quantity</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right">Price</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="trade-table-body"></tbody>
+        </table>
+      </div>
+      <div class="flex items-center justify-between">
+        <button type="button" id="add-trade-row" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-sm">Add trade</button>
+        <span class="text-xs text-neutral-500">Remove a row to delete a trade. Amounts are calculated on save.</span>
+      </div>
+    </div>`;
+}
+
+function setupTradeEditor(trades) {
+  clearTradeEditorError();
+  const tbody = document.getElementById('trade-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+  (trades || []).forEach(trade => {
+    tbody.appendChild(createTradeRow(trade));
+  });
+
+  const addButton = document.getElementById('add-trade-row');
+  if (addButton) {
+    addButton.onclick = () => {
+      tbody.appendChild(createTradeRow({ action: 'BUY', symbol: '', qty: '', price: '' }));
+      updateTradeEmptyState();
+    };
+  }
+
+  updateTradeEmptyState();
+}
+
+function createTradeRow(trade) {
+  const row = document.createElement('tr');
+  row.className = 'border-b border-neutral-800';
+  if (trade && trade.id !== undefined && trade.id !== null) {
+    row.dataset.tradeId = String(trade.id);
+  }
+
+  const actionCell = document.createElement('td');
+  actionCell.className = 'px-2 py-1 border border-neutral-800';
+  const actionSelect = document.createElement('select');
+  actionSelect.className = 'trade-action bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100';
+  ['BUY', 'SELL'].forEach(optionValue => {
+    const option = document.createElement('option');
+    option.value = optionValue;
+    option.textContent = optionValue;
+    actionSelect.appendChild(option);
+  });
+  const actionValue = trade && trade.action ? String(trade.action).toUpperCase() : 'BUY';
+  actionSelect.value = actionValue;
+  actionCell.appendChild(actionSelect);
+  row.appendChild(actionCell);
+
+  const symbolCell = document.createElement('td');
+  symbolCell.className = 'px-2 py-1 border border-neutral-800';
+  const symbolInput = document.createElement('input');
+  symbolInput.type = 'text';
+  symbolInput.className = 'trade-symbol w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 uppercase';
+  symbolInput.value = trade && trade.symbol ? trade.symbol : '';
+  symbolInput.autocomplete = 'off';
+  symbolInput.spellcheck = false;
+  symbolCell.appendChild(symbolInput);
+  row.appendChild(symbolCell);
+
+  const qtyCell = document.createElement('td');
+  qtyCell.className = 'px-2 py-1 border border-neutral-800 text-right';
+  const qtyInput = document.createElement('input');
+  qtyInput.type = 'number';
+  qtyInput.step = '0.0001';
+  qtyInput.min = '0';
+  qtyInput.inputMode = 'decimal';
+  qtyInput.className = 'trade-qty w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  qtyInput.value = trade && trade.qty !== undefined && trade.qty !== null ? trade.qty : '';
+  qtyCell.appendChild(qtyInput);
+  row.appendChild(qtyCell);
+
+  const priceCell = document.createElement('td');
+  priceCell.className = 'px-2 py-1 border border-neutral-800 text-right';
+  const priceInput = document.createElement('input');
+  priceInput.type = 'number';
+  priceInput.step = '0.0001';
+  priceInput.min = '0';
+  priceInput.inputMode = 'decimal';
+  priceInput.className = 'trade-price w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  priceInput.value = trade && trade.price !== undefined && trade.price !== null ? trade.price : '';
+  priceCell.appendChild(priceInput);
+  row.appendChild(priceCell);
+
+  const actionsCell = document.createElement('td');
+  actionsCell.className = 'px-2 py-1 border border-neutral-800 text-right';
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.className = 'remove-trade-row px-2 py-1 rounded border border-red-700 text-red-300 hover:bg-red-900/40 text-xs';
+  removeButton.textContent = 'Remove';
+  removeButton.addEventListener('click', () => {
+    row.remove();
+    updateTradeEmptyState();
+  });
+  actionsCell.appendChild(removeButton);
+  row.appendChild(actionsCell);
+
+  return row;
+}
+
+function updateTradeEmptyState() {
+  const tbody = document.getElementById('trade-table-body');
+  const message = document.getElementById('trade-empty-message');
+  if (!tbody || !message) return;
+  if (tbody.children.length === 0) {
+    message.classList.remove('hidden');
+  } else {
+    message.classList.add('hidden');
+  }
+}
+
+function clearTradeEditorError() {
+  const errorEl = document.getElementById('trade-error');
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+}
+
+function showTradeEditorError(message) {
+  const errorEl = document.getElementById('trade-error');
+  if (errorEl) {
+    errorEl.textContent = message;
+    errorEl.classList.remove('hidden');
+  }
+}
+
+function saveTrades(dateStr) {
+  const modal = getModalController();
+  if (!modal) return;
+  const tbody = document.getElementById('trade-table-body');
+  if (!tbody) return;
+
+  clearTradeEditorError();
+
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const trades = [];
+  let hasError = false;
+
+  rows.forEach(row => {
+    const actionSelect = row.querySelector('.trade-action');
+    const symbolInput = row.querySelector('.trade-symbol');
+    const qtyInput = row.querySelector('.trade-qty');
+    const priceInput = row.querySelector('.trade-price');
+
+    const symbol = symbolInput ? symbolInput.value.trim() : '';
+    const qtyRaw = qtyInput ? qtyInput.value.trim() : '';
+    const priceRaw = priceInput ? priceInput.value.trim() : '';
+    const isEmpty = !symbol && !qtyRaw && !priceRaw;
+
+    if (isEmpty) {
+      row.classList.remove('bg-red-900/40');
+      return;
+    }
+
+    const qty = parseFloat(qtyRaw);
+    const price = parseFloat(priceRaw);
+    if (!symbol || Number.isNaN(qty) || Number.isNaN(price) || qty <= 0 || price <= 0) {
+      row.classList.add('bg-red-900/40');
+      hasError = true;
+      return;
+    }
+
+    row.classList.remove('bg-red-900/40');
+    trades.push({
+      id: row.dataset.tradeId ? Number(row.dataset.tradeId) : null,
+      symbol: symbol.toUpperCase(),
+      action: actionSelect ? actionSelect.value : 'BUY',
+      qty: Math.abs(qty),
+      price: Math.abs(price),
+    });
+  });
+
+  if (hasError) {
+    showTradeEditorError('Please complete all fields for each trade or remove unused rows.');
+    return;
+  }
+
+  fetch('/api/trades/' + dateStr, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trades }),
+  })
+    .then(response => {
+      if (!response.ok) {
+        return response.json().catch(() => ({})).then(data => {
+          const message = data && data.detail ? data.detail : 'Failed to save trades.';
+          throw new Error(message);
+        });
+      }
+      return response.json();
+    })
+    .then(() => {
+      modal.open = false;
+      location.reload();
+    })
+    .catch(err => {
+      showTradeEditorError(err.message || 'Failed to save trades.');
+    });
+}
+
 function openManual(dateStr, realized, unrealized) {
   const modal = getModalController();
   if (!modal) return;
