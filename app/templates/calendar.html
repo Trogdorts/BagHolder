@@ -42,7 +42,7 @@
   {% for d in week.days %}
     {% if show_weekends or not d.is_weekend %}
       {% set cls = (d.realized > 0) and 'cell-bg-pos' or (d.realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
-      <div class="relative h-28 rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }}">
+      <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }} flex flex-col gap-2">
         <div class="flex items-center gap-1 text-xs text-neutral-400">
           <span>{{ d.date.day }}</span>
           {% if d.has_trades %}
@@ -65,7 +65,7 @@
         </div>
 
         {% if cfg.ui.show_text %}
-        <div class="mt-2 text-sm">
+        <div class="text-sm space-y-1">
           <div class="{{ 'text-green-400' if d.realized > 0 else ('text-red-400' if d.realized < 0 else 'text-neutral-200') }}">Realized: {{ d.realized|money }}</div>
           <div class="{{ 'text-green-400' if d.unrealized > 0 else ('text-red-400' if d.unrealized < 0 else 'text-neutral-200') }}"
                x-show="showUnrealized" x-cloak>
@@ -75,7 +75,7 @@
         {% endif %}
 
         <!-- Gear icon for manual entry -->
-        <a class="absolute top-1 right-1 icon-translucent" href="#"
+        <a class="absolute top-1 right-1 icon-translucent z-10" href="#"
            aria-label="Edit daily values"
            onclick="openManual('{{ d.date.strftime('%Y-%m-%d') }}', {{ d.realized }}, {{ d.unrealized }}); return false;">
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -83,7 +83,7 @@
           </svg>
         </a>
         {% if d.has_note %}
-        <div x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" class="absolute bottom-1 left-1 cursor-default">
+        <div x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" class="absolute bottom-1 left-1 cursor-default z-10">
           <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
           </svg>
@@ -95,7 +95,7 @@
         </div>
         {% endif %}
         <!-- Note icon -->
-        <a class="absolute bottom-1 right-1 icon-translucent" href="#" aria-label="Add daily note"
+        <a class="absolute bottom-1 right-1 icon-translucent z-10" href="#" aria-label="Add daily note"
            onclick="openDailyNote('{{ d.date.strftime('%Y-%m-%d') }}'); return false;">
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
@@ -105,7 +105,7 @@
     {% endif %}
   {% endfor %}
   {% set week_cls = (week.week_realized > 0) and 'cell-bg-pos' or (week.week_realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
-  <div class="relative h-28 rounded border border-neutral-800 p-2 flex flex-col justify-between {{ week_cls }}">
+  <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 flex flex-col justify-between {{ week_cls }}">
     <div>
       <div class="text-xs text-neutral-400">Week {{ week.week_index }}</div>
       <div class="mt-2 text-sm space-y-1 text-right">
@@ -117,7 +117,7 @@
       </div>
     </div>
     <div class="flex justify-end">
-      <a class="icon-translucent" href="#" aria-label="Add weekly note"
+      <a class="icon-translucent z-10" href="#" aria-label="Add weekly note"
          onclick="openWeeklyNote({{ year }}, {{ week.week_index }}); return false;">
         <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
@@ -135,7 +135,7 @@
     <div x-show="showUnrealized" x-cloak>
       Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized > 0 else ('text-red-400' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
     </div>
-    <a class="absolute top-1 right-1 icon-translucent" href="#" aria-label="Add monthly note"
+    <a class="absolute top-1 right-1 icon-translucent z-10" href="#" aria-label="Add monthly note"
        onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
       <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
