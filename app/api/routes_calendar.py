@@ -40,6 +40,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
 
     cfg = request.app.state.config.raw
     fill_strategy = cfg.get("ui", {}).get("unrealized_fill_strategy", "carry_forward")
+    today = date.today()
 
     start, end, days = month_bounds(year, month)
     # Pull daily summaries for month
@@ -137,12 +138,15 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             ds = by_day.get(day_key)
             note_text = notes_by_day.get(day_key, "")
             is_weekend = d.weekday() >= 5
+            is_future_day = d > today
             if ds:
                 running_unrealized = float(ds.unrealized)
                 has_running_unrealized = True
                 day_unrealized = running_unrealized
             elif d.month == month:
-                if fill_strategy == "average_neighbors":
+                if is_future_day:
+                    day_unrealized = 0.0
+                elif fill_strategy == "average_neighbors":
                     prev_val = get_prev_value(d)
                     next_val = get_next_value(d)
                     if prev_val is not None and next_val is not None:
@@ -196,8 +200,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     )
     year_realized = sum(float(r.realized) for r in year_rows)
     year_unrealized = sum(float(r.unrealized) for r in year_rows)
-
-    today = date.today()
 
     ctx = {
         "request": request,

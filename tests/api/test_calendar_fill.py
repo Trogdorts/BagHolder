@@ -127,3 +127,39 @@ def test_average_fill_uses_next_month_value(tmp_path, monkeypatch):
         assert day["unrealized"] == pytest.approx(60.0)
 
     db.dispose_engine()
+
+
+def test_unrealized_not_extended_past_today(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    with db.SessionLocal() as session:
+        session.add(
+            DailySummary(
+                date="2024-01-01",
+                realized=0.0,
+                unrealized=100.0,
+                total_invested=100.0,
+                updated_at="now",
+            )
+        )
+        session.commit()
+
+    class FrozenDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2024, 1, 3)
+
+    monkeypatch.setattr("app.api.routes_calendar.date", FrozenDate)
+
+    with db.SessionLocal() as session:
+        request = _build_request(app)
+        response = calendar_view(2024, 1, request, db=session)
+        weeks = response.context["weeks"]
+        jan_second = _get_day(weeks, date(2024, 1, 2))
+        assert jan_second["unrealized"] == pytest.approx(100.0)
+        jan_fourth = _get_day(weeks, date(2024, 1, 4))
+        assert jan_fourth["unrealized"] == 0.0
+
+    db.dispose_engine()
