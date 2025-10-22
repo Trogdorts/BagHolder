@@ -37,6 +37,9 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         db.add(Meta(key="last_viewed_month", value=f"{year}-{month}"))
     db.commit()
 
+    cfg = request.app.state.config.raw
+    fill_strategy = cfg.get("ui", {}).get("unrealized_fill_strategy", "carry_forward")
+
     start, end, days = month_bounds(year, month)
     # Pull daily summaries for month
     q = db.query(DailySummary).filter(DailySummary.date >= start, DailySummary.date <= end).all()
@@ -51,6 +54,50 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     )
     running_unrealized = float(prev_summary.unrealized) if prev_summary else 0.0
     has_running_unrealized = prev_summary is not None
+
+    actual_unrealized_map = {}
+    actual_unrealized_dates = []
+    next_summary = None
+    if fill_strategy == "average_neighbors":
+        for row in q:
+            actual_unrealized_map[date.fromisoformat(row.date)] = float(row.unrealized)
+        if prev_summary:
+            actual_unrealized_map[date.fromisoformat(prev_summary.date)] = float(prev_summary.unrealized)
+        next_summary = (
+            db.query(DailySummary)
+            .filter(DailySummary.date > end)
+            .order_by(DailySummary.date.asc())
+            .first()
+        )
+        if next_summary:
+            actual_unrealized_map[date.fromisoformat(next_summary.date)] = float(next_summary.unrealized)
+        actual_unrealized_dates = sorted(actual_unrealized_map.keys())
+
+        def get_prev_value(day: date):
+            if not actual_unrealized_dates:
+                return None
+            idx = bisect_right(actual_unrealized_dates, day) - 1
+            if idx >= 0:
+                prev_day = actual_unrealized_dates[idx]
+                if prev_day <= day:
+                    return actual_unrealized_map[prev_day]
+            return None
+
+        def get_next_value(day: date):
+            if not actual_unrealized_dates:
+                return None
+            idx = bisect_right(actual_unrealized_dates, day)
+            if idx < len(actual_unrealized_dates):
+                next_day = actual_unrealized_dates[idx]
+                if next_day >= day:
+                    return actual_unrealized_map[next_day]
+            return None
+    else:
+        def get_prev_value(day: date):
+            return None
+
+        def get_next_value(day: date):
+            return None
 
     note_rows = (
         db.query(NoteDaily)
@@ -93,8 +140,20 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 running_unrealized = float(ds.unrealized)
                 has_running_unrealized = True
                 day_unrealized = running_unrealized
-            elif d.month == month and has_running_unrealized:
-                day_unrealized = running_unrealized
+            elif d.month == month:
+                if fill_strategy == "average_neighbors":
+                    prev_val = get_prev_value(d)
+                    next_val = get_next_value(d)
+                    if prev_val is not None and next_val is not None:
+                        day_unrealized = (prev_val + next_val) / 2.0
+                    elif has_running_unrealized:
+                        day_unrealized = running_unrealized
+                    else:
+                        day_unrealized = 0.0
+                elif has_running_unrealized:
+                    day_unrealized = running_unrealized
+                else:
+                    day_unrealized = 0.0
             else:
                 day_unrealized = 0.0
             wk.append({

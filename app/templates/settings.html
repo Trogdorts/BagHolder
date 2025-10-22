@@ -7,6 +7,7 @@
   </div>
 {% endif %}
 {% set show_unrealized = cfg.ui.get('show_unrealized', True) %}
+{% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 <form method="post" action="/settings" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800"
       x-data="{ showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }} }">
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -42,6 +43,16 @@
         Unrealized gains and losses will be hidden unless toggled on the calendar view.
       </p>
     </div>
+    <label class="block">
+      <span class="block text-sm text-neutral-400">Missing unrealized fill</span>
+      <select name="unrealized_fill_strategy" class="bg-neutral-800 rounded px-2 py-1 w-full">
+        <option value="carry_forward" {% if unrealized_fill == 'carry_forward' %}selected{% endif %}>Carry forward</option>
+        <option value="average_neighbors" {% if unrealized_fill == 'average_neighbors' %}selected{% endif %}>Average nearest values</option>
+      </select>
+      <p class="mt-1 text-xs text-neutral-500">
+        Choose how to populate days without an imported unrealized value on the calendar view.
+      </p>
+    </label>
     <label class="block">
       <span class="block text-sm text-neutral-400">Display weekends</span>
       <select name="show_weekends" class="bg-neutral-800 rounded px-2 py-1 w-full">

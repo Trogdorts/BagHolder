@@ -20,6 +20,7 @@ DEFAULT_CONFIG = {
         "opacity_loss": 0.7,
         "grid_transparency": 0.8,
         "icon_color": "#6b7280",
+        "unrealized_fill_strategy": "carry_forward",
     },
     "notes": {
         "enabled": True,
