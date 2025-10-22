@@ -1,6 +1,9 @@
 <!doctype html>
 {% set theme = (cfg.get('ui', {}) if cfg is defined else {}).get('theme', 'dark') %}
 {% set icon_color = (cfg.get('ui', {}) if cfg is defined else {}).get('icon_color', '#6b7280') %}
+{% set notes_cfg = (cfg.get('notes', {}) if cfg is defined else {}) %}
+{% set note_icon_active_color = notes_cfg.get('icon_has_note_color', '#80CBC4') %}
+{% set note_icon_active_opacity = notes_cfg.get('icon_hover_opacity', 0.9) %}
 <html lang="en" data-theme="{{ theme }}">
 <head>
   <meta charset="utf-8">
@@ -12,6 +15,7 @@
   <style>
     :root {
       --action-icon-color: {{ icon_color }};
+      --note-icon-active-color: {{ note_icon_active_color }};
     }
 
     .cell-bg-pos { background-color: rgba(0, 200, 83, 0.20); }
@@ -22,6 +26,25 @@
     .action-icon {
       color: var(--action-icon-color);
       fill: currentColor;
+    }
+
+    .note-trigger.has-note {
+      opacity: {{ note_icon_active_opacity }};
+    }
+
+    .note-trigger.has-note .action-icon {
+      color: var(--note-icon-active-color);
+    }
+
+    .note-trigger .note-tooltip {
+      display: none;
+      pointer-events: none;
+    }
+
+    .note-trigger.has-note:hover .note-tooltip,
+    .note-trigger.has-note:focus .note-tooltip,
+    .note-trigger.has-note:focus-visible .note-tooltip {
+      display: block;
     }
 
     [x-cloak] {
