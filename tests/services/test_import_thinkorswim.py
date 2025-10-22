@@ -184,3 +184,110 @@ def test_parse_deduplicates_identical_rows():
             "amount": 1600.0,
         },
     ]
+
+
+def test_compute_daily_pnl_records_basic_long_flow():
+    records = [
+        {
+            "date": "2024-02-05",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "quantity": 10,
+            "price": 150,
+        },
+        {
+            "date": "2024-02-05",
+            "symbol": "AAPL",
+            "side": "SELL",
+            "quantity": 5,
+            "price": 155,
+        },
+    ]
+
+    daily = compute_daily_pnl_records(records)
+
+    assert daily.to_dict("records") == [
+        {
+            "date": date(2024, 2, 5),
+            "realized_pl": 25.0,
+            "unrealized_pl": 25.0,
+            "total_pl": 50.0,
+            "cumulative_pl": 50.0,
+        }
+    ]
+
+
+def test_compute_daily_pnl_records_handles_full_close():
+    records = [
+        {
+            "date": "2024-02-05",
+            "symbol": "AAPL",
+            "side": "BUY",
+            "quantity": 10,
+            "price": 100,
+        },
+        {
+            "date": "2024-02-06",
+            "symbol": "AAPL",
+            "side": "SELL",
+            "quantity": 10,
+            "price": 110,
+        },
+    ]
+
+    daily = compute_daily_pnl_records(records)
+
+    assert daily.to_dict("records") == [
+        {
+            "date": date(2024, 2, 5),
+            "realized_pl": 0.0,
+            "unrealized_pl": 0.0,
+            "total_pl": 0.0,
+            "cumulative_pl": 0.0,
+        },
+        {
+            "date": date(2024, 2, 6),
+            "realized_pl": 100.0,
+            "unrealized_pl": 0.0,
+            "total_pl": 100.0,
+            "cumulative_pl": 100.0,
+        },
+    ]
+
+
+def test_compute_daily_pnl_records_supports_short_positions():
+    records = [
+        {
+            "date": "2024-02-05",
+            "symbol": "TSLA",
+            "side": "SELL",
+            "quantity": 10,
+            "price": 200,
+        },
+        {
+            "date": "2024-02-06",
+            "symbol": "TSLA",
+            "side": "BUY",
+            "quantity": 4,
+            "price": 180,
+        },
+    ]
+
+    daily = compute_daily_pnl_records(records)
+
+    assert daily.to_dict("records") == [
+        {
+            "date": date(2024, 2, 5),
+            "realized_pl": 0.0,
+            "unrealized_pl": 0.0,
+            "total_pl": 0.0,
+            "cumulative_pl": 0.0,
+        },
+        {
+            "date": date(2024, 2, 6),
+            "realized_pl": 80.0,
+            "unrealized_pl": 120.0,
+            "total_pl": 200.0,
+            "cumulative_pl": 200.0,
+        },
+    ]
