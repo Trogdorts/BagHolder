@@ -288,10 +288,12 @@ function openDailyNote(dateStr) {
   fetch('/api/notes/daily/' + dateStr).then(r => r.json()).then(js => {
     const modal = getModalController();
     if (!modal) return;
+    const noteText = (js && typeof js.note === 'string') ? js.note : '';
     modal.title = "Daily note " + dateStr;
-    modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.body = '<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2"></textarea>';
     modal.save = () => {
-      const noteValue = document.getElementById('note-field').value;
+      const noteField = document.getElementById('note-field');
+      const noteValue = noteField ? noteField.value : '';
       const fd = new FormData();
       fd.append('note', noteValue);
       fetch('/api/notes/daily/' + dateStr, {method:'POST', body:fd})
@@ -310,6 +312,12 @@ function openDailyNote(dateStr) {
         });
     };
     modal.open = true;
+    setTimeout(() => {
+      const noteField = document.getElementById('note-field');
+      if (noteField) {
+        noteField.value = noteText;
+      }
+    });
   });
 }
 
@@ -317,13 +325,35 @@ function openWeeklyNote(year, week) {
   fetch('/api/notes/weekly/' + year + '/' + week).then(r => r.json()).then(js => {
     const modal = getModalController();
     if (!modal) return;
+    const noteText = (js && typeof js.note === 'string') ? js.note : '';
     modal.title = "Weekly note Y"+year+" W"+week;
-    modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.body = '<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2"></textarea>';
     modal.save = () => {
-      const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
-      fetch('/api/notes/weekly/' + year + '/' + week, {method:'POST', body:fd}).then(() => modal.open=false);
+      const field = document.getElementById('note-field');
+      const noteValue = field ? field.value : '';
+      const fd = new FormData();
+      fd.append('note', noteValue);
+      fetch('/api/notes/weekly/' + year + '/' + week, {method:'POST', body:fd})
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Failed to save weekly note');
+          }
+          return response.json();
+        })
+        .then(() => {
+          modal.open = false;
+        })
+        .catch((err) => {
+          console.error(err);
+        });
     };
     modal.open = true;
+    setTimeout(() => {
+      const noteField = document.getElementById('note-field');
+      if (noteField) {
+        noteField.value = noteText;
+      }
+    });
   });
 }
 
@@ -331,13 +361,35 @@ function openMonthlyNote(year, month) {
   fetch('/api/notes/monthly/' + year + '/' + month).then(r => r.json()).then(js => {
     const modal = getModalController();
     if (!modal) return;
+    const noteText = (js && typeof js.note === 'string') ? js.note : '';
     modal.title = "Monthly note " + year + "-" + String(month).padStart(2,'0');
-    modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
+    modal.body = '<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2"></textarea>';
     modal.save = () => {
-      const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
-      fetch('/api/notes/monthly/' + year + '/' + month, {method:'POST', body:fd}).then(() => modal.open=false);
+      const field = document.getElementById('note-field');
+      const noteValue = field ? field.value : '';
+      const fd = new FormData();
+      fd.append('note', noteValue);
+      fetch('/api/notes/monthly/' + year + '/' + month, {method:'POST', body:fd})
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Failed to save monthly note');
+          }
+          return response.json();
+        })
+        .then(() => {
+          modal.open = false;
+        })
+        .catch((err) => {
+          console.error(err);
+        });
     };
     modal.open = true;
+    setTimeout(() => {
+      const noteField = document.getElementById('note-field');
+      if (noteField) {
+        noteField.value = noteText;
+      }
+    });
   });
 }
 
