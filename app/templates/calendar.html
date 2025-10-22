@@ -121,7 +121,12 @@
 
         {% if cfg.ui.show_text %}
         <div class="text-sm space-y-1">
-          <div class="{{ 'text-green-400' if d.realized > 0 else ('text-red-400' if d.realized < 0 else 'text-neutral-200') }}">Realized: {{ d.realized|money }}</div>
+          {% set realized_class = 'text-green-400' if d.realized > 0 else ('text-red-400' if d.realized < 0 else 'text-neutral-200') %}
+          {% if d.has_values %}
+          <div class="{{ realized_class }}">Realized: {{ d.realized|money }}</div>
+          {% else %}
+          <div class="{{ realized_class }}" x-show="showUnrealized" x-cloak>Realized: {{ d.realized|money }}</div>
+          {% endif %}
           <div class="{{ 'text-green-400' if d.unrealized > 0 else ('text-red-400' if d.unrealized < 0 else 'text-neutral-200') }}"
                x-show="showUnrealized" x-cloak>
             Unrealized: {{ d.unrealized|money }}

@@ -207,6 +207,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "in_month": (d.month == month),
                 "realized": float(ds.realized) if ds else 0.0,
                 "unrealized": day_unrealized,
+                "has_values": bool(ds),
                 "note": note_text,
                 "has_note": bool(note_text.strip()),
                 "is_weekend": is_weekend,
