@@ -666,20 +666,31 @@ def _deduplicate_trades(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 def _extract_trade_section(text: str) -> List[str]:
     lines = text.splitlines()
-    start = None
+    start: Optional[int] = None
     for i, line in enumerate(lines):
-        if "Account Trade History" in line:
-            start = i + 2
-            log.debug("Detected 'Account Trade History' section at line %s", i)
+        normalized = line.strip().lower()
+        if "trade history" in normalized:
+            start = i + 1
+            log.debug("Detected trade history section at line %s", i)
             break
     if start is None:
         return []
 
     section: List[str] = []
+    collecting = False
     for line in lines[start:]:
-        if not line.strip() or "Equities" in line or "Profits" in line:
+        stripped = line.strip()
+        lowered = stripped.lower()
+        if not stripped:
+            if collecting:
+                break
+            continue
+        if "equities" in lowered or "profits" in lowered:
             break
-        section.append(line.strip())
+        if "trade history" in lowered and collecting:
+            break
+        section.append(stripped)
+        collecting = True
     return section
 
 
