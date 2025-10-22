@@ -77,7 +77,7 @@
   {% for d in week.days %}
     {% if show_weekends or not d.is_weekend %}
       {% set cls = (d.realized > 0) and 'cell-bg-pos' or (d.realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
-      <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }} flex flex-col gap-2">
+      <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }} flex flex-col gap-2" data-day-cell="{{ d.date.strftime('%Y-%m-%d') }}">
         <div class="flex items-center gap-1 text-xs text-neutral-400">
           <span>{{ d.date.day }}</span>
           {% if d.has_trades %}
@@ -156,18 +156,17 @@
             <path d="M19.14,12.94a7.43,7.43,0,0,0,.05-.94,7.43,7.43,0,0,0-.05-.94l2.11-1.65a.5.5,0,0,0,.12-.64l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.3,7.3,0,0,0-1.63-.94l-.38-2.65A.5.5,0,0,0,12.64,1H9.36a.5.5,0,0,0-.49.41L8.49,4.06a7.3,7.3,0,0,0-1.63.94l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.64L3.94,11.06a7.43,7.43,0,0,0-.05.94,7.43,7.43,0,0,0,.05.94L1.83,14.59a.5.5,0,0,0-.12.64l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.3,7.3,0,0,0,1.63.94l.38,2.65a.5.5,0,0,0,.49.41h3.28a.5.5,0,0,0,.49-.41l.38-2.65a7.3,7.3,0,0,0,1.63-.94l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.64Zm-7.14,2.56A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" fill="currentColor" />
           </svg>
         </a>
-        {% if d.has_note %}
-        <div x-data="{ open: false }" @mouseenter="open = true" @mouseleave="open = false" class="absolute bottom-1 left-1 cursor-default z-10">
+        <div class="daily-note-indicator absolute bottom-1 left-1 cursor-default z-10 group{% if not d.has_note %} hidden{% endif %}"
+             data-note-date="{{ d.date.strftime('%Y-%m-%d') }}"
+             data-note-text="{{ d.note | e }}">
           <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" />
           </svg>
           <span class="sr-only">Daily note available</span>
-          <div class="absolute bottom-6 left-0 z-20 hidden whitespace-pre-line rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit"
-               x-show="open" @mouseenter="open = true">
+          <div class="note-tooltip absolute bottom-6 left-0 z-20 hidden whitespace-pre-line rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit group-hover:block">
             {{ d.note | e }}
           </div>
         </div>
-        {% endif %}
         <!-- Note icon -->
         <a class="absolute bottom-1 right-1 icon-translucent z-10" href="#" aria-label="Add daily note"
            onclick="openDailyNote('{{ d.date.strftime('%Y-%m-%d') }}'); return false;">
@@ -270,8 +269,23 @@ function openDailyNote(dateStr) {
     modal.title = "Daily note " + dateStr;
     modal.body = `<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2">${js.note||''}</textarea>`;
     modal.save = () => {
-      const fd = new FormData(); fd.append('note', document.getElementById('note-field').value);
-      fetch('/api/notes/daily/' + dateStr, {method:'POST', body:fd}).then(() => modal.open=false);
+      const noteValue = document.getElementById('note-field').value;
+      const fd = new FormData();
+      fd.append('note', noteValue);
+      fetch('/api/notes/daily/' + dateStr, {method:'POST', body:fd})
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error('Failed to save daily note');
+          }
+          return response.json();
+        })
+        .then(() => {
+          modal.open = false;
+          updateDailyNoteIndicator(dateStr, noteValue);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
     };
     modal.open = true;
   });
@@ -312,6 +326,32 @@ function getModalController() {
     return null;
   }
   return modal;
+}
+
+function updateDailyNoteIndicator(dateStr, noteText) {
+  const cell = document.querySelector(`[data-day-cell='${dateStr}']`);
+  if (!cell) {
+    return;
+  }
+  const indicator = cell.querySelector('.daily-note-indicator');
+  if (!indicator) {
+    return;
+  }
+  const tooltip = indicator.querySelector('.note-tooltip');
+  const hasNote = noteText.trim().length > 0;
+  if (hasNote) {
+    indicator.classList.remove('hidden');
+    indicator.dataset.noteText = noteText;
+    if (tooltip) {
+      tooltip.textContent = noteText;
+    }
+  } else {
+    indicator.classList.add('hidden');
+    indicator.dataset.noteText = '';
+    if (tooltip) {
+      tooltip.textContent = '';
+    }
+  }
 }
 </script>
 {% endblock %}
