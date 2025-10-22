@@ -2,16 +2,50 @@
 {% block content %}
 {% set ui_cfg = cfg.get('ui', {}) %}
 {% set show_unrealized_default = ui_cfg.get('show_unrealized', True) %}
-<div x-data="{ showUnrealized: {{ 'true' if show_unrealized_default else 'false' }} }" class="space-y-4">
+<div x-data="{ showUnrealized: {{ 'true' if show_unrealized_default else 'false' }}, exportOpen: false }" class="space-y-4">
 <div class="flex items-center justify-between">
   <div class="text-lg font-semibold">{{ year }}-{{ "%02d"|format(month) }}</div>
-  <div class="flex items-center gap-2 flex-wrap justify-end">
+  <div class="flex items-center gap-2 flex-wrap justify-end" @keydown.escape.window="exportOpen = false">
     {% set prev_year = (month == 1) and year-1 or year %}
     {% set prev_month = (month == 1) and 12 or month-1 %}
     {% set next_year = (month == 12) and year+1 or year %}
     {% set next_month = (month == 12) and 1 or month+1 %}
     <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Prev</a>
     <a href="/calendar/{{ next_year }}/{{ next_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Next</a>
+    <div class="relative">
+      <button type="button"
+              class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
+              :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': exportOpen }"
+              @click="exportOpen = !exportOpen"
+              aria-haspopup="true"
+              :aria-expanded="exportOpen.toString()">
+        Export
+      </button>
+      <div x-show="exportOpen"
+           x-cloak
+           @click.outside="exportOpen = false"
+           class="absolute right-0 z-30 mt-2 w-72 space-y-3 rounded border border-neutral-800 bg-neutral-950 p-4 shadow-xl">
+        <form method="get" action="/export" class="space-y-3">
+          <p class="text-sm text-neutral-300">Download daily summaries as CSV.</p>
+          <div class="space-y-2">
+            <label class="block text-sm">
+              <span class="text-neutral-400">Start date</span>
+              <input type="date" name="start" value="{{ export_default_start }}"
+                     class="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500" />
+            </label>
+            <label class="block text-sm">
+              <span class="text-neutral-400">End date</span>
+              <input type="date" name="end" value="{{ export_default_end }}"
+                     class="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500" />
+            </label>
+          </div>
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-neutral-800">
+            <button type="button" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800" @click="exportOpen = false">Cancel</button>
+            <button type="submit" class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-500">Download</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <button type="button"
             class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
             :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showUnrealized }"
