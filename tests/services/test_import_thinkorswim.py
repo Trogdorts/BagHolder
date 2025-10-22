@@ -133,6 +133,29 @@ Trade Date,Trade Time,Type,Instrument,Quantity,Trade Price,Trade Amount
     ]
 
 
+def test_parse_trade_history_section_with_blank_line():
+    content = """Account Statement,,,,,
+Account: 12345678,,,,,
+Account Trade History,,,,,
+
+Trade Date,Time,Action,Quantity,Symbol,Description,Price,Amount
+02/05/2024,09:31:00,Buy,1,AAPL,Apple Inc,$150.00,-$150.00
+""".encode("utf-8")
+
+    rows = parse_thinkorswim_csv(content)
+
+    assert rows == [
+        {
+            "date": "2024-02-05",
+            "symbol": "AAPL",
+            "action": "BUY",
+            "qty": 1.0,
+            "price": 150.0,
+            "amount": -150.0,
+        }
+    ]
+
+
 def test_parse_deduplicates_identical_rows():
     content = """Trade Date,Action,Symbol,Qty,Price,Amount
 02/06/2024,BUY,MSFT,10,315.50,-3155.00
