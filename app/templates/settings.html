@@ -6,7 +6,9 @@
     All application data has been cleared.
   </div>
 {% endif %}
-<form method="post" action="/settings" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800">
+{% set show_unrealized = cfg.ui.get('show_unrealized', True) %}
+<form method="post" action="/settings" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800"
+      x-data="{ showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }} }">
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
     <label class="block">
       <span class="block text-sm text-neutral-400">Theme</span>
@@ -22,6 +24,24 @@
         <option value="false" {% if not cfg.ui.show_text %}selected{% endif %}>False</option>
       </select>
     </label>
+    <div class="block">
+      <span class="block text-sm text-neutral-400">Unrealized values</span>
+      <input type="hidden" name="show_unrealized" value="{{ 'true' if show_unrealized else 'false' }}"
+             :value="showUnrealizedSetting ? 'true' : 'false'">
+      <button type="button"
+              class="mt-1 w-full px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
+              :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showUnrealizedSetting }"
+              @click="showUnrealizedSetting = !showUnrealizedSetting"
+              aria-pressed="{{ 'true' if show_unrealized else 'false' }}"
+              :aria-pressed="showUnrealizedSetting.toString()">
+        <span x-text="showUnrealizedSetting ? 'Hide by default' : 'Show by default'">
+          {% if show_unrealized %}Hide by default{% else %}Show by default{% endif %}
+        </span>
+      </button>
+      <p class="mt-1 text-xs text-neutral-500" x-show="!showUnrealizedSetting" x-cloak>
+        Unrealized gains and losses will be hidden unless toggled on the calendar view.
+      </p>
+    </div>
     <label class="block">
       <span class="block text-sm text-neutral-400">Display weekends</span>
       <select name="show_weekends" class="bg-neutral-800 rounded px-2 py-1 w-full">
