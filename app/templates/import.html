@@ -1,14 +1,32 @@
 {% extends "base.html" %}
 {% block content %}
-<h1 class="text-xl font-semibold mb-4">Import ThinkOrSwim CSV</h1>
-{% if error %}
-<div class="mb-4 rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
-  {{ error }}
-</div>
-{% endif %}
-<form action="/import/thinkorswim" method="post" enctype="multipart/form-data" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800">
-  <input type="file" name="file" accept=".csv" class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
-  <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Upload</button>
-</form>
-<p class="mt-4 text-neutral-400 text-sm">BagHolder stores only trade fields (date, symbol, action, qty, price, amount). Account identifiers are discarded.</p>
+<h1 class="text-xl font-semibold mb-6">Import CSV Data</h1>
+
+<section class="space-y-3 bg-neutral-950 p-4 rounded border border-neutral-800">
+  <h2 class="text-lg font-semibold">BagHolder Export</h2>
+  <p class="text-neutral-400 text-sm">Restore daily summaries exported from BagHolder. Columns: date, realized, unrealized, total_invested, updated_at.</p>
+  {% if bagholder_error %}
+  <div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
+    {{ bagholder_error }}
+  </div>
+  {% endif %}
+  <form action="/import/bagholder" method="post" enctype="multipart/form-data" class="space-y-4">
+    <input type="file" name="file" accept=".csv" class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
+    <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Upload</button>
+  </form>
+</section>
+
+<section class="mt-8 space-y-3 bg-neutral-950 p-4 rounded border border-neutral-800">
+  <h2 class="text-lg font-semibold">ThinkOrSwim Account Statement</h2>
+  <p class="text-neutral-400 text-sm">Only trade fields are persisted (date, symbol, action, qty, price, amount). Account identifiers are discarded after parsing.</p>
+  {% if thinkorswim_error %}
+  <div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
+    {{ thinkorswim_error }}
+  </div>
+  {% endif %}
+  <form action="/import/thinkorswim" method="post" enctype="multipart/form-data" class="space-y-4">
+    <input type="file" name="file" accept=".csv" class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
+    <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Upload</button>
+  </form>
+</section>
 {% endblock %}

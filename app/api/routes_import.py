@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_session
 from app.core.models import DailySummary, Trade
+from app.services.import_bagholder import parse_bagholder_csv
 from app.services.import_thinkorswim import (
     compute_daily_pnl_records,
     parse_thinkorswim_csv,
@@ -21,8 +22,63 @@ def _is_close(a: float, b: float, tol: float = 0.01) -> bool:
 @router.get("/import", response_class=HTMLResponse)
 def import_page(request: Request):
     return request.app.state.templates.TemplateResponse(
-        "import.html", {"request": request}
+        "import.html",
+        {
+            "request": request,
+            "bagholder_error": None,
+            "thinkorswim_error": None,
+        },
     )
+
+
+@router.post("/import/bagholder")
+async def import_bagholder(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_session),
+):
+    content = await file.read()
+    rows = parse_bagholder_csv(content)
+
+    if not rows:
+        return request.app.state.templates.TemplateResponse(
+            "import.html",
+            {
+                "request": request,
+                "bagholder_error": "No daily summaries detected in the uploaded file.",
+                "thinkorswim_error": None,
+            },
+        )
+
+    now = datetime.utcnow().isoformat()
+    for row in rows:
+        date = row["date"]
+        realized = float(row.get("realized", 0.0))
+        unrealized = float(row.get("unrealized", 0.0))
+        total_invested = float(row.get("total_invested", unrealized))
+        updated_at = row.get("updated_at") or now
+
+        summary = db.get(DailySummary, date)
+        if summary is None:
+            db.add(
+                DailySummary(
+                    date=date,
+                    realized=realized,
+                    unrealized=unrealized,
+                    total_invested=total_invested,
+                    updated_at=updated_at,
+                )
+            )
+            continue
+
+        summary.realized = realized
+        summary.unrealized = unrealized
+        summary.total_invested = total_invested
+        summary.updated_at = updated_at
+
+    db.commit()
+
+    return RedirectResponse(url="/", status_code=303)
 
 
 @router.post("/import/thinkorswim")
@@ -39,7 +95,8 @@ async def import_thinkorswim(
             "import.html",
             {
                 "request": request,
-                "error": "No trades detected in the uploaded statement.",
+                "thinkorswim_error": "No trades detected in the uploaded statement.",
+                "bagholder_error": None,
             },
         )
 
