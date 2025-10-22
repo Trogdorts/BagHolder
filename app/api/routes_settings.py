@@ -1,7 +1,9 @@
 import os
+import signal
 
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.background import BackgroundTask
 
 from app.core.config import AppConfig
 from app.services.data_reset import clear_all_data
@@ -12,7 +14,12 @@ router = APIRouter()
 def settings_page(request: Request):
     cfg: AppConfig = request.app.state.config
     cleared = request.query_params.get("cleared") is not None
-    context = {"request": request, "cfg": cfg.raw, "cleared": cleared}
+    context = {
+        "request": request,
+        "cfg": cfg.raw,
+        "cleared": cleared,
+        "shutting_down": False,
+    }
     return request.app.state.templates.TemplateResponse("settings.html", context)
 
 @router.post("/settings", response_class=HTMLResponse)
@@ -50,3 +57,24 @@ def clear_settings_data(request: Request):
     data_dir = os.path.dirname(cfg.path) if cfg.path else os.environ.get("BAGHOLDER_DATA", "/app/data")
     clear_all_data(data_dir)
     return RedirectResponse(url="/settings?cleared=1", status_code=303)
+
+
+@router.post("/settings/shutdown", response_class=HTMLResponse)
+def shutdown_application(request: Request):
+    cfg: AppConfig = request.app.state.config
+
+    def _trigger_shutdown():
+        sig = getattr(signal, "SIGTERM", signal.SIGINT)
+        os.kill(os.getpid(), sig)
+
+    context = {
+        "request": request,
+        "cfg": cfg.raw,
+        "cleared": False,
+        "shutting_down": True,
+    }
+
+    background = BackgroundTask(_trigger_shutdown)
+    return request.app.state.templates.TemplateResponse(
+        "settings.html", context, background=background
+    )
