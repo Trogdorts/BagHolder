@@ -266,15 +266,13 @@ def export_data(
 
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["date", "realized", "unrealized", "total_invested", "updated_at"])
+    writer.writerow(["date", "realized", "unrealized"])
     for summary in summaries:
         writer.writerow(
             [
                 summary.date,
                 f"{float(summary.realized):.2f}",
                 f"{float(summary.unrealized):.2f}",
-                f"{float(summary.total_invested):.2f}",
-                summary.updated_at,
             ]
         )
 
