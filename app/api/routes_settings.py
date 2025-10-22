@@ -22,7 +22,8 @@ def save_settings(request: Request,
                   show_unrealized: str = Form("true"),
                   show_weekends: str = Form("false"),
                   default_view: str = Form("latest"),
-                  icon_color: str = Form("#6b7280")):
+                  icon_color: str = Form("#6b7280"),
+                  unrealized_fill_strategy: str = Form("carry_forward")):
     cfg: AppConfig = request.app.state.config
     cfg.raw["ui"]["theme"] = theme
     cfg.raw["ui"]["show_text"] = (show_text.lower() == "true")
@@ -35,6 +36,10 @@ def save_settings(request: Request,
     elif not (icon_color.startswith("#") and len(icon_color) == 7 and all(ch in "0123456789abcdefABCDEF" for ch in icon_color[1:])):
         icon_color = cfg.raw["ui"].get("icon_color", "#6b7280")
     cfg.raw["ui"]["icon_color"] = icon_color
+    fill_options = {"carry_forward", "average_neighbors"}
+    if unrealized_fill_strategy not in fill_options:
+        unrealized_fill_strategy = "carry_forward"
+    cfg.raw["ui"]["unrealized_fill_strategy"] = unrealized_fill_strategy
     cfg.save()
     return RedirectResponse(url="/settings", status_code=303)
 
