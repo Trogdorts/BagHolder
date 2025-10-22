@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Request, Form, Depends
-from fastapi.responses import HTMLResponse, RedirectResponse
+import csv
+import io
+from datetime import date, datetime, timedelta
+from typing import Optional
+
+from fastapi import APIRouter, Request, Form, Depends, Query, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
-from datetime import date, datetime
 import calendar
 from app.core.database import get_session
 from app.core.models import DailySummary, Meta, NoteDaily, Trade
@@ -129,6 +133,8 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "month_realized": month_realized,
         "month_unrealized": month_unrealized,
         "cfg": request.app.state.config.raw,
+        "export_default_start": start,
+        "export_default_end": end,
     }
     return request.app.state.templates.TemplateResponse("calendar.html", ctx)
 
@@ -146,3 +152,56 @@ def overwrite_daily(date_str: str, realized: float = Form(...), unrealized: floa
         db.add(DailySummary(date=date_str, realized=realized, unrealized=unrealized, total_invested=unrealized, updated_at=now))
     db.commit()
     return {"ok": True}
+
+
+@router.get("/export")
+def export_data(
+    start: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_session),
+):
+    fmt = "%Y-%m-%d"
+    today = date.today()
+
+    def parse(value: Optional[str], fallback: date) -> date:
+        if value:
+            try:
+                return datetime.strptime(value, fmt).date()
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.") from exc
+        return fallback
+
+    end_dt = parse(end, today)
+    start_dt = parse(start, end_dt - timedelta(days=30))
+
+    if start_dt > end_dt:
+        start_dt, end_dt = end_dt, start_dt
+
+    start_str = start_dt.strftime(fmt)
+    end_str = end_dt.strftime(fmt)
+
+    summaries = (
+        db.query(DailySummary)
+        .filter(DailySummary.date >= start_str, DailySummary.date <= end_str)
+        .order_by(DailySummary.date.asc())
+        .all()
+    )
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["date", "realized", "unrealized", "total_invested", "updated_at"])
+    for summary in summaries:
+        writer.writerow(
+            [
+                summary.date,
+                f"{float(summary.realized):.2f}",
+                f"{float(summary.unrealized):.2f}",
+                f"{float(summary.total_invested):.2f}",
+                summary.updated_at,
+            ]
+        )
+
+    filename = f"bagholder_export_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv"
+    headers = {"Content-Disposition": f"attachment; filename={filename}"}
+    content = buffer.getvalue().encode("utf-8")
+    return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)
