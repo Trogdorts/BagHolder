@@ -29,6 +29,18 @@ def _build_request(app, method: str = "POST"):
     return Request({"type": "http", "app": app, "method": method, "headers": []})
 
 
+class DummyUploadFile:
+    def __init__(self, filename: str, data: bytes):
+        self.filename = filename
+        self._data = data
+
+    async def read(self) -> bytes:
+        return self._data
+
+    async def close(self) -> None:
+        return None
+
+
 def test_shutdown_application_schedules_process_signal(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
@@ -70,8 +82,9 @@ def test_import_settings_config_updates_state_and_persists(tmp_path, monkeypatch
     new_config = json.loads(export_response.body.decode("utf-8"))
     new_config["ui"]["theme"] = "light"
 
+    upload = DummyUploadFile("config.json", json.dumps(new_config).encode("utf-8"))
     request = _build_request(app)
-    response = import_settings_config(request, config_json=json.dumps(new_config))
+    response = asyncio.run(import_settings_config(request, config_file=upload))
 
     assert response.status_code == 303
     assert response.headers["location"] == "/settings?config_imported=1"
@@ -90,8 +103,9 @@ def test_import_settings_config_with_invalid_json_sets_error(tmp_path, monkeypat
     monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
     app = create_app()
 
+    upload = DummyUploadFile("config.json", b"not-json")
     request = _build_request(app)
-    response = import_settings_config(request, config_json="not-json")
+    response = asyncio.run(import_settings_config(request, config_file=upload))
 
     assert response.status_code == 303
     assert response.headers["location"].startswith("/settings?config_error=")
@@ -143,17 +157,6 @@ def test_import_full_backup_replaces_data_and_reloads_state(tmp_path, monkeypatc
     extra_path.write_text("extra", encoding="utf-8")
 
     archive_bytes = create_backup_archive(str(backup_source))
-
-    class DummyUploadFile:
-        def __init__(self, filename: str, data: bytes):
-            self.filename = filename
-            self._data = data
-
-        async def read(self) -> bytes:
-            return self._data
-
-        async def close(self) -> None:
-            return None
 
     upload = DummyUploadFile("backup.zip", archive_bytes)
     request = _build_request(app)

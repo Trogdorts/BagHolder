@@ -2,6 +2,7 @@ import json
 import os
 import signal
 from datetime import datetime
+from urllib.parse import quote_plus
 from zipfile import BadZipFile
 
 from fastapi import APIRouter, Request, Form, UploadFile, File
@@ -26,16 +27,19 @@ def settings_page(request: Request):
     cfg: AppConfig = request.app.state.config
     cleared = request.query_params.get("cleared") is not None
     config_imported = request.query_params.get("config_imported") is not None
-    error_code = request.query_params.get("config_error")
+    error_param = request.query_params.get("config_error")
     backup_restored = request.query_params.get("backup_restored") is not None
     backup_error_code = request.query_params.get("backup_error")
     error_message = None
-    if error_code == "invalid_json":
-        error_message = "Unable to import configuration: the provided text is not valid JSON."
-    elif error_code == "invalid_type":
-        error_message = "Unable to import configuration: the JSON must describe an object."
-    elif error_code == "apply_failed":
-        error_message = "Unable to import configuration due to an unknown error."
+    if error_param:
+        if error_param == "invalid_json":
+            error_message = "Unable to import configuration: the provided data was not valid JSON."
+        elif error_param == "invalid_type":
+            error_message = "Unable to import configuration: the JSON must describe an object."
+        elif error_param == "apply_failed":
+            error_message = "Unable to import configuration due to an unknown error."
+        else:
+            error_message = error_param
     backup_error_message = None
     if backup_error_code == "no_file":
         backup_error_message = "Unable to import backup: no file was provided."
@@ -99,22 +103,59 @@ def export_settings_config(request: Request):
     )
 
 
+def _config_error_redirect(message: str) -> RedirectResponse:
+    safe_message = quote_plus(message, safe="")
+    return RedirectResponse(url=f"/settings?config_error={safe_message}", status_code=303)
+
+
 @router.post("/settings/config/import", response_class=HTMLResponse)
-def import_settings_config(request: Request, config_json: str = Form(...)):
+async def import_settings_config(request: Request, config_file: UploadFile = File(None)):
     cfg: AppConfig = request.app.state.config
-    payload = (config_json or "").strip()
-    if not payload:
-        return RedirectResponse(url="/settings?config_error=invalid_json", status_code=303)
+
+    if config_file is None or not config_file.filename:
+        if config_file is not None:
+            await config_file.close()
+        return _config_error_redirect(
+            "Unable to import configuration: no file was provided."
+        )
+
+    try:
+        payload_bytes = await config_file.read()
+    finally:
+        await config_file.close()
+
+    if not payload_bytes:
+        return _config_error_redirect(
+            "Unable to import configuration: the uploaded file was empty."
+        )
+
+    try:
+        payload = payload_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        return _config_error_redirect(
+            f"Unable to import configuration: the file is not valid UTF-8 ({exc})."
+        )
+
     try:
         parsed = json.loads(payload)
-    except json.JSONDecodeError:
-        return RedirectResponse(url="/settings?config_error=invalid_json", status_code=303)
+    except json.JSONDecodeError as exc:
+        detail = f"{exc.msg} at line {exc.lineno}, column {exc.colno}"
+        return _config_error_redirect(
+            f"Unable to import configuration: JSON parsing failed ({detail})."
+        )
+
     try:
         cfg.update_from_dict(parsed)
-    except ValueError:
-        return RedirectResponse(url="/settings?config_error=invalid_type", status_code=303)
-    except Exception:  # pragma: no cover - defensive guard
-        return RedirectResponse(url="/settings?config_error=apply_failed", status_code=303)
+    except ValueError as exc:
+        detail = str(exc) or "the provided JSON does not describe a valid configuration"
+        return _config_error_redirect(
+            f"Unable to import configuration: {detail}."
+        )
+    except Exception as exc:  # pragma: no cover - defensive guard
+        detail = f"unexpected {exc.__class__.__name__}: {exc}".strip()
+        return _config_error_redirect(
+            f"Unable to import configuration: {detail}."
+        )
 
     templates = getattr(request.app.state, "templates", None)
     if templates is not None:
