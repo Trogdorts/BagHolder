@@ -50,7 +50,7 @@
            @click.outside="exportOpen = false"
            class="absolute right-0 z-30 mt-2 w-72 space-y-3 rounded border border-neutral-800 bg-neutral-950 p-4 shadow-xl">
         <form method="get" action="/export" class="space-y-3">
-          <p class="text-sm text-neutral-300">Download daily summaries as CSV.</p>
+          <p class="text-sm text-neutral-300">Download data from the selected date range.</p>
           <div class="space-y-2">
             <label class="block text-sm">
               <span class="text-neutral-400">Start date</span>
@@ -61,6 +61,15 @@
               <span class="text-neutral-400">End date</span>
               <input type="date" name="end" value="{{ export_default_end }}"
                      class="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500" />
+            </label>
+            <label class="block text-sm">
+              <span class="text-neutral-400">Data type</span>
+              <select name="dataset"
+                      class="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500">
+                <option value="summaries">Daily summaries (CSV)</option>
+                <option value="trades">Trades (CSV)</option>
+                <option value="notes">Notes (JSON)</option>
+              </select>
             </label>
           </div>
           <div class="flex items-center justify-end gap-2 pt-2 border-t border-neutral-800">
