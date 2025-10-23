@@ -16,7 +16,7 @@ def _ensure_daily_notes_markdown_column(engine) -> None:
         if not has_column:
             conn.execute(
                 text(
-                    "ALTER TABLE notes_daily ADD COLUMN is_markdown INTEGER NOT NULL DEFAULT 1"
+                    "ALTER TABLE notes_daily ADD COLUMN is_markdown INTEGER NOT NULL DEFAULT 0"
                 )
             )
 
