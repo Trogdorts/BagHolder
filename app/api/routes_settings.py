@@ -1,8 +1,9 @@
+import json
 import os
 import signal
 
 from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from starlette.background import BackgroundTask
 
 from app.core.config import AppConfig
@@ -14,11 +15,22 @@ router = APIRouter()
 def settings_page(request: Request):
     cfg: AppConfig = request.app.state.config
     cleared = request.query_params.get("cleared") is not None
+    config_imported = request.query_params.get("config_imported") is not None
+    error_code = request.query_params.get("config_error")
+    error_message = None
+    if error_code == "invalid_json":
+        error_message = "Unable to import configuration: the provided text is not valid JSON."
+    elif error_code == "invalid_type":
+        error_message = "Unable to import configuration: the JSON must describe an object."
+    elif error_code == "apply_failed":
+        error_message = "Unable to import configuration due to an unknown error."
     context = {
         "request": request,
         "cfg": cfg.raw,
         "cleared": cleared,
         "shutting_down": False,
+        "config_imported": config_imported,
+        "config_error_message": error_message,
     }
     return request.app.state.templates.TemplateResponse("settings.html", context)
 
@@ -53,6 +65,39 @@ def save_settings(request: Request,
     cfg.raw["export"]["fill_empty_with_zero"] = export_preference != "empty"
     cfg.save()
     return RedirectResponse(url="/settings", status_code=303)
+
+
+@router.get("/settings/config/export")
+def export_settings_config(request: Request):
+    cfg: AppConfig = request.app.state.config
+    return JSONResponse(
+        content=cfg.as_dict(),
+        headers={"Content-Disposition": "attachment; filename=bagholder-config.json"},
+    )
+
+
+@router.post("/settings/config/import", response_class=HTMLResponse)
+def import_settings_config(request: Request, config_json: str = Form(...)):
+    cfg: AppConfig = request.app.state.config
+    payload = (config_json or "").strip()
+    if not payload:
+        return RedirectResponse(url="/settings?config_error=invalid_json", status_code=303)
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError:
+        return RedirectResponse(url="/settings?config_error=invalid_json", status_code=303)
+    try:
+        cfg.update_from_dict(parsed)
+    except ValueError:
+        return RedirectResponse(url="/settings?config_error=invalid_type", status_code=303)
+    except Exception:  # pragma: no cover - defensive guard
+        return RedirectResponse(url="/settings?config_error=apply_failed", status_code=303)
+
+    templates = getattr(request.app.state, "templates", None)
+    if templates is not None:
+        templates.env.globals["cfg"] = cfg.raw
+
+    return RedirectResponse(url="/settings?config_imported=1", status_code=303)
 
 
 @router.post("/settings/clear-data", response_class=HTMLResponse)

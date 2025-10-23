@@ -1,6 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
 <h1 class="text-xl font-semibold mb-4">Settings</h1>
+{% if config_imported %}
+  <div class="mb-4 rounded border border-green-800 bg-green-900/40 px-4 py-3 text-sm text-green-100">
+    Configuration imported successfully.
+  </div>
+{% elif config_error_message %}
+  <div class="mb-4 rounded border border-red-800 bg-red-900/40 px-4 py-3 text-sm text-red-100">
+    {{ config_error_message }}
+  </div>
+{% endif %}
 {% if cleared %}
   <div class="mb-4 rounded border border-green-800 bg-green-900/40 px-4 py-3 text-sm text-green-100">
     All application data has been cleared.
@@ -94,6 +103,34 @@
   </div>
   <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Save</button>
 </form>
+
+<div class="mt-6 rounded border border-neutral-800 bg-neutral-950 p-4 space-y-3">
+  <h2 class="text-lg font-semibold">Configuration</h2>
+  <p class="text-sm text-neutral-500">
+    Download a JSON copy of your current configuration or import a configuration that was previously exported.
+  </p>
+  <div class="grid gap-4 md:grid-cols-2">
+    <a href="/settings/config/export"
+       class="flex items-center justify-center rounded border border-neutral-700 px-4 py-2 text-center text-neutral-200 hover:bg-neutral-900"
+       download>
+      Download config (JSON)
+    </a>
+    <form method="post" action="/settings/config/import" class="space-y-2">
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Import configuration JSON</span>
+        <textarea name="config_json"
+                  class="mt-1 h-32 w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
+                  placeholder="Paste JSON exported from BagHolder here"></textarea>
+      </label>
+      <p class="text-xs text-neutral-500">
+        The imported configuration replaces all current settings. Missing values revert to their defaults.
+      </p>
+      <button class="w-full rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-500">
+        Import config
+      </button>
+    </form>
+  </div>
+</div>
 
 <div class="mt-6 space-y-3 rounded border border-red-900 bg-red-950/40 p-4">
   <div>
