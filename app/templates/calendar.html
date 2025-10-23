@@ -169,7 +169,7 @@
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
           </svg>
-          <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
+          <div class="note-tooltip absolute bottom-6 right-0 z-20 h-[14rem] w-[14rem] overflow-auto rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg">
             <p class="whitespace-pre-line" data-note-tooltip-body>{{ d.note | e }}</p>
           </div>
         </a>
@@ -203,7 +203,7 @@
         <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
         </svg>
-        <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
+        <div class="note-tooltip absolute bottom-6 right-0 z-20 h-[14rem] w-[14rem] overflow-auto rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg">
           <p class="whitespace-pre-line" data-note-tooltip-body>{{ week.note | default('', true) | e }}</p>
         </div>
       </a>
@@ -233,7 +233,7 @@
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
           </svg>
-          <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
+          <div class="note-tooltip absolute bottom-6 right-0 z-20 h-[14rem] w-[14rem] overflow-auto rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg">
             <p class="whitespace-pre-line" data-note-tooltip-body>{{ month_note_text | e }}</p>
           </div>
         </a>
@@ -1206,7 +1206,11 @@ function updateTradeIndicators(dateStr, trades) {
     modal.saving = false;
     modal.body = `
       <form id="manual-form" class="space-y-3">
-        <p class="text-sm text-danger hidden" data-manual-error></p>
+        <p class="text-sm text-red-400 hidden" data-manual-error></p>
+        <p class="text-sm leading-relaxed text-amber-200 bg-amber-900/40 border border-amber-500/40 rounded px-3 py-2">
+          Manual overrides are not recommended when trades are also tracked for this day. The next trade import or recompute
+          will overwrite these values and can leave your stock totals mismatched.
+        </p>
         <label class="block text-sm space-y-1">
           <span class="text-neutral-300">Realized</span>
           <input type="number" step="0.01" inputmode="decimal" name="realized" value="${normalizedRealized}" class="w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500">

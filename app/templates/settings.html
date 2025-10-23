@@ -242,20 +242,6 @@
       <button class="btn btn-primary px-4 py-2">Upload</button>
     </form>
   </section>
-  <section class="space-y-3 rounded border border-neutral-800 bg-neutral-900 p-4">
-    <h3 class="text-base font-semibold">Daily summaries</h3>
-    <p class="text-sm text-neutral-400">Restore daily realized and unrealized performance from a CSV export. Columns: date, realized, unrealized.</p>
-    {% if daily_summary_error_message %}
-    <div class="rounded border alert alert-error p-3 text-sm">
-      {{ daily_summary_error_message }}
-    </div>
-    {% endif %}
-    <form action="/import/daily-summaries" method="post" enctype="multipart/form-data" class="space-y-4">
-      <input type="file" name="file" accept=".csv"
-             class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
-      <button class="btn btn-primary px-4 py-2">Upload</button>
-    </form>
-  </section>
 </div>
 
 <div class="mt-6 rounded border border-neutral-800 bg-neutral-950 p-4 space-y-3">
