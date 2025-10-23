@@ -146,7 +146,13 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         .filter(NoteDaily.date >= start, NoteDaily.date <= end)
         .all()
     )
-    notes_by_day = {r.date: r.note for r in note_rows}
+    notes_by_day = {
+        row.date: {
+            "note": row.note or "",
+            "is_markdown": bool(getattr(row, "is_markdown", True)),
+        }
+        for row in note_rows
+    }
 
     trade_rows = (
         db.query(Trade)
@@ -177,7 +183,9 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         for d in week:
             day_key = d.strftime("%Y-%m-%d")
             ds = by_day.get(day_key)
-            note_text = notes_by_day.get(day_key, "")
+            note_entry = notes_by_day.get(day_key)
+            note_text = note_entry["note"] if note_entry else ""
+            note_is_markdown = note_entry["is_markdown"] if note_entry else True
             is_weekend = d.weekday() >= 5
             is_future_day = d > today
             if ds:
@@ -209,6 +217,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "unrealized": day_unrealized,
                 "has_values": bool(ds),
                 "note": note_text,
+                "note_is_markdown": note_is_markdown,
                 "has_note": bool(note_text.strip()),
                 "is_weekend": is_weekend,
                 "trades": trades_by_day.get(day_key, []),

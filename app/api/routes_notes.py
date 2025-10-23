@@ -15,11 +15,17 @@ router = APIRouter()
 
 @router.get("/api/notes/daily/{date}")
 def get_daily(date: str, db: Session = Depends(get_session)):
-    return {"note": get_daily_note(db, date)}
+    note, is_markdown = get_daily_note(db, date)
+    return {"note": note, "is_markdown": is_markdown}
 
 @router.post("/api/notes/daily/{date}")
-def set_daily(date: str, note: str = Form(""), db: Session = Depends(get_session)):
-    set_daily_note(db, date, note)
+def set_daily(
+    date: str,
+    note: str = Form(""),
+    use_markdown: bool = Form(True),
+    db: Session = Depends(get_session),
+):
+    set_daily_note(db, date, note, bool(use_markdown))
     return {"ok": True}
 
 @router.get("/api/notes/weekly/{year}/{week}")
