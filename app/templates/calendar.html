@@ -115,9 +115,14 @@
       <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }} flex flex-col gap-2" data-day-cell="{{ d.date.strftime('%Y-%m-%d') }}">
         <div class="flex items-center gap-1 text-xs text-neutral-400">
           <span>{{ d.date.day }}</span>
-          {% if d.has_trades %}
+          {% set trade_button_classes = [
+            'relative inline-flex items-center justify-center rounded-full bg-emerald-900/20 p-1 text-emerald-400 hover:bg-emerald-800/30 focus:outline-none focus:ring-2 focus:ring-emerald-500'
+          ] %}
+          {% if not d.has_trades %}
+            {% set trade_button_classes = trade_button_classes + ['icon-translucent'] %}
+          {% endif %}
           <button type="button"
-                  class="relative inline-flex items-center justify-center rounded-full bg-emerald-900/20 p-1 text-emerald-400 hover:bg-emerald-800/30 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  class="{{ trade_button_classes|join(' ') }}"
                   onclick="openTrades('{{ d.date.strftime('%Y-%m-%d') }}'); return false;"
                   aria-label="View trades">
             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -130,7 +135,6 @@
             <span class="absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-emerald-400 text-neutral-900 text-[10px] font-semibold px-1 text-center">{{ trade_count }}</span>
             {% endif %}
           </button>
-          {% endif %}
         </div>
 
         {% if show_text_default %}
