@@ -25,24 +25,54 @@ def import_page(request: Request):
 
 
 def _persist_trade_rows(db: Session, rows):
-    inserted = 0
-    for r in rows:
-        exists = (
-            db.query(Trade)
-            .filter_by(
-                date=r["date"],
-                symbol=r["symbol"],
-                action=r["action"],
-                qty=r["qty"],
-                price=r["price"],
-                amount=r["amount"],
-            )
-            .first()
+    if not rows:
+        return 0
+
+    deduped_rows = []
+    seen = set()
+    for row in rows:
+        key = (
+            row["date"],
+            row["symbol"],
+            row["action"],
+            float(row["qty"]),
+            float(row["price"]),
+            float(row["amount"]),
         )
-        if exists:
+        if key in seen:
             continue
-        db.add(Trade(**r))
+        seen.add(key)
+        deduped_rows.append(
+            {
+                "date": row["date"],
+                "symbol": row["symbol"],
+                "action": row["action"],
+                "qty": float(row["qty"]),
+                "price": float(row["price"]),
+                "amount": float(row["amount"]),
+            }
+        )
+
+    if not deduped_rows:
+        return 0
+
+    affected_dates = {row["date"] for row in deduped_rows}
+    if affected_dates:
+        existing_rows = (
+            db.query(Trade)
+            .filter(Trade.date.in_(affected_dates))
+            .all()
+        )
+        for trade in existing_rows:
+            db.delete(trade)
+        if existing_rows:
+            db.flush()
+
+    inserted = 0
+    for row in deduped_rows:
+        db.add(Trade(**row))
         inserted += 1
+
     db.commit()
     return inserted
 
