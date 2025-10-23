@@ -33,12 +33,13 @@
 {% set show_trade_count = cfg.ui.get('show_trade_count', True) %}
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
-<form method="post" action="/settings" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800"
+<form method="post" action="/settings" class="space-y-3 bg-neutral-950 p-4 rounded border border-neutral-800"
       x-data="{
         showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }},
         hasChanges: false,
         initialData: '',
         formEl: null,
+        defaultColors: {{ color_defaults | default({}, true) | tojson }},
         init() {
           this.formEl = this.$el;
           this.initialData = this.serializeForm();
@@ -60,14 +61,52 @@
         resetChanges() {
           this.initialData = this.serializeForm();
           this.hasChanges = false;
+        },
+        isColorDefault(field) {
+          if (!this.formEl || !this.defaultColors[field]) {
+            return false;
+          }
+          const input = this.formEl.querySelector(`[name="${field}"]`);
+          if (!input) {
+            return false;
+          }
+          return input.value.toLowerCase() === this.defaultColors[field];
+        },
+        resetColor(field) {
+          const defaultValue = this.defaultColors[field];
+          if (!defaultValue || !this.formEl) {
+            return;
+          }
+          const input = this.formEl.querySelector(`[name="${field}"]`);
+          if (!input) {
+            return;
+          }
+          input.value = defaultValue;
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+          this.evaluateChanges();
+        },
+        resetAllColors() {
+          if (!this.formEl) {
+            return;
+          }
+          Object.keys(this.defaultColors).forEach((field) => {
+            this.resetColor(field);
+          });
+        },
+        colorsAreDefault() {
+          if (!this.formEl) {
+            return false;
+          }
+          return Object.keys(this.defaultColors).every((field) => this.isColorDefault(field));
         }
       }"
       @submit="resetChanges()">
   <div x-show="hasChanges" x-cloak x-transition.opacity.duration.150ms
-       class="rounded border alert alert-warning px-4 py-3 text-sm">
+       class="rounded border alert alert-error px-4 py-3 text-sm">
     You have unsaved changes. Don't forget to save.
   </div>
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
     <label class="block">
       <span class="block text-sm text-neutral-400">Theme</span>
       <select name="theme" class="bg-neutral-800 rounded px-2 py-1 w-full">
@@ -132,63 +171,54 @@
       </select>
     </label>
   </div>
-  <div class="pt-4 border-t border-neutral-800">
-    <h2 class="text-lg font-semibold mb-2">Color palette</h2>
-    <p class="text-sm text-neutral-500 mb-3">
-      Customize the accent colors used for buttons, alerts, and trade highlights.
-    </p>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Action icon color</span>
-        <input type="color" name="icon_color" value="{{ cfg.ui.icon_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-      </label>
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Primary button color</span>
-        <input type="color" name="primary_color" value="{{ cfg.ui.primary_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-      </label>
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Primary hover color</span>
-        <input type="color" name="primary_hover_color" value="{{ cfg.ui.primary_hover_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-      </label>
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Success accent color</span>
-        <input type="color" name="success_color" value="{{ cfg.ui.success_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-      </label>
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Warning accent color</span>
-        <input type="color" name="warning_color" value="{{ cfg.ui.warning_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-      </label>
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Danger accent color</span>
-        <input type="color" name="danger_color" value="{{ cfg.ui.danger_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-      </label>
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Danger hover color</span>
-        <input type="color" name="danger_hover_color" value="{{ cfg.ui.danger_hover_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-      </label>
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Trade badge color</span>
-        <input type="color" name="trade_badge_color" value="{{ cfg.ui.trade_badge_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-      </label>
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Trade badge text color</span>
-        <input type="color" name="trade_badge_text_color" value="{{ cfg.ui.trade_badge_text_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-      </label>
-      <label class="block">
-        <span class="block text-sm text-neutral-400">Note icon highlight color</span>
-        <input type="color" name="note_icon_color" value="{{ cfg.notes.icon_has_note_color }}"
-               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-        <p class="mt-1 text-xs text-neutral-500">Applies when a day or week already has a note.</p>
-      </label>
+  <div class="pt-3 border-t border-neutral-800 space-y-3">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h2 class="text-lg font-semibold">Color palette</h2>
+        <p class="text-sm text-neutral-500 leading-snug">
+          Review the default accents for actions, profitability, and supporting badges. Adjust them here or reset them back to the
+          curated defaults.
+        </p>
+      </div>
+      <button type="button"
+              class="self-start sm:self-auto px-3 py-1 text-sm rounded border border-neutral-700 hover:bg-neutral-800 transition"
+              @click="resetAllColors()"
+              :class="{ 'opacity-50 cursor-not-allowed pointer-events-none': colorsAreDefault() }"
+              :aria-disabled="colorsAreDefault().toString()">
+        Reset palette
+      </button>
+    </div>
+    <div class="space-y-3">
+      {% for group in color_groups | default([], true) %}
+      <section class="rounded border border-neutral-800 bg-neutral-900">
+        <header class="border-b border-neutral-800 px-3 py-2">
+          <h3 class="text-sm font-semibold text-neutral-200">{{ group.title }}</h3>
+          <p class="mt-1 text-xs text-neutral-500 leading-snug">{{ group.description }}</p>
+        </header>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-3">
+          {% for field in group.fields %}
+          <label class="block space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-sm text-neutral-300">{{ field.label }}</span>
+              <button type="button"
+                      class="text-xs text-neutral-500 hover:text-neutral-200 transition"
+                      @click.prevent="resetColor('{{ field.name }}')"
+                      :class="{ 'opacity-40 pointer-events-none': isColorDefault('{{ field.name }}') }"
+                      :aria-disabled="isColorDefault('{{ field.name }}').toString()">
+                Reset
+              </button>
+            </div>
+            <input type="color" name="{{ field.name }}" value="{{ field.current }}"
+                   class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+            <p class="text-xs text-neutral-500 leading-snug">
+              {{ field.description }}
+              <span class="ml-1 text-neutral-400 uppercase tracking-wide">Default: {{ field.default | upper }}</span>
+            </p>
+          </label>
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
     </div>
   </div>
   <div class="pt-4 border-t border-neutral-800">
@@ -207,7 +237,7 @@
   <button class="btn btn-primary px-4 py-2">Save</button>
 </form>
 
-<div id="stock-data-import" class="mt-6 rounded border border-neutral-800 bg-neutral-950 p-4 space-y-6">
+<div id="stock-data-import" class="mt-6 rounded border border-neutral-800 bg-neutral-950 p-4 space-y-5">
   <div>
     <h2 class="text-lg font-semibold">Stock data importing</h2>
     <p class="text-sm text-neutral-500">
@@ -222,7 +252,7 @@
       {{ trade_csv_error_message }}
     </div>
     {% endif %}
-    <form action="/import/trades" method="post" enctype="multipart/form-data" class="space-y-4">
+    <form action="/import/trades" method="post" enctype="multipart/form-data" class="space-y-3">
       <input type="file" name="file" accept=".csv"
              class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
       <button class="btn btn-primary px-4 py-2">Upload</button>
@@ -236,7 +266,7 @@
       {{ thinkorswim_error_message }}
     </div>
     {% endif %}
-    <form action="/import/thinkorswim" method="post" enctype="multipart/form-data" class="space-y-4">
+    <form action="/import/thinkorswim" method="post" enctype="multipart/form-data" class="space-y-3">
       <input type="file" name="file" accept=".csv"
              class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
       <button class="btn btn-primary px-4 py-2">Upload</button>
