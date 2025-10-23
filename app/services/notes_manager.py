@@ -2,19 +2,29 @@ from sqlalchemy.orm import Session
 from app.core.models import NoteDaily, NoteWeekly, NoteMonthly
 from datetime import datetime
 
-def set_daily_note(db: Session, date_str: str, note: str):
+def set_daily_note(db: Session, date_str: str, note: str, is_markdown: bool):
     nd = db.get(NoteDaily, date_str)
     now = datetime.utcnow().isoformat()
     if nd:
         nd.note = note
+        nd.is_markdown = is_markdown
         nd.updated_at = now
     else:
-        db.add(NoteDaily(date=date_str, note=note, updated_at=now))
+        db.add(
+            NoteDaily(
+                date=date_str,
+                note=note,
+                is_markdown=is_markdown,
+                updated_at=now,
+            )
+        )
     db.commit()
 
-def get_daily_note(db: Session, date_str: str) -> str:
+def get_daily_note(db: Session, date_str: str) -> tuple[str, bool]:
     nd = db.get(NoteDaily, date_str)
-    return nd.note if nd else ""
+    if not nd:
+        return "", True
+    return nd.note, bool(nd.is_markdown)
 
 def set_weekly_note(db: Session, year: int, week: int, note: str):
     now = datetime.utcnow().isoformat()

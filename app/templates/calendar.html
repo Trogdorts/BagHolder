@@ -149,6 +149,7 @@
            aria-label="{{ 'Edit daily note' if d.has_note else 'Add daily note' }}"
            data-note-date="{{ d.date.strftime('%Y-%m-%d') }}"
            data-note-text="{{ d.note | e }}"
+           data-note-markdown="{{ 'true' if d.note_is_markdown else 'false' }}"
            onclick="openDailyNote('{{ d.date.strftime('%Y-%m-%d') }}'); return false;">
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
@@ -499,41 +500,225 @@ function openManual(dateStr, realized, unrealized) {
   modal.open = true;
 }
 
-function openDailyNote(dateStr) {
-  fetch('/api/notes/daily/' + dateStr).then(r => r.json()).then(js => {
-    const modal = getModalController();
-    if (!modal) return;
-    const noteText = (js && typeof js.note === 'string') ? js.note : '';
-    modal.title = "Daily note " + dateStr;
-    modal.body = '<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2"></textarea>';
-    modal.save = () => {
-      const noteField = document.getElementById('note-field');
-      const noteValue = noteField ? noteField.value : '';
-      const fd = new FormData();
-      fd.append('note', noteValue);
-      fetch('/api/notes/daily/' + dateStr, {method:'POST', body:fd})
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error('Failed to save daily note');
-          }
-          return response.json();
-        })
-        .then(() => {
-          modal.open = false;
-          updateDailyNoteIndicator(dateStr, noteValue);
-        })
-        .catch((err) => {
-          console.error(err);
-        });
-    };
-    modal.open = true;
-    setTimeout(() => {
-      const noteField = document.getElementById('note-field');
-      if (noteField) {
-        noteField.value = noteText;
+function applyMarkdownFormatting(action, textarea) {
+  if (!textarea) {
+    return;
+  }
+
+  const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : 0;
+  const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : 0;
+  const value = typeof textarea.value === 'string' ? textarea.value : '';
+  const selection = value.slice(start, end);
+  const hasSelection = end > start;
+
+  let replacement = selection;
+  let offsetStart = 0;
+  let offsetEnd = replacement.length;
+
+  switch (action) {
+    case 'bold': {
+      const content = hasSelection ? selection : 'bold text';
+      replacement = `**${content}**`;
+      offsetStart = 2;
+      offsetEnd = 2 + content.length;
+      break;
+    }
+    case 'italic': {
+      const content = hasSelection ? selection : 'italic text';
+      replacement = `_${content}_`;
+      offsetStart = 1;
+      offsetEnd = 1 + content.length;
+      break;
+    }
+    case 'strikethrough': {
+      const content = hasSelection ? selection : 'strikethrough';
+      replacement = `~~${content}~~`;
+      offsetStart = 2;
+      offsetEnd = 2 + content.length;
+      break;
+    }
+    case 'code': {
+      const content = hasSelection ? selection : 'code';
+      replacement = `\`${content}\``;
+      offsetStart = 1;
+      offsetEnd = 1 + content.length;
+      break;
+    }
+    case 'code-block': {
+      const content = hasSelection ? selection : 'code';
+      replacement = `\`\`\`\n${content}\n\`\`\``;
+      offsetStart = 4;
+      offsetEnd = 4 + content.length;
+      break;
+    }
+    case 'heading': {
+      const content = hasSelection ? selection : 'Heading';
+      replacement = `## ${content}`;
+      offsetStart = 3;
+      offsetEnd = 3 + content.length;
+      break;
+    }
+    case 'quote': {
+      const content = hasSelection ? selection : 'Quote';
+      replacement = `> ${content}`;
+      offsetStart = 2;
+      offsetEnd = 2 + content.length;
+      break;
+    }
+    case 'unordered-list': {
+      if (hasSelection) {
+        const lines = selection.split('\n');
+        replacement = lines
+          .map((line) => (line.length ? `- ${line}` : '- '))
+          .join('\n');
+        offsetStart = replacement.length;
+        offsetEnd = replacement.length;
+      } else {
+        const content = 'List item';
+        replacement = `- ${content}`;
+        offsetStart = 2;
+        offsetEnd = 2 + content.length;
       }
-    });
+      break;
+    }
+    case 'ordered-list': {
+      if (hasSelection) {
+        const lines = selection.split('\n');
+        replacement = lines
+          .map((line, index) => `${index + 1}. ${line || 'Item'}`)
+          .join('\n');
+        offsetStart = replacement.length;
+        offsetEnd = replacement.length;
+      } else {
+        const content = 'First item';
+        replacement = `1. ${content}`;
+        offsetStart = 3;
+        offsetEnd = 3 + content.length;
+      }
+      break;
+    }
+    case 'link': {
+      const text = hasSelection ? selection : 'link text';
+      const url = 'https://example.com';
+      replacement = `[${text}](${url})`;
+      offsetStart = text.length + 3;
+      offsetEnd = text.length + 3 + url.length;
+      break;
+    }
+    default:
+      return;
+  }
+
+  textarea.setRangeText(replacement, start, end, 'end');
+  const newSelectionStart = start + Math.max(0, Math.min(offsetStart, replacement.length));
+  const newSelectionEnd = start + Math.max(0, Math.min(offsetEnd, replacement.length));
+  textarea.focus();
+  textarea.selectionStart = newSelectionStart;
+  textarea.selectionEnd = newSelectionEnd;
+}
+
+function setMarkdownToolbarEnabled(toolbar, enabled) {
+  if (!toolbar) {
+    return;
+  }
+  toolbar.classList.toggle('opacity-50', !enabled);
+  toolbar.querySelectorAll('button').forEach((button) => {
+    button.disabled = !enabled;
+    button.classList.toggle('cursor-not-allowed', !enabled);
+    button.setAttribute('aria-disabled', (!enabled).toString());
   });
+}
+
+function setupMarkdownEditor(textarea, toolbar, toggle, initialUseMarkdown) {
+  if (!textarea || !toolbar || !toggle) {
+    return;
+  }
+
+  toolbar.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-md-action]');
+    if (!button || button.disabled) {
+      return;
+    }
+    event.preventDefault();
+    const action = button.dataset.mdAction;
+    applyMarkdownFormatting(action, textarea);
+  });
+
+  toggle.addEventListener('change', (event) => {
+    const enabled = event.target.checked;
+    setMarkdownToolbarEnabled(toolbar, enabled);
+  });
+
+  toggle.checked = initialUseMarkdown;
+  setMarkdownToolbarEnabled(toolbar, initialUseMarkdown);
+}
+
+function openDailyNote(dateStr) {
+  fetch('/api/notes/daily/' + dateStr)
+    .then((response) => response.json())
+    .then((js) => {
+      const modal = getModalController();
+      if (!modal) return;
+      const noteText = js && typeof js.note === 'string' ? js.note : '';
+      const useMarkdown = js && typeof js.is_markdown === 'boolean' ? js.is_markdown : true;
+      modal.title = 'Daily note ' + dateStr;
+      modal.body = `
+        <div class="space-y-4">
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-sm text-neutral-300">
+            <label class="inline-flex items-center gap-2">
+              <input type="checkbox" id="note-markdown-toggle" class="h-4 w-4 rounded border-neutral-600 bg-neutral-900 text-blue-500 focus:ring-blue-500" checked>
+              <span>Use Markdown</span>
+            </label>
+            <span class="text-xs text-neutral-500">Formatting buttons insert Markdown syntax when Markdown is enabled.</span>
+          </div>
+          <div id="note-markdown-toolbar" class="flex flex-wrap gap-2">
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="bold" title="Bold"><span class="font-semibold">B</span></button>
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="italic" title="Italic"><span class="italic">I</span></button>
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="strikethrough" title="Strikethrough"><span class="line-through">S</span></button>
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="code" title="Inline code"><span class="font-mono text-xs">code</span></button>
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="code-block" title="Code block"><span class="font-mono text-xs">{ }</span></button>
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="heading" title="Heading"><span class="font-semibold">H</span></button>
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="quote" title="Quote">&ldquo; &rdquo;</button>
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="unordered-list" title="Bullet list">&bull; List</button>
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="ordered-list" title="Numbered list">1. List</button>
+            <button type="button" class="px-2 py-1 rounded border border-neutral-700 bg-neutral-900 text-neutral-200 hover:bg-neutral-800" data-md-action="link" title="Link">Link</button>
+          </div>
+          <textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2" placeholder="Write your note..."></textarea>
+        </div>`;
+      modal.save = () => {
+        const noteField = document.getElementById('note-field');
+        const toggle = document.getElementById('note-markdown-toggle');
+        const noteValue = noteField ? noteField.value : '';
+        const useMarkdownValue = toggle ? toggle.checked : true;
+        const fd = new FormData();
+        fd.append('note', noteValue);
+        fd.append('use_markdown', useMarkdownValue ? 'true' : 'false');
+        fetch('/api/notes/daily/' + dateStr, { method: 'POST', body: fd })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error('Failed to save daily note');
+            }
+            return response.json();
+          })
+          .then(() => {
+            modal.open = false;
+            updateDailyNoteIndicator(dateStr, noteValue, useMarkdownValue);
+          })
+          .catch((err) => {
+            console.error(err);
+          });
+      };
+      modal.open = true;
+      setTimeout(() => {
+        const noteField = document.getElementById('note-field');
+        if (noteField) {
+          noteField.value = noteText;
+        }
+        const toggle = document.getElementById('note-markdown-toggle');
+        const toolbar = document.getElementById('note-markdown-toolbar');
+        setupMarkdownEditor(noteField, toolbar, toggle, useMarkdown);
+      });
+    });
 }
 
 function openWeeklyNote(year, week) {
@@ -647,7 +832,7 @@ function updateWeeklyNoteIndicator(year, week, noteText) {
   }
 }
 
-function updateDailyNoteIndicator(dateStr, noteText) {
+function updateDailyNoteIndicator(dateStr, noteText, isMarkdown) {
   const cell = document.querySelector(`[data-day-cell='${dateStr}']`);
   if (!cell) {
     return;
@@ -659,6 +844,7 @@ function updateDailyNoteIndicator(dateStr, noteText) {
   const tooltip = trigger.querySelector('.note-tooltip');
   const hasNote = noteText.trim().length > 0;
   trigger.dataset.noteText = noteText;
+  trigger.dataset.noteMarkdown = isMarkdown ? 'true' : 'false';
   trigger.classList.toggle('has-note', hasNote);
   trigger.setAttribute('aria-label', hasNote ? 'Edit daily note' : 'Add daily note');
   if (tooltip) {
