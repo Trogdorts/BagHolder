@@ -66,6 +66,7 @@ def save_settings(request: Request,
                   theme: str = Form(...),
                   show_text: str = Form("true"),
                   show_unrealized: str = Form("true"),
+                  show_trade_count: str = Form("true"),
                   show_weekends: str = Form("false"),
                   default_view: str = Form("latest"),
                   icon_color: str = Form("#6b7280"),
@@ -75,6 +76,7 @@ def save_settings(request: Request,
     cfg.raw["ui"]["theme"] = theme
     cfg.raw["ui"]["show_text"] = (show_text.lower() == "true")
     cfg.raw["ui"]["show_unrealized"] = (show_unrealized.lower() == "true")
+    cfg.raw["ui"]["show_trade_count"] = (show_trade_count.lower() == "true")
     cfg.raw["ui"]["show_weekends"] = (show_weekends.lower() == "true")
     cfg.raw["view"]["default"] = default_view
     icon_color = icon_color.strip()
