@@ -274,9 +274,7 @@
       });
     },
     toggleBackgroundInteractivity(isOpen) {
-      const selectors = ['main', 'nav'];
-      selectors.forEach((selector) => {
-        const element = document.querySelector(selector);
+      const applyState = (element) => {
         if (!element) {
           return;
         }
@@ -289,7 +287,17 @@
         if ('inert' in element) {
           element.inert = isOpen;
         }
-      });
+      };
+
+      applyState(document.querySelector('nav'));
+
+      const main = document.querySelector('main');
+      if (!main) {
+        return;
+      }
+
+      const backgroundElements = Array.from(main.children).filter((child) => child.id !== 'modal');
+      backgroundElements.forEach(applyState);
     },
     storeActiveElement() {
       this.previouslyFocused = document.activeElement;
