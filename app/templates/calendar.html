@@ -2,7 +2,7 @@
 {% block content %}
 {% set ui_cfg = cfg.get('ui', {}) %}
 {% set show_unrealized_default = ui_cfg.get('show_unrealized', True) %}
-{% set show_trade_count_badges = ui_cfg.get('show_trade_count', True) %}
+{% set show_trade_count_badges = show_trade_badges if show_trade_badges is defined else ui_cfg.get('show_trade_count', True) %}
 <div x-data="{
         showUnrealized: {{ 'true' if show_unrealized_default else 'false' }},
         exportOpen: false,
