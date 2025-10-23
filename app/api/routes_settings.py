@@ -257,7 +257,11 @@ def settings_page(request: Request):
         "log_export_available": log_export_available,
         "log_error_message": log_error_message,
     }
-    return request.app.state.templates.TemplateResponse("settings.html", context)
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "settings.html",
+        context,
+    )
 
 @router.post("/settings", response_class=HTMLResponse)
 def save_settings(
@@ -446,7 +450,10 @@ def shutdown_application(request: Request):
 
     background = BackgroundTask(_trigger_shutdown)
     return request.app.state.templates.TemplateResponse(
-        "settings.html", context, background=background
+        request,
+        "settings.html",
+        context,
+        background=background,
     )
 
 

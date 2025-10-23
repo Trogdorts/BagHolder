@@ -115,6 +115,7 @@ def _finalize_trade_import(request: Request, db: Session, inserted: int):
 
     if conflicts:
         return request.app.state.templates.TemplateResponse(
+            request,
             "import_conflicts.html",
             {
                 "request": request,

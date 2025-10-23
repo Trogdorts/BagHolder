@@ -333,7 +333,11 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "current_year": today.year,
         "current_month": today.month,
     }
-    return request.app.state.templates.TemplateResponse("calendar.html", ctx)
+    return request.app.state.templates.TemplateResponse(
+        request,
+        "calendar.html",
+        ctx,
+    )
 
 
 @router.get("/api/trades/{date_str}")
