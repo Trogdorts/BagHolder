@@ -161,14 +161,14 @@
     </p>
   </div>
   <section class="space-y-3 rounded border border-neutral-800 bg-neutral-900 p-4">
-    <h3 class="text-base font-semibold">BagHolder export</h3>
-    <p class="text-sm text-neutral-400">Restore daily summaries exported from BagHolder. Columns: date, realized, unrealized.</p>
-    {% if bagholder_error_message %}
+    <h3 class="text-base font-semibold">Stock buy &amp; sell CSV trade data</h3>
+    <p class="text-sm text-neutral-400">Import executed stock trades from a CSV with columns: date, symbol, action, qty, price, amount.</p>
+    {% if trade_csv_error_message %}
     <div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
-      {{ bagholder_error_message }}
+      {{ trade_csv_error_message }}
     </div>
     {% endif %}
-    <form action="/import/bagholder" method="post" enctype="multipart/form-data" class="space-y-4">
+    <form action="/import/trades" method="post" enctype="multipart/form-data" class="space-y-4">
       <input type="file" name="file" accept=".csv"
              class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
       <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Upload</button>
@@ -183,6 +183,20 @@
     </div>
     {% endif %}
     <form action="/import/thinkorswim" method="post" enctype="multipart/form-data" class="space-y-4">
+      <input type="file" name="file" accept=".csv"
+             class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
+      <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Upload</button>
+    </form>
+  </section>
+  <section class="space-y-3 rounded border border-neutral-800 bg-neutral-900 p-4">
+    <h3 class="text-base font-semibold">Daily summaries</h3>
+    <p class="text-sm text-neutral-400">Restore daily realized and unrealized performance from a CSV export. Columns: date, realized, unrealized.</p>
+    {% if daily_summary_error_message %}
+    <div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
+      {{ daily_summary_error_message }}
+    </div>
+    {% endif %}
+    <form action="/import/daily-summaries" method="post" enctype="multipart/form-data" class="space-y-4">
       <input type="file" name="file" accept=".csv"
              class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
       <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Upload</button>

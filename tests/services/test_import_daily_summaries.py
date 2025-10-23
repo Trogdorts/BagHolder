@@ -5,16 +5,16 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from app.services.import_bagholder import parse_bagholder_csv
+from app.services.import_daily_summaries import parse_daily_summary_csv
 
 
-def test_parse_bagholder_csv_basic():
+def test_parse_daily_summary_csv_basic():
     content = """date,realized,unrealized,total_invested,updated_at
 2024-02-01,100.50,50.25,75.00,2024-02-01T12:00:00
 2024-02-02,-10.00,0,,
 """.encode("utf-8")
 
-    rows = parse_bagholder_csv(content)
+    rows = parse_daily_summary_csv(content)
 
     assert rows == [
         {
@@ -34,12 +34,12 @@ def test_parse_bagholder_csv_basic():
     ]
 
 
-def test_parse_bagholder_csv_handles_bom_and_aliases():
+def test_parse_daily_summary_csv_handles_bom_and_aliases():
     content = "\ufeffDate,Realized PnL,Unrealized PnL,Total,Updated At\n02/03/2024,$25.00,$5.00,,2024-02-03T10:00:00\n".encode(
         "utf-8"
     )
 
-    rows = parse_bagholder_csv(content)
+    rows = parse_daily_summary_csv(content)
 
     assert rows == [
         {
@@ -52,12 +52,12 @@ def test_parse_bagholder_csv_handles_bom_and_aliases():
     ]
 
 
-def test_parse_bagholder_csv_skips_invalid_rows():
+def test_parse_daily_summary_csv_skips_invalid_rows():
     content = """date,realized,unrealized,total_invested,updated_at
 ,10,20,30,
 invalid,5,5,5,
 """.encode("utf-8")
 
-    rows = parse_bagholder_csv(content)
+    rows = parse_daily_summary_csv(content)
 
     assert rows == []
