@@ -520,7 +520,7 @@ function focusTradeEditorFirstField() {
   }
 }
 
-function setupTradeEditor(trades) {
+function setupTradeEditor(trades, dateStr) {
   clearTradeEditorMessages();
   const tbody = document.getElementById('trade-table-body');
   if (!tbody) return;
