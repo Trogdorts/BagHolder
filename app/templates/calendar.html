@@ -436,10 +436,17 @@ function createTradeEditorHTML() {
           <tbody id="trade-table-body"></tbody>
         </table>
       </div>
-      <div class="flex items-center justify-between flex-wrap gap-2">
-        <div class="flex items-center gap-2">
-          <button type="button" id="add-trade-row" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-sm">Add trade</button>
-          <button type="button" id="clear-trades" class="px-3 py-1 rounded border border-red-700 text-red-300 hover:bg-red-900/40 text-sm">Clear all trades</button>
+      <div class="space-y-2">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" id="add-trade-row" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-sm">Add trade</button>
+            <button type="button" id="clear-trades" class="px-3 py-1 rounded border border-red-700 text-red-300 hover:bg-red-900/40 text-sm">Clear all trades</button>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <input type="file" id="trade-import-input" accept=".csv,text/csv" class="hidden">
+            <button type="button" id="export-trades" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-sm">Export CSV</button>
+            <button type="button" id="import-trades" class="px-3 py-1 rounded border border-blue-700 text-blue-200 hover:bg-blue-900/40 text-sm">Import CSV</button>
+          </div>
         </div>
         <span class="text-xs text-neutral-500">Remove a row to delete a trade. Amounts are calculated on save.</span>
       </div>
@@ -450,6 +457,7 @@ const tradeEditorState = {
   initialSnapshot: '[]',
   isDirty: false,
   unsavedWarning: null,
+  currentDate: null,
 };
 
 function getTradeEditorWarningElement() {
@@ -546,9 +554,26 @@ function setupTradeEditor(trades, dateStr) {
     };
   }
 
+  const importInput = document.getElementById('trade-import-input');
+  const importButton = document.getElementById('import-trades');
+  if (importButton && importInput) {
+    importButton.onclick = () => {
+      importInput.click();
+    };
+  }
+  if (importInput) {
+    importInput.onchange = (event) => handleTradeCsvImport(event, dateStr);
+  }
+
+  const exportButton = document.getElementById('export-trades');
+  if (exportButton) {
+    exportButton.onclick = () => exportTradesToCsv(dateStr);
+  }
+
   updateTradeEmptyState();
 
   tradeEditorState.unsavedWarning = document.getElementById('trade-unsaved');
+  tradeEditorState.currentDate = dateStr;
   resetTradeEditorInitialSnapshot();
 
   const modal = getModalController();
@@ -700,6 +725,320 @@ function showTradeEditorSuccess(message) {
     successEl.textContent = message;
     successEl.classList.remove('hidden');
   }
+}
+
+function parseCsv(text) {
+  if (typeof text !== 'string') {
+    return [];
+  }
+
+  const rows = [];
+  let current = '';
+  let row = [];
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const char = text[i];
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          current += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += char;
+      }
+    } else if (char === '"') {
+      inQuotes = true;
+    } else if (char === ',') {
+      row.push(current);
+      current = '';
+    } else if (char === '\r') {
+      // Ignore carriage returns
+    } else if (char === '\n') {
+      row.push(current);
+      rows.push(row);
+      row = [];
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  row.push(current);
+  rows.push(row);
+
+  return rows.filter((cells) => cells.some((cell) => cell.trim() !== ''));
+}
+
+function normalizeNumberString(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.replace(/[^0-9.\-]/g, '');
+}
+
+function parseTradeCsv(text) {
+  const rows = parseCsv(text);
+  if (!rows.length) {
+    throw new Error('The CSV file is empty.');
+  }
+
+  const headerAliases = {
+    action: ['action', 'type', 'side'],
+    symbol: ['symbol', 'ticker', 'security'],
+    qty: ['qty', 'quantity', 'shares', 'volume'],
+    price: ['price', 'fill price', 'trade price', 'avg price'],
+  };
+
+  const normalizedHeader = rows[0].map((cell) => cell.trim().toLowerCase());
+  const columnIndex = {};
+
+  normalizedHeader.forEach((header, index) => {
+    Object.entries(headerAliases).forEach(([key, aliases]) => {
+      if (columnIndex[key] !== undefined) {
+        return;
+      }
+      if (aliases.includes(header)) {
+        columnIndex[key] = index;
+      }
+    });
+  });
+
+  const requiredKeys = ['action', 'symbol', 'qty', 'price'];
+  const hasHeader = requiredKeys.every((key) => columnIndex[key] !== undefined);
+
+  if (!hasHeader) {
+    if (rows[0].length < requiredKeys.length) {
+      throw new Error('CSV rows must include action, symbol, quantity, and price columns.');
+    }
+    columnIndex.action = 0;
+    columnIndex.symbol = 1;
+    columnIndex.qty = 2;
+    columnIndex.price = 3;
+  }
+
+  const dataRows = hasHeader ? rows.slice(1) : rows;
+
+  const trades = [];
+  const errors = [];
+
+  dataRows.forEach((cells, rowIndex) => {
+    const values = {
+      action: columnIndex.action < cells.length ? cells[columnIndex.action] : '',
+      symbol: columnIndex.symbol < cells.length ? cells[columnIndex.symbol] : '',
+      qty: columnIndex.qty < cells.length ? cells[columnIndex.qty] : '',
+      price: columnIndex.price < cells.length ? cells[columnIndex.price] : '',
+    };
+
+    const trimmed = {
+      action: (values.action || '').trim(),
+      symbol: (values.symbol || '').trim(),
+      qty: (values.qty || '').trim(),
+      price: (values.price || '').trim(),
+    };
+
+    if (!trimmed.action && !trimmed.symbol && !trimmed.qty && !trimmed.price) {
+      return;
+    }
+
+    const rowNumber = hasHeader ? rowIndex + 2 : rowIndex + 1;
+
+    if (!trimmed.symbol) {
+      errors.push(`Row ${rowNumber}: Symbol is required.`);
+      return;
+    }
+
+    if (!trimmed.action) {
+      errors.push(`Row ${rowNumber}: Action is required.`);
+      return;
+    }
+
+    const normalizedAction = trimmed.action.toUpperCase();
+    if (normalizedAction !== 'BUY' && normalizedAction !== 'SELL') {
+      errors.push(`Row ${rowNumber}: Action must be BUY or SELL.`);
+      return;
+    }
+
+    if (!trimmed.qty) {
+      errors.push(`Row ${rowNumber}: Quantity is required.`);
+      return;
+    }
+
+    if (!trimmed.price) {
+      errors.push(`Row ${rowNumber}: Price is required.`);
+      return;
+    }
+
+    const qtyValue = parseFloat(normalizeNumberString(trimmed.qty));
+    const priceValue = parseFloat(normalizeNumberString(trimmed.price));
+
+    if (!Number.isFinite(qtyValue) || qtyValue <= 0) {
+      errors.push(`Row ${rowNumber}: Quantity must be a positive number.`);
+      return;
+    }
+
+    if (!Number.isFinite(priceValue) || priceValue <= 0) {
+      errors.push(`Row ${rowNumber}: Price must be a positive number.`);
+      return;
+    }
+
+    trades.push({
+      action: normalizedAction,
+      symbol: trimmed.symbol.toUpperCase(),
+      qty: Math.abs(qtyValue),
+      price: Math.abs(priceValue),
+    });
+  });
+
+  if (errors.length) {
+    throw new Error(errors.join(' '));
+  }
+
+  if (!trades.length) {
+    throw new Error('No trades were found in the CSV file.');
+  }
+
+  return trades;
+}
+
+function applyImportedTrades(trades) {
+  const tbody = document.getElementById('trade-table-body');
+  if (!tbody) {
+    return;
+  }
+
+  tbody.innerHTML = '';
+  trades.forEach((trade) => {
+    tbody.appendChild(
+      createTradeRow({
+        action: trade.action,
+        symbol: trade.symbol,
+        qty: trade.qty,
+        price: trade.price,
+      })
+    );
+  });
+
+  updateTradeEmptyState();
+  refreshTradeEditorDirtyState();
+  focusTradeEditorFirstField();
+}
+
+function handleTradeCsvImport(event, dateStr) {
+  const input = event && event.target ? event.target : null;
+  const files = input && input.files ? Array.from(input.files) : [];
+  const file = files.length ? files[0] : null;
+
+  if (!file) {
+    return;
+  }
+
+  clearTradeEditorMessages();
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const text = typeof reader.result === 'string' ? reader.result : '';
+      const trades = parseTradeCsv(text);
+      applyImportedTrades(trades);
+      const dateLabel = dateStr || 'this date';
+      showTradeEditorSuccess(
+        `${trades.length} trade${trades.length === 1 ? '' : 's'} imported. Save to overwrite existing trades for ${dateLabel}.`,
+      );
+    } catch (error) {
+      showTradeEditorError(error && error.message ? error.message : 'Unable to import trades from CSV.');
+    } finally {
+      input.value = '';
+    }
+  };
+  reader.onerror = () => {
+    showTradeEditorError('Failed to read the CSV file. Please try again.');
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+function escapeCsvValue(value) {
+  const stringValue = value === undefined || value === null ? '' : String(value);
+  if (/[",\n\r]/.test(stringValue)) {
+    return '"' + stringValue.replace(/"/g, '""') + '"';
+  }
+  return stringValue;
+}
+
+function exportTradesToCsv(dateStr) {
+  clearTradeEditorMessages();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(captureTradeEditorSnapshot());
+  } catch (error) {
+    showTradeEditorError('Unable to export trades. Try again after making a change.');
+    return;
+  }
+
+  if (!Array.isArray(parsed)) {
+    showTradeEditorError('Unable to export trades.');
+    return;
+  }
+
+  const rows = [];
+  let hasIncomplete = false;
+
+  parsed.forEach((row) => {
+    const action = (row.action || 'BUY').toString().toUpperCase();
+    const symbol = (row.symbol || '').trim();
+    const qty = (row.qty || '').toString().trim();
+    const price = (row.price || '').toString().trim();
+    const hasAny = symbol || qty || price;
+    if (!hasAny) {
+      return;
+    }
+    if (!symbol || !qty || !price) {
+      hasIncomplete = true;
+      return;
+    }
+
+    rows.push([
+      action === 'SELL' ? 'SELL' : 'BUY',
+      symbol.toUpperCase(),
+      qty,
+      price,
+    ]);
+  });
+
+  if (hasIncomplete) {
+    showTradeEditorError('Cannot export CSV because some trades are incomplete. Complete or remove them and try again.');
+    return;
+  }
+
+  if (!rows.length) {
+    showTradeEditorError('No trades are available to export. Add trades first.');
+    return;
+  }
+
+  const csvRows = [
+    ['Action', 'Symbol', 'Quantity', 'Price'],
+    ...rows,
+  ];
+
+  const csvContent = csvRows.map((cells) => cells.map(escapeCsvValue).join(',')).join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const downloadName = `trades-${(dateStr || 'day').replace(/[^0-9A-Za-z_-]/g, '') || 'day'}.csv`;
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = downloadName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+
+  showTradeEditorSuccess('CSV downloaded.');
 }
 
 function saveTrades(dateStr) {
