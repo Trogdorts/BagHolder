@@ -69,7 +69,7 @@
               if (!this.formEl || !this.defaultColors[field]) {
                 return false;
               }
-              const input = this.formEl.querySelector(`[name=\"${field}\"]`);
+              const input = this.formEl.querySelector(`[name='${field}']`);
               if (!input) {
                 return false;
               }
@@ -80,7 +80,7 @@
               if (!defaultValue || !this.formEl) {
                 return;
               }
-              const input = this.formEl.querySelector(`[name=\"${field}\"]`);
+              const input = this.formEl.querySelector(`[name='${field}']`);
               if (!input) {
                 return;
               }
