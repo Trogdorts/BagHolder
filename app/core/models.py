@@ -37,7 +37,7 @@ class NoteDaily(Base):
     __tablename__ = "notes_daily"
     date: Mapped[str] = mapped_column(String, primary_key=True)
     note: Mapped[str] = mapped_column(Text, default="")
-    is_markdown: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_markdown: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     updated_at: Mapped[str] = mapped_column(String, default="")
 
 class NoteWeekly(Base):

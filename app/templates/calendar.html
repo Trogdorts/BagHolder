@@ -148,14 +148,14 @@
         <a class="note-trigger absolute bottom-1 right-1 icon-translucent z-10{% if d.has_note %} has-note{% endif %}"
            href="#"
            aria-label="{{ 'Edit daily note' if d.has_note else 'Add daily note' }}"
-           data-note-date="{{ d.date.strftime('%Y-%m-%d') }}"
            data-note-text="{{ d.note | e }}"
+           data-note-updated="{{ d.note_updated_at | default('', true) }}"
            onclick="openDailyNote('{{ d.date.strftime('%Y-%m-%d') }}'); return false;">
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
           </svg>
-          <div class="note-tooltip absolute bottom-6 right-0 z-20 whitespace-pre-line rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
-            {{ d.note | e }}
+          <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
+            <p class="whitespace-pre-line" data-note-tooltip-body>{{ d.note | e }}</p>
           </div>
         </a>
       </div>
@@ -174,14 +174,19 @@
       </div>
     </div>
     <div class="flex justify-end">
-      <a class="z-10 weekly-note-trigger{% if not week.has_note %} icon-translucent{% endif %}" href="#" aria-label="Add weekly note"
+      <a class="note-trigger weekly-note-trigger z-10{% if week.has_note %} has-note{% else %} icon-translucent{% endif %}" href="#"
+         aria-label="{{ 'Edit weekly note' if week.has_note else 'Add weekly note' }}"
          data-week-year="{{ week.week_year }}"
          data-week-index="{{ week.week_number }}"
          data-note-text="{{ week.note | default('', true) | e }}"
+         data-note-updated="{{ week.note_updated_at | default('', true) }}"
          onclick="openWeeklyNote({{ week.week_year }}, {{ week.week_number }}); return false;">
         <svg class="w-4 h-4 action-icon{% if week.has_note %} text-amber-400{% endif %}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
         </svg>
+        <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
+          <p class="whitespace-pre-line" data-note-tooltip-body>{{ week.note | default('', true) | e }}</p>
+        </div>
       </a>
     </div>
   </div>
@@ -196,11 +201,20 @@
       <div x-show="showUnrealized" x-cloak>
         Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized > 0 else ('text-red-400' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
       </div>
-      <a class="absolute top-1 right-1 icon-translucent z-10" href="#" aria-label="Add monthly note"
+      {% set month_note_text = month_note.note | default('', true) %}
+      {% set month_note_has = month_note_text.strip() %}
+      <a class="note-trigger absolute top-1 right-1 z-10{% if month_note_has %} has-note{% else %} icon-translucent{% endif %}" href="#"
+         aria-label="{{ 'Edit monthly note' if month_note_has else 'Add monthly note' }}"
+         data-month-key="{{ year }}-{{ '%02d'|format(month) }}"
+         data-note-text="{{ month_note_text | e }}"
+         data-note-updated="{{ month_note.updated_at | default('', true) }}"
          onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
-        <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <svg class="w-4 h-4 action-icon{% if month_note_has %} text-amber-400{% endif %}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
         </svg>
+        <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
+          <p class="whitespace-pre-line" data-note-tooltip-body>{{ month_note_text | e }}</p>
+        </div>
       </a>
     </div>
     <div class="rounded border border-neutral-800 p-3 bg-neutral-950">
@@ -224,6 +238,9 @@
     body: '',
     save: null,
     previouslyFocused: null,
+    closeLabel: 'Close',
+    saveLabel: 'Save',
+    saving: false,
     init() {
       window.modalController = this;
       this.$watch('open', (value) => {
@@ -234,6 +251,7 @@
           this.$nextTick(() => this.focusFirstElement());
         } else {
           this.restoreActiveElement();
+          this.resetState();
         }
       });
     },
@@ -276,6 +294,12 @@
         dialog.focus();
       }
     },
+    resetState() {
+      this.save = null;
+      this.closeLabel = 'Close';
+      this.saveLabel = 'Save';
+      this.saving = false;
+    },
     close() {
       this.open = false;
     },
@@ -287,6 +311,7 @@
   aria-modal="true"
   :aria-hidden="(!open).toString()"
   @click.self="close()"
+  @keydown.escape.window.stop.prevent="close()"
 >
   <div
     x-ref="dialog"
@@ -298,8 +323,16 @@
     <h3 class="font-semibold mb-2" x-text="title"></h3>
     <div x-html="body"></div>
     <div class="mt-4 flex justify-end gap-2">
-      <button class="px-3 py-1 rounded border border-neutral-700" @click="close()">Close</button>
-      <button class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500" @click="if (save) save()">Save</button>
+      <button type="button" class="px-3 py-1 rounded border border-neutral-700" @click="close()" x-text="closeLabel"></button>
+      <button
+        type="button"
+        class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500"
+        :class="{ 'opacity-60 cursor-not-allowed': saving || !save }"
+        :disabled="saving || !save"
+        @click="if (!saving && save) save()"
+      >
+        <span x-text="saving ? 'Saving…' : saveLabel"></span>
+      </button>
     </div>
   </div>
 </div>
@@ -577,130 +610,366 @@ function openManual(dateStr, realized, unrealized) {
   modal.open = true;
 }
 
-function openDailyNote(dateStr) {
-  fetch('/api/notes/daily/' + dateStr)
-    .then((response) => response.json())
-    .then((js) => {
-      const modal = getModalController();
-      if (!modal) return;
-      const noteText = js && typeof js.note === 'string' ? js.note : '';
-      modal.title = 'Daily note ' + dateStr;
-      modal.body = `
-        <div class="space-y-4">
-          <label class="block text-sm text-neutral-300">
-            <span class="mb-2 block text-neutral-400">Note</span>
-            <textarea id="note-field" class="w-full h-48 bg-neutral-800 border border-neutral-700 rounded px-3 py-2 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Write your note..." spellcheck="true"></textarea>
-          </label>
-        </div>`;
-      modal.save = () => {
-        const noteField = document.getElementById('note-field');
-        const noteValue = noteField ? noteField.value : '';
-        const fd = new FormData();
-        fd.append('note', noteValue);
-        fd.append('use_markdown', 'false');
-        fetch('/api/notes/daily/' + dateStr, { method: 'POST', body: fd })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error('Failed to save daily note');
-            }
-            return response.json();
-          })
-          .then(() => {
-            modal.open = false;
-            updateDailyNoteIndicator(dateStr, noteValue);
-          })
-          .catch((err) => {
-            console.error(err);
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return char;
+    }
+  });
+}
+
+function formatNoteTimestamp(isoString) {
+  if (!isoString) {
+    return '';
+  }
+  try {
+    const value = new Date(isoString);
+    if (Number.isNaN(value.getTime())) {
+      return '';
+    }
+    return value.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (error) {
+    return '';
+  }
+}
+
+function formatDailySubtitle(dateStr) {
+  try {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const value = new Date(year, (month || 1) - 1, day || 1);
+    return value.toLocaleDateString(undefined, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  } catch (error) {
+    return dateStr;
+  }
+}
+
+function getIsoWeekStart(year, week) {
+  const simple = new Date(year, 0, 1 + (week - 1) * 7);
+  const dayOfWeek = simple.getDay() || 7;
+  const isoStart = new Date(simple);
+  if (dayOfWeek <= 4) {
+    isoStart.setDate(simple.getDate() - dayOfWeek + 1);
+  } else {
+    isoStart.setDate(simple.getDate() + (8 - dayOfWeek));
+  }
+  isoStart.setHours(0, 0, 0, 0);
+  return isoStart;
+}
+
+function formatWeeklySubtitle(year, week) {
+  try {
+    const start = getIsoWeekStart(year, week);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    const startLabel = start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const endLabel = end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return `Week ${week} • ${startLabel} – ${endLabel}`;
+  } catch (error) {
+    return `Week ${week}, ${year}`;
+  }
+}
+
+function formatMonthlySubtitle(year, month) {
+  try {
+    const value = new Date(year, (month || 1) - 1, 1);
+    return value.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  } catch (error) {
+    return `${year}-${String(month).padStart(2, '0')}`;
+  }
+}
+
+function openNoteEditor(config) {
+  const modal = getModalController();
+  if (!modal) {
+    return;
+  }
+
+  const {
+    title,
+    subtitle,
+    fetchUrl,
+    saveUrl,
+    placeholder,
+    onSave,
+    closeLabel = 'Cancel',
+    saveLabel = 'Save note',
+  } = config;
+
+  modal.title = title;
+  modal.closeLabel = closeLabel;
+  modal.saveLabel = saveLabel;
+  modal.saving = false;
+  modal.body = '<div class="flex items-center justify-center p-6 text-sm text-neutral-300">Loading note…</div>';
+  modal.save = null;
+  modal.open = true;
+
+  fetch(fetchUrl)
+    .then((response) => {
+      if (!response.ok) {
+        return response
+          .json()
+          .catch(() => ({}))
+          .then((data) => {
+            const message = data && data.detail ? data.detail : 'Failed to load note.';
+            throw new Error(message);
           });
-      };
-      modal.open = true;
-      setTimeout(() => {
-        const noteField = document.getElementById('note-field');
-        if (noteField) {
-          noteField.value = noteText;
-          noteField.focus();
-          const length = noteText.length;
-          if (typeof noteField.setSelectionRange === 'function') {
-            try {
-              noteField.setSelectionRange(length, length);
-            } catch (error) {
-              // Some input types may not support selection updates; ignore.
-            }
-          }
-        }
+      }
+      return response.json();
+    })
+    .then((payload) => {
+      const noteText = payload && typeof payload.note === 'string' ? payload.note : '';
+      const updatedAt = payload && typeof payload.updated_at === 'string' ? payload.updated_at : '';
+      renderNoteEditor(modal, {
+        subtitle,
+        noteText,
+        updatedAt,
+        placeholder,
+        saveUrl,
+        onSave,
+        saveLabel,
       });
+    })
+    .catch((error) => {
+      console.error(error);
+      const message = error && error.message ? error.message : 'Failed to load note.';
+      modal.body = `<p class="text-sm text-red-400">${escapeHtml(message)}</p>`;
+      modal.closeLabel = 'Close';
+      modal.saveLabel = 'Save';
+      modal.save = null;
     });
 }
-function openWeeklyNote(year, week) {
-  fetch('/api/notes/weekly/' + year + '/' + week).then(r => r.json()).then(js => {
-    const modal = getModalController();
-    if (!modal) return;
-    const noteText = (js && typeof js.note === 'string') ? js.note : '';
-    modal.title = "Weekly note Y"+year+" W"+week;
-    modal.body = '<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2"></textarea>';
-    modal.save = () => {
-      const field = document.getElementById('note-field');
-      const noteValue = field ? field.value : '';
-      const fd = new FormData();
-      fd.append('note', noteValue);
-      fetch('/api/notes/weekly/' + year + '/' + week, {method:'POST', body:fd})
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error('Failed to save weekly note');
-          }
-          return response.json();
-        })
-        .then(() => {
-          modal.open = false;
-          updateWeeklyNoteIndicator(year, week, noteValue);
-        })
-        .catch((err) => {
-          console.error(err);
-        });
-    };
-    modal.open = true;
-    setTimeout(() => {
-      const noteField = document.getElementById('note-field');
-      if (noteField) {
-        noteField.value = noteText;
-      }
+
+function renderNoteEditor(modal, config) {
+  const {
+    subtitle,
+    noteText,
+    updatedAt,
+    placeholder,
+    saveUrl,
+    onSave,
+    saveLabel,
+  } = config;
+
+  const subtitleText = subtitle ? escapeHtml(subtitle) : '';
+  const placeholderText = placeholder ? escapeHtml(placeholder) : 'Add your note…';
+
+  modal.saveLabel = saveLabel;
+  modal.body = `
+    <div class="space-y-4" data-note-editor-root>
+      <div class="space-y-1">
+        <p class="text-xs uppercase tracking-wide text-neutral-500">Context</p>
+        <p class="text-sm text-neutral-300">${subtitleText}</p>
+        <p class="text-xs text-neutral-500" data-note-updated-display></p>
+      </div>
+      <div class="space-y-2">
+        <label class="block text-sm text-neutral-300" for="note-field">
+          <span class="mb-2 block text-neutral-400">Note</span>
+          <textarea id="note-field" data-autofocus class="w-full min-h-[14rem] rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${placeholderText}" spellcheck="true"></textarea>
+        </label>
+        <div class="flex items-center justify-between text-xs text-neutral-500">
+          <span>Notes are saved as plain text.</span>
+          <span data-note-char-count>0 characters</span>
+        </div>
+      </div>
+      <p class="text-sm text-red-400 hidden" data-note-error></p>
+      <div class="flex items-center justify-between border-t border-neutral-800 pt-3">
+        <button type="button" class="text-xs text-neutral-400 transition hover:text-neutral-100" data-note-clear>Clear note</button>
+        <span class="text-xs text-neutral-500" data-note-updated-display-secondary></span>
+      </div>
+    </div>
+  `;
+
+  window.requestAnimationFrame(() => {
+    initializeNoteEditor({
+      modal,
+      noteText,
+      updatedAt,
+      saveUrl,
+      onSave,
     });
   });
 }
 
-function openMonthlyNote(year, month) {
-  fetch('/api/notes/monthly/' + year + '/' + month).then(r => r.json()).then(js => {
-    const modal = getModalController();
-    if (!modal) return;
-    const noteText = (js && typeof js.note === 'string') ? js.note : '';
-    modal.title = "Monthly note " + year + "-" + String(month).padStart(2,'0');
-    modal.body = '<textarea id="note-field" class="w-full h-40 bg-neutral-800 rounded p-2"></textarea>';
-    modal.save = () => {
-      const field = document.getElementById('note-field');
-      const noteValue = field ? field.value : '';
-      const fd = new FormData();
-      fd.append('note', noteValue);
-      fetch('/api/notes/monthly/' + year + '/' + month, {method:'POST', body:fd})
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error('Failed to save monthly note');
-          }
-          return response.json();
-        })
-        .then(() => {
-          modal.open = false;
-        })
-        .catch((err) => {
-          console.error(err);
-        });
-    };
-    modal.open = true;
-    setTimeout(() => {
-      const noteField = document.getElementById('note-field');
-      if (noteField) {
-        noteField.value = noteText;
+function initializeNoteEditor(options) {
+  const { modal, noteText, updatedAt, saveUrl, onSave } = options;
+  const root = document.querySelector('[data-note-editor-root]');
+  if (!root) {
+    return;
+  }
+
+  const field = root.querySelector('#note-field');
+  const counter = root.querySelector('[data-note-char-count]');
+  const errorEl = root.querySelector('[data-note-error]');
+  const clearButton = root.querySelector('[data-note-clear]');
+  const updatedDisplays = root.querySelectorAll('[data-note-updated-display], [data-note-updated-display-secondary]');
+
+  const updateDisplays = (isoString) => {
+    let label = 'Not saved yet';
+    if (isoString) {
+      const formatted = formatNoteTimestamp(isoString);
+      label = formatted ? `Last updated ${formatted}` : `Last updated ${isoString}`;
+    }
+    updatedDisplays.forEach((element) => {
+      if (element) {
+        element.textContent = label;
       }
     });
+  };
+
+  const updateCounter = () => {
+    if (!counter || !field) {
+      return;
+    }
+    const length = field.value.length;
+    counter.textContent = `${length} ${length === 1 ? 'character' : 'characters'}`;
+  };
+
+  if (field) {
+    field.value = noteText;
+    try {
+      field.focus({ preventScroll: true });
+    } catch (error) {
+      field.focus();
+    }
+    const length = noteText.length;
+    if (typeof field.setSelectionRange === 'function') {
+      try {
+        field.setSelectionRange(length, length);
+      } catch (error) {
+        // ignore selection issues for unsupported inputs
+      }
+    }
+    field.addEventListener('input', () => {
+      updateCounter();
+      if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+      }
+    });
+  }
+
+  updateCounter();
+  updateDisplays(updatedAt);
+
+  if (clearButton && field) {
+    clearButton.addEventListener('click', () => {
+      field.value = '';
+      try {
+        field.focus({ preventScroll: true });
+      } catch (error) {
+        field.focus();
+      }
+      updateCounter();
+    });
+  }
+
+  modal.save = () => {
+    if (!field) {
+      return;
+    }
+
+    if (errorEl) {
+      errorEl.textContent = '';
+      errorEl.classList.add('hidden');
+    }
+
+    const noteValue = field.value;
+    modal.saving = true;
+    const fd = new FormData();
+    fd.append('note', noteValue);
+
+    fetch(saveUrl, { method: 'POST', body: fd })
+      .then((response) => {
+        if (!response.ok) {
+          return response
+            .json()
+            .catch(() => ({}))
+            .then((data) => {
+              const message = data && data.detail ? data.detail : 'Failed to save note.';
+              throw new Error(message);
+            });
+        }
+        return response.json();
+      })
+      .then((payload) => {
+        modal.saving = false;
+        const updatedValue = payload && typeof payload.updated_at === 'string'
+          ? payload.updated_at
+          : new Date().toISOString();
+        if (typeof onSave === 'function') {
+          onSave(noteValue, { updatedAt: updatedValue });
+        }
+        modal.open = false;
+      })
+      .catch((error) => {
+        console.error(error);
+        modal.saving = false;
+        if (errorEl) {
+          errorEl.textContent = error && error.message ? error.message : 'Failed to save note.';
+          errorEl.classList.remove('hidden');
+        }
+      });
+  };
+}
+
+function openDailyNote(dateStr) {
+  openNoteEditor({
+    title: 'Daily note',
+    subtitle: formatDailySubtitle(dateStr),
+    fetchUrl: '/api/notes/daily/' + dateStr,
+    saveUrl: '/api/notes/daily/' + dateStr,
+    placeholder: 'Capture highlights from this trading day…',
+    onSave: (noteValue, meta) => {
+      updateDailyNoteIndicator(dateStr, noteValue, meta && meta.updatedAt);
+    },
+  });
+}
+
+function openWeeklyNote(year, week) {
+  openNoteEditor({
+    title: 'Weekly note',
+    subtitle: formatWeeklySubtitle(year, week),
+    fetchUrl: `/api/notes/weekly/${year}/${week}`,
+    saveUrl: `/api/notes/weekly/${year}/${week}`,
+    placeholder: 'Summarize how the week went…',
+    onSave: (noteValue, meta) => {
+      updateWeeklyNoteIndicator(year, week, noteValue, meta && meta.updatedAt);
+    },
+  });
+}
+
+function openMonthlyNote(year, month) {
+  openNoteEditor({
+    title: 'Monthly note',
+    subtitle: formatMonthlySubtitle(year, month),
+    fetchUrl: `/api/notes/monthly/${year}/${month}`,
+    saveUrl: `/api/notes/monthly/${year}/${month}`,
+    placeholder: 'Reflect on the month as a whole…',
+    onSave: (noteValue, meta) => {
+      updateMonthlyNoteIndicator(year, month, noteValue, meta && meta.updatedAt);
+    },
   });
 }
 
@@ -713,7 +982,7 @@ function getModalController() {
   return modal;
 }
 
-function updateWeeklyNoteIndicator(year, week, noteText) {
+function updateWeeklyNoteIndicator(year, week, noteText, updatedAt) {
   const selector = `[data-week-year='${year}'][data-week-index='${week}']`;
   const trigger = document.querySelector(selector);
   if (!trigger) {
@@ -722,18 +991,17 @@ function updateWeeklyNoteIndicator(year, week, noteText) {
   const normalized = typeof noteText === 'string' ? noteText : '';
   const hasNote = normalized.trim().length > 0;
   trigger.dataset.noteText = normalized;
-  if (hasNote) {
-    trigger.classList.remove('icon-translucent');
-  } else {
-    trigger.classList.add('icon-translucent');
-  }
+  trigger.dataset.noteUpdated = updatedAt || '';
+  trigger.classList.toggle('has-note', hasNote);
+  trigger.classList.toggle('icon-translucent', !hasNote);
+  trigger.setAttribute('aria-label', hasNote ? 'Edit weekly note' : 'Add weekly note');
   const svg = trigger.querySelector('svg');
   if (svg) {
-    if (hasNote) {
-      svg.classList.add('text-amber-400');
-    } else {
-      svg.classList.remove('text-amber-400');
-    }
+    svg.classList.toggle('text-amber-400', hasNote);
+  }
+  const tooltipBody = trigger.querySelector('.note-tooltip [data-note-tooltip-body]');
+  if (tooltipBody) {
+    tooltipBody.textContent = normalized;
   }
   if (hasNote) {
     trigger.setAttribute('title', normalized);
@@ -742,7 +1010,7 @@ function updateWeeklyNoteIndicator(year, week, noteText) {
   }
 }
 
-function updateDailyNoteIndicator(dateStr, noteText) {
+function updateDailyNoteIndicator(dateStr, noteText, updatedAt) {
   const cell = document.querySelector(`[data-day-cell='${dateStr}']`);
   if (!cell) {
     return;
@@ -751,13 +1019,39 @@ function updateDailyNoteIndicator(dateStr, noteText) {
   if (!trigger) {
     return;
   }
-  const tooltip = trigger.querySelector('.note-tooltip');
-  const hasNote = noteText.trim().length > 0;
-  trigger.dataset.noteText = noteText;
+  const normalized = typeof noteText === 'string' ? noteText : '';
+  const hasNote = normalized.trim().length > 0;
+  trigger.dataset.noteText = normalized;
+  trigger.dataset.noteUpdated = updatedAt || '';
   trigger.classList.toggle('has-note', hasNote);
+  trigger.classList.toggle('icon-translucent', !hasNote);
   trigger.setAttribute('aria-label', hasNote ? 'Edit daily note' : 'Add daily note');
-  if (tooltip) {
-    tooltip.textContent = noteText;
+  const tooltipBody = trigger.querySelector('.note-tooltip [data-note-tooltip-body]');
+  if (tooltipBody) {
+    tooltipBody.textContent = normalized;
+  }
+}
+
+function updateMonthlyNoteIndicator(year, month, noteText, updatedAt) {
+  const selector = `[data-month-key='${year}-${String(month).padStart(2, '0')}']`;
+  const trigger = document.querySelector(selector);
+  if (!trigger) {
+    return;
+  }
+  const normalized = typeof noteText === 'string' ? noteText : '';
+  const hasNote = normalized.trim().length > 0;
+  trigger.dataset.noteText = normalized;
+  trigger.dataset.noteUpdated = updatedAt || '';
+  trigger.classList.toggle('has-note', hasNote);
+  trigger.classList.toggle('icon-translucent', !hasNote);
+  trigger.setAttribute('aria-label', hasNote ? 'Edit monthly note' : 'Add monthly note');
+  const svg = trigger.querySelector('svg');
+  if (svg) {
+    svg.classList.toggle('text-amber-400', hasNote);
+  }
+  const tooltipBody = trigger.querySelector('.note-tooltip [data-note-tooltip-body]');
+  if (tooltipBody) {
+    tooltipBody.textContent = normalized;
   }
 }
 </script>
