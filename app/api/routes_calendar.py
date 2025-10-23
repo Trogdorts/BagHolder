@@ -252,18 +252,28 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                     day_unrealized = 0.0
             else:
                 day_unrealized = 0.0
+            day_trades = trades_by_day.get(day_key, [])
+            has_trades = bool(day_trades)
+            has_sell_trade = any(
+                (trade.get("action") or "").upper() == "SELL" for trade in day_trades
+            )
+            realized_value = float(ds.realized) if ds else 0.0
+            show_realized = bool(ds) and (
+                not math.isclose(realized_value, 0.0, abs_tol=0.005) or has_sell_trade
+            )
             wk.append({
                 "date": d,
                 "in_month": (d.month == month),
-                "realized": float(ds.realized) if ds else 0.0,
+                "realized": realized_value,
                 "unrealized": day_unrealized,
                 "has_values": bool(ds),
+                "show_realized": show_realized,
                 "note": note_text,
                 "note_updated_at": note_updated_at,
                 "has_note": bool(note_text.strip()),
                 "is_weekend": is_weekend,
-                "trades": trades_by_day.get(day_key, []),
-                "has_trades": bool(trades_by_day.get(day_key, [])),
+                "trades": day_trades,
+                "has_trades": has_trades,
             })
             if d.month == month and ds:
                 week_total_realized += float(ds.realized)
