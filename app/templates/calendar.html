@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 {% set ui_cfg = cfg.get('ui', {}) %}
-{% set show_unrealized_default = ui_cfg.get('show_unrealized', True) %}
+{% set notes_cfg = cfg.get('notes', {}) %}
+{% set show_unrealized_default = show_unrealized_flag if show_unrealized_flag is defined else ui_cfg.get('show_unrealized', True) %}
 {% set show_trade_count_badges = show_trade_badges if show_trade_badges is defined else ui_cfg.get('show_trade_count', True) %}
+{% set show_text_default = show_text_flag if show_text_flag is defined else ui_cfg.get('show_text', True) %}
+{% set show_weekends = show_weekends_flag if show_weekends_flag is defined else ui_cfg.get('show_weekends', False) %}
+{% set notes_enabled = notes_enabled_flag if notes_enabled_flag is defined else notes_cfg.get('enabled', True) %}
 <div x-data="{
         showUnrealized: {{ 'true' if show_unrealized_default else 'false' }},
         exportOpen: false,
@@ -92,7 +96,6 @@
   </div>
 </div>
 
-{% set show_weekends = ui_cfg.get('show_weekends', False) %}
 {% set day_labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
 {% set visible_day_labels = day_labels if show_weekends else day_labels[:5] %}
 {% set grid_columns = visible_day_labels|length + 1 %}
@@ -130,7 +133,7 @@
           {% endif %}
         </div>
 
-        {% if cfg.ui.show_text %}
+        {% if show_text_default %}
         <div class="text-sm space-y-1">
           {% set realized_class = 'text-green-400' if d.realized > 0 else ('text-red-400' if d.realized < 0 else 'text-neutral-200') %}
           {% if d.has_values %}
@@ -153,6 +156,7 @@
             <path d="M19.14,12.94a7.43,7.43,0,0,0,.05-.94,7.43,7.43,0,0,0-.05-.94l2.11-1.65a.5.5,0,0,0,.12-.64l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.3,7.3,0,0,0-1.63-.94l-.38-2.65A.5.5,0,0,0,12.64,1H9.36a.5.5,0,0,0-.49.41L8.49,4.06a7.3,7.3,0,0,0-1.63.94l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.64L3.94,11.06a7.43,7.43,0,0,0-.05.94,7.43,7.43,0,0,0,.05.94L1.83,14.59a.5.5,0,0,0-.12.64l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.3,7.3,0,0,0,1.63.94l.38,2.65a.5.5,0,0,0,.49.41h3.28a.5.5,0,0,0,.49-.41l.38-2.65a7.3,7.3,0,0,0,1.63-.94l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.64Zm-7.14,2.56A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" fill="currentColor" />
           </svg>
         </a>
+        {% if notes_enabled %}
         <!-- Note icon -->
         <a class="note-trigger absolute bottom-1 right-1 icon-translucent z-10{% if d.has_note %} has-note{% endif %}"
            href="#"
@@ -167,6 +171,7 @@
             <p class="whitespace-pre-line" data-note-tooltip-body>{{ d.note | e }}</p>
           </div>
         </a>
+        {% endif %}
       </div>
     {% endif %}
   {% endfor %}
@@ -182,6 +187,7 @@
         </div>
       </div>
     </div>
+    {% if notes_enabled %}
     <div class="flex justify-end">
       <a class="note-trigger weekly-note-trigger z-10{% if week.has_note %} has-note{% else %} icon-translucent{% endif %}" href="#"
          aria-label="{{ 'Edit weekly note' if week.has_note else 'Add weekly note' }}"
@@ -198,6 +204,7 @@
         </div>
       </a>
     </div>
+    {% endif %}
   </div>
 {% endfor %}
 </div>
@@ -210,21 +217,23 @@
       <div x-show="showUnrealized" x-cloak>
         Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized > 0 else ('text-red-400' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
       </div>
-      {% set month_note_text = month_note.note | default('', true) %}
-      {% set month_note_has = month_note_text.strip() %}
-      <a class="note-trigger absolute top-1 right-1 z-10{% if month_note_has %} has-note{% else %} icon-translucent{% endif %}" href="#"
-         aria-label="{{ 'Edit monthly note' if month_note_has else 'Add monthly note' }}"
-         data-month-key="{{ year }}-{{ '%02d'|format(month) }}"
-         data-note-text="{{ month_note_text | e }}"
-         data-note-updated="{{ month_note.updated_at | default('', true) }}"
-         onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
-        <svg class="w-4 h-4 action-icon{% if month_note_has %} text-amber-400{% endif %}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
-        </svg>
-        <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
-          <p class="whitespace-pre-line" data-note-tooltip-body>{{ month_note_text | e }}</p>
-        </div>
-      </a>
+        {% set month_note_text = month_note.note | default('', true) %}
+        {% set month_note_has = month_note_text.strip() %}
+        {% if notes_enabled %}
+        <a class="note-trigger absolute top-1 right-1 z-10{% if month_note_has %} has-note{% else %} icon-translucent{% endif %}" href="#"
+           aria-label="{{ 'Edit monthly note' if month_note_has else 'Add monthly note' }}"
+           data-month-key="{{ year }}-{{ '%02d'|format(month) }}"
+           data-note-text="{{ month_note_text | e }}"
+           data-note-updated="{{ month_note.updated_at | default('', true) }}"
+           onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
+          <svg class="w-4 h-4 action-icon{% if month_note_has %} text-amber-400{% endif %}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
+          </svg>
+          <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
+            <p class="whitespace-pre-line" data-note-tooltip-body>{{ month_note_text | e }}</p>
+          </div>
+        </a>
+        {% endif %}
     </div>
     <div class="rounded border border-neutral-800 p-3 bg-neutral-950">
       <h2 class="font-semibold">Yearly summary</h2>
@@ -598,26 +607,74 @@ function saveTrades(dateStr) {
     });
 }
 
-function openManual(dateStr, realized, unrealized) {
-  const modal = getModalController();
-  if (!modal) return;
-  modal.title = "Manual edit " + dateStr;
-  modal.body = `
-    <form id="manual-form">
-      <label class="block mb-2 text-sm">Realized
-        <input type="number" step="0.01" name="realized" value="${realized}" class="w-full bg-neutral-800 rounded px-2 py-1">
-      </label>
-      <label class="block mb-2 text-sm">Unrealized (invested)
-        <input type="number" step="0.01" name="unrealized" value="${unrealized}" class="w-full bg-neutral-800 rounded px-2 py-1">
-      </label>
-    </form>`;
-  modal.save = () => {
-    const form = document.getElementById('manual-form');
-    const fd = new FormData(form);
-    fetch('/api/daily/' + dateStr, { method:'POST', body: fd }).then(() => location.reload());
-  };
-  modal.open = true;
-}
+  function openManual(dateStr, realized, unrealized) {
+    const modal = getModalController();
+    if (!modal) return;
+
+    const normalizedRealized = typeof realized === 'number' && Number.isFinite(realized) ? realized : '';
+    const normalizedUnrealized = typeof unrealized === 'number' && Number.isFinite(unrealized) ? unrealized : '';
+
+    modal.title = 'Manual edit ' + dateStr;
+    modal.closeLabel = 'Cancel';
+    modal.saveLabel = 'Save values';
+    modal.saving = false;
+    modal.body = `
+      <form id="manual-form" class="space-y-3">
+        <p class="text-sm text-red-400 hidden" data-manual-error></p>
+        <label class="block text-sm space-y-1">
+          <span class="text-neutral-300">Realized</span>
+          <input type="number" step="0.01" inputmode="decimal" name="realized" value="${normalizedRealized}" class="w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500">
+        </label>
+        <label class="block text-sm space-y-1">
+          <span class="text-neutral-300">Unrealized (invested)</span>
+          <input type="number" step="0.01" inputmode="decimal" name="unrealized" value="${normalizedUnrealized}" class="w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500">
+        </label>
+      </form>`;
+    modal.save = () => {
+      const form = document.getElementById('manual-form');
+      if (!form) {
+        modal.save = null;
+        return;
+      }
+
+      const errorEl = form.querySelector('[data-manual-error]');
+      if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+      }
+
+      const fd = new FormData(form);
+      modal.saving = true;
+
+      fetch('/api/daily/' + dateStr, { method: 'POST', body: fd })
+        .then((response) => {
+          if (!response.ok) {
+            return response
+              .json()
+              .catch(() => ({}))
+              .then((data) => {
+                const message = data && data.detail ? data.detail : 'Failed to save daily values.';
+                throw new Error(message);
+              });
+          }
+          return response.json();
+        })
+        .then(() => {
+          modal.saving = false;
+          modal.open = false;
+          window.location.reload();
+        })
+        .catch((error) => {
+          console.error(error);
+          modal.saving = false;
+          if (errorEl) {
+            errorEl.textContent = error && error.message ? error.message : 'Failed to save daily values.';
+            errorEl.classList.remove('hidden');
+          }
+        });
+    };
+    modal.open = true;
+  }
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => {

@@ -115,6 +115,11 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     ui_cfg = cfg.get("ui", {})
     fill_strategy = ui_cfg.get("unrealized_fill_strategy", "carry_forward")
     show_trade_badges = _coerce_bool(ui_cfg.get("show_trade_count", True), True)
+    show_unrealized_default = _coerce_bool(ui_cfg.get("show_unrealized", True), True)
+    show_text_default = _coerce_bool(ui_cfg.get("show_text", True), True)
+    show_weekends_default = _coerce_bool(ui_cfg.get("show_weekends", False), False)
+    notes_cfg = cfg.get("notes", {})
+    notes_enabled = _coerce_bool(notes_cfg.get("enabled", True), True)
     today = date.today()
 
     start, end, days = month_bounds(year, month)
@@ -336,6 +341,10 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "year_unrealized": year_unrealized,
         "cfg": request.app.state.config.raw,
         "show_trade_badges": show_trade_badges,
+        "show_unrealized_flag": show_unrealized_default,
+        "show_text_flag": show_text_default,
+        "show_weekends_flag": show_weekends_default,
+        "notes_enabled_flag": notes_enabled,
         "export_default_start": start,
         "export_default_end": end,
         "current_year": today.year,
