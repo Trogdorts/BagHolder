@@ -37,3 +37,7 @@ Daily/weekly/monthly notes are accessible via faint note icons. Autosave enabled
 ## Settings
 
 Theme defaults to **dark**. Toggle numeric text visibility, default month view, and note settings.
+
+## Support
+
+If this project has been useful, consider [buying me a coffee](https://buymeacoffee.com/crissejdav6).
