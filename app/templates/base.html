@@ -107,6 +107,15 @@
     [data-theme="light"] .hover\:file\:bg-neutral-700:hover::file-selector-button {
       background-color: #d1d5db !important;
     }
+
+    body.modal-open {
+      overflow: hidden;
+    }
+
+    .modal-background-inert {
+      pointer-events: none !important;
+      user-select: none !important;
+    }
   </style>
 </head>
 <body class="min-h-screen bg-neutral-900 text-neutral-100">
