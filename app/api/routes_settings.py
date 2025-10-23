@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import signal
 from datetime import datetime
 from urllib.parse import quote_plus
@@ -21,6 +22,20 @@ def _resolve_data_directory(cfg: AppConfig) -> str:
     if cfg.path:
         return os.path.dirname(cfg.path)
     return os.environ.get("BAGHOLDER_DATA", "/app/data")
+
+
+_HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _sanitize_hex_color(value: str, default: str, existing: str | None = None) -> str:
+    """Return a normalized hex color from user input."""
+
+    fallback = existing if isinstance(existing, str) and _HEX_COLOR_PATTERN.fullmatch(existing.strip()) else default
+    if isinstance(value, str):
+        candidate = value.strip()
+        if _HEX_COLOR_PATTERN.fullmatch(candidate):
+            return candidate.lower()
+    return fallback.lower()
 
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
@@ -80,28 +95,47 @@ def save_settings(request: Request,
                   show_weekends: str = Form("false"),
                   default_view: str = Form("latest"),
                   icon_color: str = Form("#6b7280"),
+                  primary_color: str = Form("#2563eb"),
+                  primary_hover_color: str = Form("#3b82f6"),
+                  success_color: str = Form("#22c55e"),
+                  warning_color: str = Form("#f59e0b"),
+                  danger_color: str = Form("#dc2626"),
+                  danger_hover_color: str = Form("#ef4444"),
+                  trade_badge_color: str = Form("#34d399"),
+                  trade_badge_text_color: str = Form("#111827"),
+                  note_icon_color: str = Form("#80cbc4"),
                   unrealized_fill_strategy: str = Form("carry_forward"),
                   export_empty_values: str = Form("zero")):
     cfg: AppConfig = request.app.state.config
-    cfg.raw["ui"]["theme"] = theme
-    cfg.raw["ui"]["show_text"] = (show_text.lower() == "true")
-    cfg.raw["ui"]["show_unrealized"] = (show_unrealized.lower() == "true")
-    cfg.raw["ui"]["show_trade_count"] = (show_trade_count.lower() == "true")
-    cfg.raw["ui"]["show_weekends"] = (show_weekends.lower() == "true")
+    ui_section = cfg.raw.setdefault("ui", {})
+    ui_section["theme"] = theme
+    ui_section["show_text"] = (show_text.lower() == "true")
+    ui_section["show_unrealized"] = (show_unrealized.lower() == "true")
+    ui_section["show_trade_count"] = (show_trade_count.lower() == "true")
+    ui_section["show_weekends"] = (show_weekends.lower() == "true")
     cfg.raw["view"]["default"] = default_view
-    icon_color = icon_color.strip()
-    if not icon_color:
-        icon_color = "#6b7280"
-    elif not (icon_color.startswith("#") and len(icon_color) == 7 and all(ch in "0123456789abcdefABCDEF" for ch in icon_color[1:])):
-        icon_color = cfg.raw["ui"].get("icon_color", "#6b7280")
-    cfg.raw["ui"]["icon_color"] = icon_color
+    ui_section["icon_color"] = _sanitize_hex_color(icon_color, "#6b7280", ui_section.get("icon_color"))
+    ui_section["primary_color"] = _sanitize_hex_color(primary_color, "#2563eb", ui_section.get("primary_color"))
+    ui_section["primary_hover_color"] = _sanitize_hex_color(primary_hover_color, "#3b82f6", ui_section.get("primary_hover_color"))
+    ui_section["success_color"] = _sanitize_hex_color(success_color, "#22c55e", ui_section.get("success_color"))
+    ui_section["warning_color"] = _sanitize_hex_color(warning_color, "#f59e0b", ui_section.get("warning_color"))
+    ui_section["danger_color"] = _sanitize_hex_color(danger_color, "#dc2626", ui_section.get("danger_color"))
+    ui_section["danger_hover_color"] = _sanitize_hex_color(danger_hover_color, "#ef4444", ui_section.get("danger_hover_color"))
+    ui_section["trade_badge_color"] = _sanitize_hex_color(trade_badge_color, "#34d399", ui_section.get("trade_badge_color"))
+    ui_section["trade_badge_text_color"] = _sanitize_hex_color(trade_badge_text_color, "#111827", ui_section.get("trade_badge_text_color"))
     fill_options = {"carry_forward", "average_neighbors"}
     if unrealized_fill_strategy not in fill_options:
         unrealized_fill_strategy = "carry_forward"
-    cfg.raw["ui"]["unrealized_fill_strategy"] = unrealized_fill_strategy
+    ui_section["unrealized_fill_strategy"] = unrealized_fill_strategy
     export_preference = export_empty_values.lower()
     cfg.raw.setdefault("export", {})
     cfg.raw["export"]["fill_empty_with_zero"] = export_preference != "empty"
+    notes_section = cfg.raw.setdefault("notes", {})
+    notes_section["icon_has_note_color"] = _sanitize_hex_color(
+        note_icon_color,
+        "#80cbc4",
+        notes_section.get("icon_has_note_color"),
+    )
     cfg.save()
     return RedirectResponse(url="/settings", status_code=303)
 
