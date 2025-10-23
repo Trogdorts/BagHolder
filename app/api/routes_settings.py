@@ -1,15 +1,25 @@
 import json
 import os
 import signal
+from datetime import datetime
+from zipfile import BadZipFile
 
-from fastapi import APIRouter, Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import APIRouter, Request, Form, UploadFile, File
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from starlette.background import BackgroundTask
 
 from app.core.config import AppConfig
+from app.core.lifecycle import reload_application_state
+from app.services.data_backup import create_backup_archive, restore_backup_archive
 from app.services.data_reset import clear_all_data
 
 router = APIRouter()
+
+
+def _resolve_data_directory(cfg: AppConfig) -> str:
+    if cfg.path:
+        return os.path.dirname(cfg.path)
+    return os.environ.get("BAGHOLDER_DATA", "/app/data")
 
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
@@ -17,6 +27,8 @@ def settings_page(request: Request):
     cleared = request.query_params.get("cleared") is not None
     config_imported = request.query_params.get("config_imported") is not None
     error_code = request.query_params.get("config_error")
+    backup_restored = request.query_params.get("backup_restored") is not None
+    backup_error_code = request.query_params.get("backup_error")
     error_message = None
     if error_code == "invalid_json":
         error_message = "Unable to import configuration: the provided text is not valid JSON."
@@ -24,6 +36,15 @@ def settings_page(request: Request):
         error_message = "Unable to import configuration: the JSON must describe an object."
     elif error_code == "apply_failed":
         error_message = "Unable to import configuration due to an unknown error."
+    backup_error_message = None
+    if backup_error_code == "no_file":
+        backup_error_message = "Unable to import backup: no file was provided."
+    elif backup_error_code == "invalid_zip":
+        backup_error_message = "Unable to import backup: the uploaded file is not a valid ZIP archive."
+    elif backup_error_code == "unsafe":
+        backup_error_message = "Unable to import backup: archive paths would write outside the data directory."
+    elif backup_error_code == "apply_failed":
+        backup_error_message = "Unable to import backup due to an unknown error."
     context = {
         "request": request,
         "cfg": cfg.raw,
@@ -31,6 +52,8 @@ def settings_page(request: Request):
         "shutting_down": False,
         "config_imported": config_imported,
         "config_error_message": error_message,
+        "backup_restored": backup_restored,
+        "backup_error_message": backup_error_message,
     }
     return request.app.state.templates.TemplateResponse("settings.html", context)
 
@@ -103,7 +126,7 @@ def import_settings_config(request: Request, config_json: str = Form(...)):
 @router.post("/settings/clear-data", response_class=HTMLResponse)
 def clear_settings_data(request: Request):
     cfg: AppConfig = request.app.state.config
-    data_dir = os.path.dirname(cfg.path) if cfg.path else os.environ.get("BAGHOLDER_DATA", "/app/data")
+    data_dir = _resolve_data_directory(cfg)
     clear_all_data(data_dir)
     return RedirectResponse(url="/settings?cleared=1", status_code=303)
 
@@ -127,3 +150,44 @@ def shutdown_application(request: Request):
     return request.app.state.templates.TemplateResponse(
         "settings.html", context, background=background
     )
+
+
+@router.get("/settings/backup/export")
+def export_full_backup(request: Request):
+    cfg: AppConfig = request.app.state.config
+    data_dir = _resolve_data_directory(cfg)
+    payload = create_backup_archive(data_dir)
+    filename = f"bagholder-backup-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.zip"
+    return Response(
+        content=payload,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post("/settings/backup/import", response_class=HTMLResponse)
+async def import_full_backup(request: Request, backup_file: UploadFile = File(...)):
+    cfg: AppConfig = request.app.state.config
+    data_dir = _resolve_data_directory(cfg)
+
+    if not backup_file.filename:
+        await backup_file.close()
+        return RedirectResponse("/settings?backup_error=no_file", status_code=303)
+
+    payload = await backup_file.read()
+    await backup_file.close()
+
+    if not payload:
+        return RedirectResponse("/settings?backup_error=invalid_zip", status_code=303)
+
+    try:
+        restore_backup_archive(data_dir, payload)
+    except BadZipFile:
+        return RedirectResponse("/settings?backup_error=invalid_zip", status_code=303)
+    except ValueError:
+        return RedirectResponse("/settings?backup_error=unsafe", status_code=303)
+    except Exception:
+        return RedirectResponse("/settings?backup_error=apply_failed", status_code=303)
+
+    reload_application_state(request.app, data_dir=data_dir)
+    return RedirectResponse("/settings?backup_restored=1", status_code=303)

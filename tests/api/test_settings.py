@@ -1,9 +1,12 @@
 import asyncio
+import io
 import json
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import shutil
+import zipfile
 import yaml
 from starlette.requests import Request
 
@@ -16,7 +19,10 @@ from app.api.routes_settings import (
     shutdown_application,
     export_settings_config,
     import_settings_config,
+    export_full_backup,
+    import_full_backup,
 )  # noqa: E402
+from app.services.data_backup import create_backup_archive  # noqa: E402
 
 
 def _build_request(app, method: str = "POST"):
@@ -90,3 +96,74 @@ def test_import_settings_config_with_invalid_json_sets_error(tmp_path, monkeypat
     assert response.status_code == 303
     assert response.headers["location"].startswith("/settings?config_error=")
     assert app.state.config.raw["ui"]["theme"] == "dark"
+
+
+def test_export_full_backup_includes_database_and_config(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    # Ensure there is an extra file to confirm arbitrary data is included.
+    extra_file = Path(app.state.config.path).parent / "notes-cache.txt"
+    extra_file.write_text("notes", encoding="utf-8")
+
+    request = _build_request(app, method="GET")
+    response = export_full_backup(request)
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"].startswith("attachment; filename=bagholder-backup-")
+
+    with zipfile.ZipFile(io.BytesIO(response.body)) as archive:
+        names = set(archive.namelist())
+
+    assert "config.yaml" in names
+    assert "profitloss.db" in names
+    assert "notes-cache.txt" in names
+
+
+def test_import_full_backup_replaces_data_and_reloads_state(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    existing_dir = Path(app.state.config.path).parent
+    old_file = existing_dir / "legacy.txt"
+    old_file.write_text("old", encoding="utf-8")
+
+    backup_source = tmp_path / "backup_src"
+    backup_source.mkdir()
+
+    config_data = app.state.config.as_dict()
+    config_data["ui"]["theme"] = "light"
+    with (backup_source / "config.yaml").open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(config_data, handle, sort_keys=False)
+
+    shutil.copy2(existing_dir / "profitloss.db", backup_source / "profitloss.db")
+    extra_path = backup_source / "extra.txt"
+    extra_path.write_text("extra", encoding="utf-8")
+
+    archive_bytes = create_backup_archive(str(backup_source))
+
+    class DummyUploadFile:
+        def __init__(self, filename: str, data: bytes):
+            self.filename = filename
+            self._data = data
+
+        async def read(self) -> bytes:
+            return self._data
+
+        async def close(self) -> None:
+            return None
+
+    upload = DummyUploadFile("backup.zip", archive_bytes)
+    request = _build_request(app)
+    response = asyncio.run(import_full_backup(request, backup_file=upload))
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/settings?backup_restored=1"
+
+    new_dir = Path(app.state.config.path).parent
+    assert not (new_dir / "legacy.txt").exists()
+    assert (new_dir / "extra.txt").read_text(encoding="utf-8") == "extra"
+    assert app.state.config.raw["ui"]["theme"] == "light"
+    assert app.state.templates.env.globals["cfg"]["ui"]["theme"] == "light"
