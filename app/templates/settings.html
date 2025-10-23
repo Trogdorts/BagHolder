@@ -163,9 +163,6 @@
   <section class="space-y-3 rounded border border-neutral-800 bg-neutral-900 p-4">
     <h3 class="text-base font-semibold">Stock buy &amp; sell CSV trade data</h3>
     <p class="text-sm text-neutral-400">Import executed stock trades from a CSV with columns: date, symbol, action, qty, price, amount.</p>
-    <p class="text-xs text-neutral-500">
-      Need a template? <a href="/static/samples/trades_sample.csv" download class="text-blue-300 hover:underline">Download a sample trade CSV</a>.
-    </p>
     {% if trade_csv_error_message %}
     <div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
       {{ trade_csv_error_message }}
@@ -193,10 +190,7 @@
   </section>
   <section class="space-y-3 rounded border border-neutral-800 bg-neutral-900 p-4">
     <h3 class="text-base font-semibold">Daily summaries</h3>
-    <p class="text-sm text-neutral-400">Restore daily realized and unrealized performance from a CSV export. Columns: date, realized, unrealized, and optionally total_invested.</p>
-    <p class="text-xs text-neutral-500">
-      Need a template? <a href="/static/samples/daily_summaries_sample.csv" download class="text-blue-300 hover:underline">Download a sample daily summary CSV</a>.
-    </p>
+    <p class="text-sm text-neutral-400">Restore daily realized and unrealized performance from a CSV export. Columns: date, realized, unrealized.</p>
     {% if daily_summary_error_message %}
     <div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
       {{ daily_summary_error_message }}
