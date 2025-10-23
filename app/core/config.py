@@ -48,6 +48,33 @@ class AppConfig:
     raw: Dict[str, Any] = field(default_factory=lambda: copy.deepcopy(DEFAULT_CONFIG))
     path: str = ""
 
+    @staticmethod
+    def _merge_with_defaults(overrides: Dict[str, Any]) -> Dict[str, Any]:
+        """Merge overrides with :data:`DEFAULT_CONFIG` recursively.
+
+        The function ensures every key defined in ``DEFAULT_CONFIG`` is present in
+        the resulting mapping while preserving any user-provided overrides and
+        additional keys. Nested dictionaries are merged recursively so that
+        missing values fall back to their defaults without clobbering
+        user-provided nested options.
+        """
+
+        def merge(defaults: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
+            merged = copy.deepcopy(updates) if isinstance(updates, dict) else {}
+            for key, value in defaults.items():
+                if isinstance(value, dict):
+                    existing = merged.get(key)
+                    if isinstance(existing, dict):
+                        merged[key] = merge(value, existing)
+                    else:
+                        merged[key] = merge(value, {})
+                else:
+                    merged.setdefault(key, copy.deepcopy(value))
+            return merged
+
+        sanitized = overrides if isinstance(overrides, dict) else {}
+        return merge(copy.deepcopy(DEFAULT_CONFIG), sanitized)
+
     @classmethod
     def load(cls, data_dir: str) -> "AppConfig":
         os.makedirs(data_dir, exist_ok=True)
@@ -58,15 +85,7 @@ class AppConfig:
             return cls(raw=copy.deepcopy(DEFAULT_CONFIG), path=cfg_path)
         with open(cfg_path, "r") as f:
             loaded = yaml.safe_load(f) or {}
-        # Merge defaults with loaded
-        def merge(d, u):
-            for k, v in d.items():
-                if isinstance(v, dict):
-                    u[k] = merge(v, u.get(k, {}))
-                else:
-                    u.setdefault(k, copy.deepcopy(v))
-            return u
-        merged = merge(copy.deepcopy(DEFAULT_CONFIG), loaded or {})
+        merged = cls._merge_with_defaults(loaded)
         with open(cfg_path, "w") as f:
             yaml.safe_dump(merged, f, sort_keys=False)
         return cls(raw=merged, path=cfg_path)
@@ -74,6 +93,28 @@ class AppConfig:
     def save(self):
         with open(self.path, "w") as f:
             yaml.safe_dump(self.raw, f, sort_keys=False)
+
+    def update_from_dict(self, new_config: Dict[str, Any]) -> None:
+        """Replace the current configuration with ``new_config``.
+
+        Parameters
+        ----------
+        new_config:
+            A mapping describing the configuration values to apply. The values
+            are merged with :data:`DEFAULT_CONFIG` so that missing keys fall
+            back to their defaults. The resulting configuration is persisted to
+            disk immediately.
+        """
+
+        if not isinstance(new_config, dict):
+            raise ValueError("Configuration payload must be a mapping")
+        self.raw = self._merge_with_defaults(new_config)
+        self.save()
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Return a deep copy of the configuration suitable for exporting."""
+
+        return copy.deepcopy(self.raw)
 
     def get(self, *keys, default=None):
         d = self.raw
