@@ -1,17 +1,22 @@
 import csv
 import io
+import json
 import math
 from bisect import bisect_right
 from datetime import date, datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Set, Tuple
 
 from fastapi import APIRouter, Request, Form, Depends, Query, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import (
+    HTMLResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 from sqlalchemy import tuple_
 from sqlalchemy.orm import Session
 import calendar
 from app.core.database import get_session
-from app.core.models import DailySummary, Meta, NoteDaily, NoteWeekly, NoteMonthly, Trade
+from app.core.models import DailySummary, Meta, NoteDaily, NoteMonthly, NoteWeekly, Trade
 from app.core.utils import month_bounds
 from pydantic import BaseModel, Field, field_validator
 
@@ -437,6 +442,10 @@ def export_data(
     request: Request,
     start: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    dataset: str = Query(
+        "summaries",
+        description="The dataset to export (summaries, trades, or notes)",
+    ),
     db: Session = Depends(get_session),
 ):
     fmt = "%Y-%m-%d"
@@ -464,45 +473,159 @@ def export_data(
     start_str = start_dt.strftime(fmt)
     end_str = end_dt.strftime(fmt)
 
-    summaries = (
-        db.query(DailySummary)
-        .filter(DailySummary.date >= start_str, DailySummary.date <= end_str)
-        .order_by(DailySummary.date.asc())
+    dataset_value = dataset
+    if not isinstance(dataset_value, str):  # When called directly in tests
+        dataset_value = getattr(dataset_value, "default", "summaries")
+    dataset_key = (dataset_value or "").strip().lower()
+    if dataset_key not in {"summaries", "trades", "notes"}:
+        raise HTTPException(status_code=400, detail="Unknown export dataset")
+
+    if dataset_key == "summaries":
+        summaries = (
+            db.query(DailySummary)
+            .filter(DailySummary.date >= start_str, DailySummary.date <= end_str)
+            .order_by(DailySummary.date.asc())
+            .all()
+        )
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["date", "realized", "unrealized"])
+
+        def format_value(value: Optional[float]) -> str:
+            if value is None:
+                return "0.00" if fill_empty_with_zero else ""
+            if isinstance(value, str):
+                stripped = value.strip()
+                if not stripped:
+                    return "0.00" if fill_empty_with_zero else ""
+                candidate = stripped
+            else:
+                candidate = value
+            try:
+                number = float(candidate)
+            except (TypeError, ValueError):
+                return "0.00" if fill_empty_with_zero else ""
+            if math.isnan(number):  # pragma: no cover - defensive guard
+                return "0.00" if fill_empty_with_zero else ""
+            return f"{number:.2f}"
+
+        for summary in summaries:
+            writer.writerow(
+                [
+                    summary.date,
+                    format_value(summary.realized),
+                    format_value(summary.unrealized),
+                ]
+            )
+
+        filename = f"bagholder_export_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv"
+        headers = {"Content-Disposition": f"attachment; filename={filename}"}
+        content = buffer.getvalue().encode("utf-8")
+        return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)
+
+    if dataset_key == "trades":
+        trades = (
+            db.query(Trade)
+            .filter(Trade.date >= start_str, Trade.date <= end_str)
+            .order_by(Trade.date.asc(), Trade.id.asc())
+            .all()
+        )
+
+        def _format_decimal(value: Optional[float], precision: int = 2) -> str:
+            if value is None:
+                return ""
+            text = f"{float(value):.{precision}f}"
+            text = text.rstrip("0").rstrip(".")
+            return text or "0"
+
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["date", "symbol", "action", "qty", "price", "amount"])
+        for trade in trades:
+            writer.writerow(
+                [
+                    trade.date,
+                    trade.symbol,
+                    trade.action,
+                    _format_decimal(trade.qty, precision=8),
+                    _format_decimal(trade.price, precision=4),
+                    _format_decimal(trade.amount, precision=4),
+                ]
+            )
+
+        filename = f"bagholder_trades_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv"
+        headers = {"Content-Disposition": f"attachment; filename={filename}"}
+        content = buffer.getvalue().encode("utf-8")
+        return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)
+
+    # dataset_key == "notes"
+    day_cursor = start_dt
+    week_pairs: Set[Tuple[int, int]] = set()
+    month_pairs: Set[Tuple[int, int]] = set()
+    while day_cursor <= end_dt:
+        iso_year, iso_week, _ = day_cursor.isocalendar()
+        week_pairs.add((iso_year, iso_week))
+        month_pairs.add((day_cursor.year, day_cursor.month))
+        day_cursor += timedelta(days=1)
+
+    daily_notes = (
+        db.query(NoteDaily)
+        .filter(NoteDaily.date >= start_str, NoteDaily.date <= end_str)
+        .order_by(NoteDaily.date.asc())
         .all()
     )
 
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(["date", "realized", "unrealized"])
-
-    def format_value(value: Optional[float]) -> str:
-        if value is None:
-            return "0.00" if fill_empty_with_zero else ""
-        if isinstance(value, str):
-            stripped = value.strip()
-            if not stripped:
-                return "0.00" if fill_empty_with_zero else ""
-            candidate = stripped
-        else:
-            candidate = value
-        try:
-            number = float(candidate)
-        except (TypeError, ValueError):
-            return "0.00" if fill_empty_with_zero else ""
-        if math.isnan(number):  # pragma: no cover - defensive guard
-            return "0.00" if fill_empty_with_zero else ""
-        return f"{number:.2f}"
-
-    for summary in summaries:
-        writer.writerow(
-            [
-                summary.date,
-                format_value(summary.realized),
-                format_value(summary.unrealized),
-            ]
+    weekly_notes = []
+    if week_pairs:
+        weekly_notes = (
+            db.query(NoteWeekly)
+            .filter(tuple_(NoteWeekly.year, NoteWeekly.week).in_(list(week_pairs)))
+            .order_by(NoteWeekly.year.asc(), NoteWeekly.week.asc())
+            .all()
         )
 
-    filename = f"bagholder_export_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.csv"
+    monthly_notes = []
+    if month_pairs:
+        monthly_notes = (
+            db.query(NoteMonthly)
+            .filter(tuple_(NoteMonthly.year, NoteMonthly.month).in_(list(month_pairs)))
+            .order_by(NoteMonthly.year.asc(), NoteMonthly.month.asc())
+            .all()
+        )
+
+    payload = {
+        "range": {"start": start_str, "end": end_str},
+        "daily": [
+            {
+                "date": note.date,
+                "note": note.note,
+                "is_markdown": bool(note.is_markdown),
+                "updated_at": note.updated_at,
+            }
+            for note in daily_notes
+        ],
+        "weekly": [
+            {
+                "year": note.year,
+                "week": note.week,
+                "note": note.note,
+                "updated_at": note.updated_at,
+            }
+            for note in weekly_notes
+        ],
+        "monthly": [
+            {
+                "year": note.year,
+                "month": note.month,
+                "note": note.note,
+                "updated_at": note.updated_at,
+            }
+            for note in monthly_notes
+        ],
+    }
+
+    filename = f"bagholder_notes_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.json"
     headers = {"Content-Disposition": f"attachment; filename={filename}"}
-    content = buffer.getvalue().encode("utf-8")
-    return StreamingResponse(iter([content]), media_type="text/csv", headers=headers)
+    content = json.dumps(payload, indent=2).encode("utf-8")
+    return StreamingResponse(iter([content]), media_type="application/json", headers=headers)
