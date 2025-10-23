@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_session
 from app.core.models import DailySummary, Trade
-from app.services.import_daily_summaries import parse_daily_summary_csv
 from app.services.import_thinkorswim import parse_thinkorswim_csv
 from app.services.import_trades_csv import parse_trade_csv
 from app.services.trade_summaries import calculate_daily_trade_map, upsert_daily_summaries
@@ -123,52 +122,6 @@ def _finalize_trade_import(request: Request, db: Session, inserted: int):
                 "inserted": inserted,
             },
         )
-
-    return RedirectResponse(url="/", status_code=303)
-
-
-@router.post("/import/daily-summaries")
-async def import_daily_summaries(
-    request: Request,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_session),
-):
-    content = await file.read()
-    rows = parse_daily_summary_csv(content)
-
-    if not rows:
-        return RedirectResponse(
-            "/settings?daily_summary_error=no_summaries#stock-data-import",
-            status_code=303,
-        )
-
-    now = datetime.utcnow().isoformat()
-    for row in rows:
-        date = row["date"]
-        realized = float(row.get("realized", 0.0))
-        unrealized = float(row.get("unrealized", 0.0))
-        total_invested = float(row.get("total_invested", unrealized))
-        updated_at = row.get("updated_at") or now
-
-        summary = db.get(DailySummary, date)
-        if summary is None:
-            db.add(
-                DailySummary(
-                    date=date,
-                    realized=realized,
-                    unrealized=unrealized,
-                    total_invested=total_invested,
-                    updated_at=updated_at,
-                )
-            )
-            continue
-
-        summary.realized = realized
-        summary.unrealized = unrealized
-        summary.total_invested = total_invested
-        summary.updated_at = updated_at
-
-    db.commit()
 
     return RedirectResponse(url="/", status_code=303)
 
