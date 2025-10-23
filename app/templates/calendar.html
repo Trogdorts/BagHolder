@@ -264,6 +264,7 @@
     saveLabel: 'Save',
     saving: false,
     shouldReloadOnClose: false,
+    beforeClose: null,
     init() {
       window.modalController = this;
       this.$watch('open', (value) => {
@@ -331,8 +332,20 @@
       this.saveLabel = 'Save';
       this.saving = false;
       this.shouldReloadOnClose = false;
+      this.beforeClose = null;
     },
-    close() {
+    close(force = false) {
+      if (!force && typeof this.beforeClose === 'function') {
+        try {
+          const shouldClose = this.beforeClose();
+          if (shouldClose === false) {
+            return;
+          }
+        } catch (error) {
+          console.error(error);
+          return;
+        }
+      }
       const reload = this.shouldReloadOnClose;
       this.open = false;
       if (reload) {
@@ -409,6 +422,7 @@ function createTradeEditorHTML() {
     <div id="trade-editor" class="space-y-3">
       <p id="trade-error" class="text-sm text-red-400 hidden"></p>
       <p id="trade-success" class="text-sm text-emerald-400 hidden"></p>
+      <p id="trade-unsaved" class="text-xs text-amber-400 hidden">Unsaved changes. Save your trades to keep them.</p>
       <div id="trade-empty-message" class="text-sm text-neutral-400 hidden">No trades recorded for this date.</div>
       <div class="overflow-x-auto" style="max-height: 20rem; overflow-y: auto;">
         <table class="min-w-full text-sm text-left text-neutral-200 border border-neutral-800">
@@ -434,7 +448,79 @@ function createTradeEditorHTML() {
     </div>`;
 }
 
-function setupTradeEditor(trades, dateStr) {
+const tradeEditorState = {
+  initialSnapshot: '[]',
+  isDirty: false,
+  unsavedWarning: null,
+};
+
+function getTradeEditorWarningElement() {
+  if (tradeEditorState.unsavedWarning && document.body && document.body.contains(tradeEditorState.unsavedWarning)) {
+    return tradeEditorState.unsavedWarning;
+  }
+  const element = document.getElementById('trade-unsaved');
+  tradeEditorState.unsavedWarning = element || null;
+  return tradeEditorState.unsavedWarning;
+}
+
+function setTradeEditorDirty(isDirty) {
+  tradeEditorState.isDirty = !!isDirty;
+  const warning = getTradeEditorWarningElement();
+  if (warning) {
+    warning.classList.toggle('hidden', !tradeEditorState.isDirty);
+  }
+}
+
+function captureTradeEditorSnapshot() {
+  const tbody = document.getElementById('trade-table-body');
+  if (!tbody) {
+    return '[]';
+  }
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const normalized = rows.map((row) => {
+    const actionSelect = row.querySelector('.trade-action');
+    const symbolInput = row.querySelector('.trade-symbol');
+    const qtyInput = row.querySelector('.trade-qty');
+    const priceInput = row.querySelector('.trade-price');
+    return {
+      id: row.dataset.tradeId ? String(row.dataset.tradeId) : '',
+      action: actionSelect ? actionSelect.value : '',
+      symbol: symbolInput ? symbolInput.value : '',
+      qty: qtyInput ? qtyInput.value : '',
+      price: priceInput ? priceInput.value : '',
+    };
+  });
+  return JSON.stringify(normalized);
+}
+
+function refreshTradeEditorDirtyState() {
+  const snapshot = captureTradeEditorSnapshot();
+  const isDirty = snapshot !== tradeEditorState.initialSnapshot;
+  setTradeEditorDirty(isDirty);
+  return isDirty;
+}
+
+function resetTradeEditorInitialSnapshot() {
+  tradeEditorState.initialSnapshot = captureTradeEditorSnapshot();
+  setTradeEditorDirty(false);
+}
+
+function focusTradeEditorFirstField() {
+  const editor = document.getElementById('trade-editor');
+  if (!editor) {
+    return;
+  }
+  const field = editor.querySelector('.trade-symbol, .trade-qty, .trade-price, .trade-action');
+  if (field && typeof field.focus === 'function') {
+    try {
+      field.focus({ preventScroll: true });
+    } catch (error) {
+      field.focus();
+    }
+  }
+}
+
+function setupTradeEditor(trades) {
   clearTradeEditorMessages();
   const tbody = document.getElementById('trade-table-body');
   if (!tbody) return;
@@ -450,6 +536,7 @@ function setupTradeEditor(trades, dateStr) {
       hideTradeEditorSuccess();
       tbody.appendChild(createTradeRow({ action: 'BUY', symbol: '', qty: '', price: '' }));
       updateTradeEmptyState();
+      refreshTradeEditorDirtyState();
     };
   }
 
@@ -462,6 +549,25 @@ function setupTradeEditor(trades, dateStr) {
   }
 
   updateTradeEmptyState();
+
+  tradeEditorState.unsavedWarning = document.getElementById('trade-unsaved');
+  resetTradeEditorInitialSnapshot();
+
+  const modal = getModalController();
+  if (modal) {
+    modal.beforeClose = () => {
+      const dirty = refreshTradeEditorDirtyState();
+      if (!dirty) {
+        return true;
+      }
+      const confirmClose = window.confirm('You have unsaved changes to these trades. Discard them?');
+      if (!confirmClose) {
+        focusTradeEditorFirstField();
+        return false;
+      }
+      return true;
+    };
+  }
 }
 
 function createTradeRow(trade) {
@@ -470,6 +576,11 @@ function createTradeRow(trade) {
   if (trade && trade.id !== undefined && trade.id !== null) {
     row.dataset.tradeId = String(trade.id);
   }
+
+  const markDirty = () => {
+    hideTradeEditorSuccess();
+    refreshTradeEditorDirtyState();
+  };
 
   const actionCell = document.createElement('td');
   actionCell.className = 'px-2 py-1 border border-neutral-800';
@@ -483,7 +594,7 @@ function createTradeRow(trade) {
   });
   const actionValue = trade && trade.action ? String(trade.action).toUpperCase() : 'BUY';
   actionSelect.value = actionValue;
-  actionSelect.addEventListener('change', hideTradeEditorSuccess);
+  actionSelect.addEventListener('change', markDirty);
   actionCell.appendChild(actionSelect);
   row.appendChild(actionCell);
 
@@ -495,7 +606,7 @@ function createTradeRow(trade) {
   symbolInput.value = trade && trade.symbol ? trade.symbol : '';
   symbolInput.autocomplete = 'off';
   symbolInput.spellcheck = false;
-  symbolInput.addEventListener('input', hideTradeEditorSuccess);
+  symbolInput.addEventListener('input', markDirty);
   symbolCell.appendChild(symbolInput);
   row.appendChild(symbolCell);
 
@@ -503,12 +614,12 @@ function createTradeRow(trade) {
   qtyCell.className = 'px-2 py-1 border border-neutral-800 text-right';
   const qtyInput = document.createElement('input');
   qtyInput.type = 'number';
-  qtyInput.step = '0.0001';
+  qtyInput.step = '1';
   qtyInput.min = '0';
   qtyInput.inputMode = 'decimal';
   qtyInput.className = 'trade-qty w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
   qtyInput.value = trade && trade.qty !== undefined && trade.qty !== null ? trade.qty : '';
-  qtyInput.addEventListener('input', hideTradeEditorSuccess);
+  qtyInput.addEventListener('input', markDirty);
   qtyCell.appendChild(qtyInput);
   row.appendChild(qtyCell);
 
@@ -516,12 +627,12 @@ function createTradeRow(trade) {
   priceCell.className = 'px-2 py-1 border border-neutral-800 text-right';
   const priceInput = document.createElement('input');
   priceInput.type = 'number';
-  priceInput.step = '0.0001';
+  priceInput.step = '0.01';
   priceInput.min = '0';
   priceInput.inputMode = 'decimal';
   priceInput.className = 'trade-price w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
   priceInput.value = trade && trade.price !== undefined && trade.price !== null ? trade.price : '';
-  priceInput.addEventListener('input', hideTradeEditorSuccess);
+  priceInput.addEventListener('input', markDirty);
   priceCell.appendChild(priceInput);
   row.appendChild(priceCell);
 
@@ -535,6 +646,7 @@ function createTradeRow(trade) {
     hideTradeEditorSuccess();
     row.remove();
     updateTradeEmptyState();
+    refreshTradeEditorDirtyState();
   });
   actionsCell.appendChild(removeButton);
   row.appendChild(actionsCell);
@@ -796,7 +908,7 @@ function updateTradeIndicators(dateStr, trades) {
         })
         .then(() => {
           modal.saving = false;
-          modal.open = false;
+          modal.close(true);
           window.location.reload();
         })
         .catch((error) => {
@@ -993,6 +1105,7 @@ function renderNoteEditor(modal, config) {
           <span>Notes are saved as plain text.</span>
           <span data-note-char-count>0 characters</span>
         </div>
+        <p class="text-xs text-amber-400 hidden" data-note-unsaved-warning>Unsaved changes. Save your note to keep it.</p>
       </div>
       <p class="text-sm text-red-400 hidden" data-note-error></p>
       <div class="flex items-center justify-between border-t border-neutral-800 pt-3">
@@ -1025,6 +1138,18 @@ function initializeNoteEditor(options) {
   const errorEl = root.querySelector('[data-note-error]');
   const clearButton = root.querySelector('[data-note-clear]');
   const updatedDisplays = root.querySelectorAll('[data-note-updated-display], [data-note-updated-display-secondary]');
+  const unsavedWarning = root.querySelector('[data-note-unsaved-warning]');
+
+  let initialValue = typeof noteText === 'string' ? noteText : '';
+
+  const updateDirtyState = () => {
+    const currentValue = field ? field.value : '';
+    const isDirty = currentValue !== initialValue;
+    if (unsavedWarning) {
+      unsavedWarning.classList.toggle('hidden', !isDirty);
+    }
+    return isDirty;
+  };
 
   const updateDisplays = (isoString) => {
     let label = 'Not saved yet';
@@ -1068,11 +1193,13 @@ function initializeNoteEditor(options) {
         errorEl.textContent = '';
         errorEl.classList.add('hidden');
       }
+      updateDirtyState();
     });
   }
 
   updateCounter();
   updateDisplays(updatedAt);
+  updateDirtyState();
 
   if (clearButton && field) {
     clearButton.addEventListener('click', () => {
@@ -1083,8 +1210,28 @@ function initializeNoteEditor(options) {
         field.focus();
       }
       updateCounter();
+      updateDirtyState();
     });
   }
+
+  modal.beforeClose = () => {
+    const dirty = updateDirtyState();
+    if (!dirty) {
+      return true;
+    }
+    const confirmClose = window.confirm('You have unsaved changes to this note. Discard them?');
+    if (!confirmClose) {
+      if (field) {
+        try {
+          field.focus({ preventScroll: true });
+        } catch (error) {
+          field.focus();
+        }
+      }
+      return false;
+    }
+    return true;
+  };
 
   modal.save = () => {
     if (!field) {
@@ -1122,7 +1269,9 @@ function initializeNoteEditor(options) {
         if (typeof onSave === 'function') {
           onSave(noteValue, { updatedAt: updatedValue });
         }
-        modal.open = false;
+        initialValue = noteValue;
+        updateDirtyState();
+        modal.close(true);
       })
       .catch((error) => {
         console.error(error);
