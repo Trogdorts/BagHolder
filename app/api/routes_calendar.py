@@ -7,6 +7,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Request, Form, Depends, Query, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from sqlalchemy import tuple_
 from sqlalchemy.orm import Session
 import calendar
 from app.core.database import get_session
@@ -172,6 +173,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     weeks = []
     month_days = cal.monthdatescalendar(year, month)
     for week in month_days:
+        iso_year, iso_week, _ = week[0].isocalendar()
         wk = []
         week_total_realized = 0.0
         last_unrealized_value = None
@@ -227,16 +229,23 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             "week_realized": week_total_realized,
             "week_unrealized": last_unrealized_value if last_unrealized_value is not None else 0.0,
             "week_index": len(weeks) + 1,
+            "week_year": iso_year,
+            "week_number": iso_week,
+            "note": "",
+            "has_note": False,
         })
 
-    weekly_note_rows = (
-        db.query(NoteWeekly)
-        .filter(NoteWeekly.year == year)
-        .all()
-    )
-    weekly_notes = {row.week: row.note for row in weekly_note_rows}
+    week_pairs = {(week_entry["week_year"], week_entry["week_number"]) for week_entry in weeks}
+    weekly_note_rows = []
+    if week_pairs:
+        weekly_note_rows = (
+            db.query(NoteWeekly)
+            .filter(tuple_(NoteWeekly.year, NoteWeekly.week).in_(list(week_pairs)))
+            .all()
+        )
+    weekly_notes = {(row.year, row.week): row.note for row in weekly_note_rows}
     for week_entry in weeks:
-        note_text = weekly_notes.get(week_entry["week_index"], "")
+        note_text = weekly_notes.get((week_entry["week_year"], week_entry["week_number"]), "")
         week_entry["note"] = note_text
         week_entry["has_note"] = bool(note_text.strip())
 

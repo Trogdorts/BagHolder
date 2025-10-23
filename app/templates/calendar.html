@@ -174,10 +174,10 @@
     </div>
     <div class="flex justify-end">
       <a class="z-10 weekly-note-trigger{% if not week.has_note %} icon-translucent{% endif %}" href="#" aria-label="Add weekly note"
-         data-week-year="{{ year }}"
-         data-week-index="{{ week.week_index }}"
+         data-week-year="{{ week.week_year }}"
+         data-week-index="{{ week.week_number }}"
          data-note-text="{{ week.note | default('', true) | e }}"
-         onclick="openWeeklyNote({{ year }}, {{ week.week_index }}); return false;">
+         onclick="openWeeklyNote({{ week.week_year }}, {{ week.week_number }}); return false;">
         <svg class="w-4 h-4 action-icon{% if week.has_note %} text-amber-400{% endif %}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
         </svg>

@@ -12,7 +12,7 @@ if str(ROOT_DIR) not in sys.path:
 from app.main import create_app
 from app.api.routes_calendar import calendar_view
 from app.core import database as db
-from app.core.models import DailySummary
+from app.core.models import DailySummary, NoteWeekly
 
 
 def _build_request(app):
@@ -25,6 +25,13 @@ def _get_day(weeks, target_date):
             if day["date"] == target_date:
                 return day
     raise AssertionError(f"Date {target_date} not found in weeks data")
+
+
+def _get_week(weeks, index):
+    for week in weeks:
+        if week["week_index"] == index:
+            return week
+    raise AssertionError(f"Week index {index} not found in weeks data")
 
 
 def test_average_fill_for_missing_unrealized(tmp_path, monkeypatch):
@@ -60,6 +67,44 @@ def test_average_fill_for_missing_unrealized(tmp_path, monkeypatch):
         weeks = response.context["weeks"]
         day = _get_day(weeks, date(2024, 1, 2))
         assert day["unrealized"] == pytest.approx(150.0)
+
+    db.dispose_engine()
+
+
+def test_weekly_notes_follow_iso_week(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    with db.SessionLocal() as session:
+        session.add(
+            NoteWeekly(
+                year=2024,
+                week=1,
+                note="Week one note",
+                updated_at="now",
+            )
+        )
+        session.commit()
+
+    with db.SessionLocal() as session:
+        request = _build_request(app)
+        response = calendar_view(2024, 1, request, db=session)
+        weeks = response.context["weeks"]
+        jan_week_one = _get_week(weeks, 1)
+        assert jan_week_one["week_year"] == 2024
+        assert jan_week_one["week_number"] == 1
+        assert jan_week_one["note"] == "Week one note"
+        assert jan_week_one["has_note"] is True
+
+    with db.SessionLocal() as session:
+        request = _build_request(app)
+        response = calendar_view(2024, 2, request, db=session)
+        weeks = response.context["weeks"]
+        feb_first_week = _get_week(weeks, 1)
+        assert feb_first_week["week_number"] == 5
+        assert feb_first_week["note"] == ""
+        assert feb_first_week["has_note"] is False
 
     db.dispose_engine()
 
