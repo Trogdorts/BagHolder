@@ -21,6 +21,7 @@ from app.api.routes_settings import (
     import_settings_config,
     export_full_backup,
     import_full_backup,
+    export_debug_logs,
 )  # noqa: E402
 from app.services.data_backup import create_backup_archive  # noqa: E402
 
@@ -137,6 +138,22 @@ def test_export_full_backup_includes_database_and_config(tmp_path, monkeypatch):
     assert "config.yaml" in names
     assert "profitloss.db" in names
     assert "notes-cache.txt" in names
+
+
+def test_export_debug_logs_downloads_file(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    request = _build_request(app, method="GET")
+    log_path = Path(app.state.log_path)
+    log_path.write_text("diagnostic entry\n", encoding="utf-8")
+
+    response = export_debug_logs(request)
+
+    assert response.status_code == 200
+    assert response.headers["content-disposition"].startswith("attachment; filename=bagholder-debug-")
+    assert b"diagnostic entry" in response.body
 
 
 def test_import_full_backup_replaces_data_and_reloads_state(tmp_path, monkeypatch):

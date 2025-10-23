@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -11,10 +12,15 @@ from fastapi.templating import Jinja2Templates
 
 from app.core.config import AppConfig
 from app.core.database import dispose_engine, init_db
+from app.core.logger import configure_logging
 from app.core.seed import ensure_seed
+from app.core.utils import coerce_bool
 
 
 _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+log = logging.getLogger(__name__)
 
 
 def _parse_hex_color(color: str) -> tuple[int, int, int] | None:
@@ -105,6 +111,15 @@ def reload_application_state(app: FastAPI, data_dir: str | None = None) -> AppCo
     os.makedirs(data_dir, exist_ok=True)
 
     cfg = AppConfig.load(data_dir)
+    diagnostics_cfg = cfg.raw.get("diagnostics", {}) if isinstance(cfg.raw, dict) else {}
+    debug_logging = coerce_bool(diagnostics_cfg.get("debug_logging"), False)
+    log_path = configure_logging(
+        data_dir,
+        debug_enabled=debug_logging,
+        max_bytes=diagnostics_cfg.get("log_max_bytes", 1_048_576),
+        retention=diagnostics_cfg.get("log_retention", 5),
+    )
+
     db_path = os.path.join(data_dir, "profitloss.db")
 
     # Recreate the engine to ensure SQLite reloads the database file.
@@ -115,6 +130,13 @@ def reload_application_state(app: FastAPI, data_dir: str | None = None) -> AppCo
     templates = _build_templates(cfg)
     app.state.templates = templates
     app.state.config = cfg
+    app.state.log_path = str(log_path)
+    app.state.debug_logging_enabled = debug_logging
+
+    log.info(
+        "Application state reloaded (debug_logging=%s, log_path=%s)",
+        debug_logging,
+        log_path,
+    )
 
     return cfg
-

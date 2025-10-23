@@ -1,6 +1,15 @@
 <!doctype html>
-{% set theme = (cfg.get('ui', {}) if cfg is defined else {}).get('theme', 'dark') %}
-{% set icon_color = (cfg.get('ui', {}) if cfg is defined else {}).get('icon_color', '#6b7280') %}
+{% set ui_cfg = (cfg.get('ui', {}) if cfg is defined else {}) %}
+{% set theme = ui_cfg.get('theme', 'dark') %}
+{% set icon_color = ui_cfg.get('icon_color', '#6b7280') %}
+{% set primary_color = ui_cfg.get('primary_color', '#2563eb') %}
+{% set primary_hover_color = ui_cfg.get('primary_hover_color', '#1d4ed8') %}
+{% set success_color = ui_cfg.get('success_color', '#22c55e') %}
+{% set warning_color = ui_cfg.get('warning_color', '#f59e0b') %}
+{% set danger_color = ui_cfg.get('danger_color', '#dc2626') %}
+{% set danger_hover_color = ui_cfg.get('danger_hover_color', '#b91c1c') %}
+{% set trade_badge_color = ui_cfg.get('trade_badge_color', '#34d399') %}
+{% set trade_badge_text_color = ui_cfg.get('trade_badge_text_color', '#111827') %}
 {% set notes_cfg = (cfg.get('notes', {}) if cfg is defined else {}) %}
 {% set note_icon_active_color = notes_cfg.get('icon_has_note_color', '#80CBC4') %}
 {% set note_icon_active_opacity = notes_cfg.get('icon_hover_opacity', 0.9) %}
@@ -16,6 +25,11 @@
     :root {
       --action-icon-color: {{ icon_color }};
       --note-icon-active-color: {{ note_icon_active_color }};
+      --surface-card: #111827;
+      --surface-subtle: #0f172a;
+      --border-subtle: #1f2937;
+      --text-muted: #9ca3af;
+      --text-tertiary: #6b7280;
       --primary-color: {{ primary_color }};
       --primary-hover-color: {{ primary_hover_color }};
       --primary-soft-bg: {{ primary_color | hex_to_rgba(0.12) }};
@@ -41,6 +55,64 @@
       --trade-button-bg: {{ success_color | hex_to_rgba(0.12) }};
       --trade-button-hover-bg: {{ success_color | hex_to_rgba(0.2) }};
       --trade-button-ring: {{ success_color | hex_to_rgba(0.45) }};
+    }
+
+    .settings-grid {
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    @media (min-width: 1024px) {
+      .settings-grid.two-column {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    .settings-card {
+      background-color: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.4);
+    }
+
+    .settings-card > * + * {
+      margin-top: 1rem;
+    }
+
+    .settings-card h2,
+    .settings-card h3 {
+      color: inherit;
+      margin: 0;
+      font-weight: 600;
+    }
+
+    .settings-card p {
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .settings-subcard {
+      background-color: var(--surface-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: 0.75rem;
+      padding: 1rem;
+    }
+
+    .settings-subcard + .settings-subcard {
+      margin-top: 1rem;
+    }
+
+    .settings-section-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+
+    .settings-muted {
+      color: var(--text-tertiary);
+      font-size: 0.875rem;
+      line-height: 1.4;
     }
 
     .btn {
@@ -257,6 +329,11 @@
 
     [data-theme="light"] {
       color-scheme: light;
+      --surface-card: #ffffff;
+      --surface-subtle: #f8fafc;
+      --border-subtle: #e2e8f0;
+      --text-muted: #4b5563;
+      --text-tertiary: #6b7280;
     }
 
     [data-theme="light"] body {

@@ -1,5 +1,6 @@
 import yaml
 from fastapi import FastAPI
+from pathlib import Path
 
 from app.core.lifecycle import reload_application_state
 
@@ -12,6 +13,9 @@ def test_reload_application_state_updates_config_and_templates(tmp_path):
 
     assert app.state.config is cfg
     assert app.state.templates.env.globals["cfg"]["ui"]["theme"] == "dark"
+    assert Path(app.state.log_path).name == "bagholder.log"
+    assert Path(app.state.log_path).exists()
+    assert app.state.debug_logging_enabled is False
 
     cfg_path = data_dir / "config.yaml"
     assert cfg_path.exists()

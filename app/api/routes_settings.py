@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import signal
@@ -8,15 +9,25 @@ from urllib.parse import quote_plus
 from zipfile import BadZipFile
 
 from fastapi import APIRouter, Request, Form, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
 from starlette.background import BackgroundTask
 
 from app.core.config import AppConfig, DEFAULT_CONFIG
 from app.core.lifecycle import reload_application_state
+from app.core.logger import configure_logging
+from app.core.utils import coerce_bool
 from app.services.data_backup import create_backup_archive, restore_backup_archive
 from app.services.data_reset import clear_all_data
 
 router = APIRouter()
+
+
+log = logging.getLogger(__name__)
 
 
 def _resolve_data_directory(cfg: AppConfig) -> str:
@@ -137,6 +148,38 @@ _COLOR_FIELD_INDEX = {
 }
 
 
+_CONFIG_IMPORT_ERRORS = {
+    "invalid_json": "Unable to import configuration: the provided data was not valid JSON.",
+    "invalid_type": "Unable to import configuration: the JSON must describe an object.",
+    "apply_failed": "Unable to import configuration due to an unknown error.",
+}
+
+_BACKUP_IMPORT_ERRORS = {
+    "no_file": "Unable to import backup: no file was provided.",
+    "invalid_zip": "Unable to import backup: the uploaded file is not a valid ZIP archive.",
+    "unsafe": "Unable to import backup: archive paths would write outside the data directory.",
+    "apply_failed": "Unable to import backup due to an unknown error.",
+}
+
+_TRADE_IMPORT_ERRORS = {
+    "no_trades": "No trades were detected in the uploaded file.",
+}
+
+_THINKORSWIM_IMPORT_ERRORS = {
+    "no_trades": "No trades were detected in the uploaded statement.",
+}
+
+_LOG_EXPORT_ERRORS = {
+    "missing": "No log file is available yet. Generate activity and try again.",
+}
+
+
+def _resolve_message(code: str | None, mapping: dict[str, str]) -> str | None:
+    if not code:
+        return None
+    return mapping.get(code, code)
+
+
 def _build_color_context(cfg: AppConfig) -> tuple[list[dict[str, Any]], dict[str, str]]:
     """Return structured color configuration data for the settings template."""
 
@@ -178,39 +221,24 @@ def _build_color_context(cfg: AppConfig) -> tuple[list[dict[str, Any]], dict[str
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
     cfg: AppConfig = request.app.state.config
-    cleared = request.query_params.get("cleared") is not None
-    config_imported = request.query_params.get("config_imported") is not None
-    error_param = request.query_params.get("config_error")
-    backup_restored = request.query_params.get("backup_restored") is not None
-    backup_error_code = request.query_params.get("backup_error")
-    trade_csv_error_code = request.query_params.get("trade_csv_error")
-    thinkorswim_error_code = request.query_params.get("thinkorswim_error")
-    error_message = None
-    if error_param:
-        if error_param == "invalid_json":
-            error_message = "Unable to import configuration: the provided data was not valid JSON."
-        elif error_param == "invalid_type":
-            error_message = "Unable to import configuration: the JSON must describe an object."
-        elif error_param == "apply_failed":
-            error_message = "Unable to import configuration due to an unknown error."
-        else:
-            error_message = error_param
-    backup_error_message = None
-    if backup_error_code == "no_file":
-        backup_error_message = "Unable to import backup: no file was provided."
-    elif backup_error_code == "invalid_zip":
-        backup_error_message = "Unable to import backup: the uploaded file is not a valid ZIP archive."
-    elif backup_error_code == "unsafe":
-        backup_error_message = "Unable to import backup: archive paths would write outside the data directory."
-    elif backup_error_code == "apply_failed":
-        backup_error_message = "Unable to import backup due to an unknown error."
-    trade_csv_error_message = None
-    if trade_csv_error_code == "no_trades":
-        trade_csv_error_message = "No trades were detected in the uploaded file."
-    thinkorswim_error_message = None
-    if thinkorswim_error_code == "no_trades":
-        thinkorswim_error_message = "No trades were detected in the uploaded statement."
+    params = request.query_params
+    cleared = params.get("cleared") is not None
+    config_imported = params.get("config_imported") is not None
+    backup_restored = params.get("backup_restored") is not None
+    error_message = _resolve_message(params.get("config_error"), _CONFIG_IMPORT_ERRORS)
+    backup_error_message = _resolve_message(params.get("backup_error"), _BACKUP_IMPORT_ERRORS)
+    trade_csv_error_message = _resolve_message(
+        params.get("trade_csv_error"), _TRADE_IMPORT_ERRORS
+    )
+    thinkorswim_error_message = _resolve_message(
+        params.get("thinkorswim_error"), _THINKORSWIM_IMPORT_ERRORS
+    )
+    log_error_message = _resolve_message(params.get("log_error"), _LOG_EXPORT_ERRORS)
     color_groups, color_defaults = _build_color_context(cfg)
+    diagnostics_cfg = cfg.raw.get("diagnostics", {}) if isinstance(cfg.raw, dict) else {}
+    debug_logging_enabled = coerce_bool(diagnostics_cfg.get("debug_logging"), False)
+    log_path = getattr(request.app.state, "log_path", None)
+    log_export_available = bool(log_path and os.path.exists(log_path))
 
     context = {
         "request": request,
@@ -225,38 +253,46 @@ def settings_page(request: Request):
         "thinkorswim_error_message": thinkorswim_error_message,
         "color_groups": color_groups,
         "color_defaults": color_defaults,
+        "debug_logging_enabled": debug_logging_enabled,
+        "log_export_available": log_export_available,
+        "log_error_message": log_error_message,
     }
     return request.app.state.templates.TemplateResponse("settings.html", context)
 
 @router.post("/settings", response_class=HTMLResponse)
-def save_settings(request: Request,
-                  theme: str = Form(...),
-                  show_text: str = Form("true"),
-                  show_unrealized: str = Form("true"),
-                  show_trade_count: str = Form("true"),
-                  show_weekends: str = Form("false"),
-                  default_view: str = Form("latest"),
-                  icon_color: str = Form("#6b7280"),
-                  primary_color: str = Form("#2563eb"),
-                  primary_hover_color: str = Form("#1d4ed8"),
-                  success_color: str = Form("#22c55e"),
-                  warning_color: str = Form("#f59e0b"),
-                  danger_color: str = Form("#dc2626"),
-                  danger_hover_color: str = Form("#b91c1c"),
-                  trade_badge_color: str = Form("#34d399"),
-                  trade_badge_text_color: str = Form("#111827"),
-                  note_icon_color: str = Form("#80cbc4"),
-                  unrealized_fill_strategy: str = Form("carry_forward"),
-                  export_empty_values: str = Form("zero")):
+def save_settings(
+    request: Request,
+    theme: str = Form(...),
+    show_text: str = Form("true"),
+    show_unrealized: str = Form("true"),
+    show_trade_count: str = Form("true"),
+    show_weekends: str = Form("false"),
+    default_view: str = Form("latest"),
+    debug_logging: str = Form("false"),
+    icon_color: str = Form("#6b7280"),
+    primary_color: str = Form("#2563eb"),
+    primary_hover_color: str = Form("#1d4ed8"),
+    success_color: str = Form("#22c55e"),
+    warning_color: str = Form("#f59e0b"),
+    danger_color: str = Form("#dc2626"),
+    danger_hover_color: str = Form("#b91c1c"),
+    trade_badge_color: str = Form("#34d399"),
+    trade_badge_text_color: str = Form("#111827"),
+    note_icon_color: str = Form("#80cbc4"),
+    unrealized_fill_strategy: str = Form("carry_forward"),
+    export_empty_values: str = Form("zero"),
+):
     cfg: AppConfig = request.app.state.config
     ui_section = cfg.raw.setdefault("ui", {})
     notes_section = cfg.raw.setdefault("notes", {})
+    diagnostics_section = cfg.raw.setdefault("diagnostics", {})
+    view_section = cfg.raw.setdefault("view", {})
     ui_section["theme"] = theme
-    ui_section["show_text"] = (show_text.lower() == "true")
-    ui_section["show_unrealized"] = (show_unrealized.lower() == "true")
-    ui_section["show_trade_count"] = (show_trade_count.lower() == "true")
-    ui_section["show_weekends"] = (show_weekends.lower() == "true")
-    cfg.raw["view"]["default"] = default_view
+    ui_section["show_text"] = coerce_bool(show_text, True)
+    ui_section["show_unrealized"] = coerce_bool(show_unrealized, True)
+    ui_section["show_trade_count"] = coerce_bool(show_trade_count, True)
+    ui_section["show_weekends"] = coerce_bool(show_weekends, False)
+    view_section["default"] = default_view
     color_sections = {
         "ui": ui_section,
         "notes": notes_section,
@@ -281,13 +317,30 @@ def save_settings(request: Request,
     export_preference = export_empty_values.lower()
     cfg.raw.setdefault("export", {})
     cfg.raw["export"]["fill_empty_with_zero"] = export_preference != "empty"
+    debug_logging_enabled = coerce_bool(debug_logging, diagnostics_section.get("debug_logging", False))
+    diagnostics_section["debug_logging"] = debug_logging_enabled
     cfg.save()
+    data_dir = _resolve_data_directory(cfg)
+    log_path = configure_logging(
+        data_dir,
+        debug_enabled=debug_logging_enabled,
+        max_bytes=diagnostics_section.get("log_max_bytes", 1_048_576),
+        retention=diagnostics_section.get("log_retention", 5),
+    )
+    request.app.state.log_path = str(log_path)
+    request.app.state.debug_logging_enabled = debug_logging_enabled
+    log.info(
+        "Settings updated (theme=%s, debug_logging=%s)",
+        theme,
+        debug_logging_enabled,
+    )
     return RedirectResponse(url="/settings", status_code=303)
 
 
 @router.get("/settings/config/export")
 def export_settings_config(request: Request):
     cfg: AppConfig = request.app.state.config
+    log.info("Configuration exported as JSON")
     return JSONResponse(
         content=cfg.as_dict(),
         headers={"Content-Disposition": "attachment; filename=bagholder-config.json"},
@@ -296,6 +349,7 @@ def export_settings_config(request: Request):
 
 def _config_error_redirect(message: str) -> RedirectResponse:
     safe_message = quote_plus(message, safe="")
+    log.warning("Configuration import failed: %s", message)
     return RedirectResponse(url=f"/settings?config_error={safe_message}", status_code=303)
 
 
@@ -304,6 +358,7 @@ async def import_settings_config(request: Request, config_file: UploadFile = Fil
     cfg: AppConfig = request.app.state.config
 
     if config_file is None or not config_file.filename:
+        log.warning("Configuration import attempted without a file")
         if config_file is not None:
             await config_file.close()
         return _config_error_redirect(
@@ -316,6 +371,7 @@ async def import_settings_config(request: Request, config_file: UploadFile = Fil
         await config_file.close()
 
     if not payload_bytes:
+        log.warning("Configuration import failed: uploaded file was empty")
         return _config_error_redirect(
             "Unable to import configuration: the uploaded file was empty."
         )
@@ -323,6 +379,7 @@ async def import_settings_config(request: Request, config_file: UploadFile = Fil
     try:
         payload = payload_bytes.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
+        log.warning("Configuration import failed: invalid encoding (%s)", exc)
         return _config_error_redirect(
             f"Unable to import configuration: the file is not valid UTF-8 ({exc})."
         )
@@ -331,6 +388,7 @@ async def import_settings_config(request: Request, config_file: UploadFile = Fil
         parsed = json.loads(payload)
     except json.JSONDecodeError as exc:
         detail = f"{exc.msg} at line {exc.lineno}, column {exc.colno}"
+        log.warning("Configuration import failed: JSON parsing error (%s)", detail)
         return _config_error_redirect(
             f"Unable to import configuration: JSON parsing failed ({detail})."
         )
@@ -339,11 +397,13 @@ async def import_settings_config(request: Request, config_file: UploadFile = Fil
         cfg.update_from_dict(parsed)
     except ValueError as exc:
         detail = str(exc) or "the provided JSON does not describe a valid configuration"
+        log.warning("Configuration import failed: %s", detail)
         return _config_error_redirect(
             f"Unable to import configuration: {detail}."
         )
     except Exception as exc:  # pragma: no cover - defensive guard
         detail = f"unexpected {exc.__class__.__name__}: {exc}".strip()
+        log.exception("Configuration import failed unexpectedly")
         return _config_error_redirect(
             f"Unable to import configuration: {detail}."
         )
@@ -352,6 +412,7 @@ async def import_settings_config(request: Request, config_file: UploadFile = Fil
     if templates is not None:
         templates.env.globals["cfg"] = cfg.raw
 
+    log.info("Configuration imported successfully from %s", config_file.filename)
     return RedirectResponse(url="/settings?config_imported=1", status_code=303)
 
 
@@ -360,6 +421,7 @@ def clear_settings_data(request: Request):
     cfg: AppConfig = request.app.state.config
     data_dir = _resolve_data_directory(cfg)
     clear_all_data(data_dir)
+    log.warning("All application data cleared via settings page")
     return RedirectResponse(url="/settings?cleared=1", status_code=303)
 
 
@@ -371,6 +433,7 @@ def shutdown_application(request: Request):
         sig = getattr(signal, "SIGTERM", signal.SIGINT)
         os.kill(os.getpid(), sig)
 
+    log.info("Shutdown requested via settings page")
     color_groups, color_defaults = _build_color_context(cfg)
     context = {
         "request": request,
@@ -393,9 +456,28 @@ def export_full_backup(request: Request):
     data_dir = _resolve_data_directory(cfg)
     payload = create_backup_archive(data_dir)
     filename = f"bagholder-backup-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.zip"
+    log.info("Full backup exported to %s", filename)
     return Response(
         content=payload,
         media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/settings/logs/export")
+def export_debug_logs(request: Request):
+    log_path = getattr(request.app.state, "log_path", None)
+    if not log_path or not os.path.exists(log_path):
+        log.warning("Log export requested but no log file is available")
+        return RedirectResponse("/settings?log_error=missing", status_code=303)
+
+    filename = f"bagholder-debug-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.log"
+    log.info("Debug log exported to %s", filename)
+    with open(log_path, "rb") as handle:
+        payload = handle.read()
+    return Response(
+        content=payload,
+        media_type="text/plain",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
@@ -407,22 +489,28 @@ async def import_full_backup(request: Request, backup_file: UploadFile = File(..
 
     if not backup_file.filename:
         await backup_file.close()
+        log.warning("Backup import attempted without selecting a file")
         return RedirectResponse("/settings?backup_error=no_file", status_code=303)
 
     payload = await backup_file.read()
     await backup_file.close()
 
     if not payload:
+        log.warning("Backup import failed: file was empty")
         return RedirectResponse("/settings?backup_error=invalid_zip", status_code=303)
 
     try:
         restore_backup_archive(data_dir, payload)
     except BadZipFile:
+        log.warning("Backup import failed: invalid zip archive")
         return RedirectResponse("/settings?backup_error=invalid_zip", status_code=303)
     except ValueError:
+        log.warning("Backup import failed: unsafe archive contents")
         return RedirectResponse("/settings?backup_error=unsafe", status_code=303)
     except Exception:
+        log.exception("Backup import failed unexpectedly")
         return RedirectResponse("/settings?backup_error=apply_failed", status_code=303)
 
     reload_application_state(request.app, data_dir=data_dir)
+    log.info("Backup imported successfully from %s", backup_file.filename)
     return RedirectResponse("/settings?backup_restored=1", status_code=303)
