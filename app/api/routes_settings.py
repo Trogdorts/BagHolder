@@ -30,7 +30,6 @@ def settings_page(request: Request):
     error_param = request.query_params.get("config_error")
     backup_restored = request.query_params.get("backup_restored") is not None
     backup_error_code = request.query_params.get("backup_error")
-    daily_summary_error_code = request.query_params.get("daily_summary_error")
     trade_csv_error_code = request.query_params.get("trade_csv_error")
     thinkorswim_error_code = request.query_params.get("thinkorswim_error")
     error_message = None
@@ -52,9 +51,6 @@ def settings_page(request: Request):
         backup_error_message = "Unable to import backup: archive paths would write outside the data directory."
     elif backup_error_code == "apply_failed":
         backup_error_message = "Unable to import backup due to an unknown error."
-    daily_summary_error_message = None
-    if daily_summary_error_code == "no_summaries":
-        daily_summary_error_message = "No daily summaries were detected in the uploaded file."
     trade_csv_error_message = None
     if trade_csv_error_code == "no_trades":
         trade_csv_error_message = "No trades were detected in the uploaded file."
@@ -70,7 +66,6 @@ def settings_page(request: Request):
         "config_error_message": error_message,
         "backup_restored": backup_restored,
         "backup_error_message": backup_error_message,
-        "daily_summary_error_message": daily_summary_error_message,
         "trade_csv_error_message": trade_csv_error_message,
         "thinkorswim_error_message": thinkorswim_error_message,
     }
