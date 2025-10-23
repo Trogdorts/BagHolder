@@ -2,6 +2,7 @@
 {% block content %}
 {% set ui_cfg = cfg.get('ui', {}) %}
 {% set show_unrealized_default = ui_cfg.get('show_unrealized', True) %}
+{% set show_trade_count_badges = ui_cfg.get('show_trade_count', True) %}
 <div x-data="{
         showUnrealized: {{ 'true' if show_unrealized_default else 'false' }},
         exportOpen: false,
@@ -113,7 +114,7 @@
             </svg>
             <span class="sr-only">View trades</span>
             {% set trade_count = d.trades|length %}
-            {% if trade_count %}
+            {% if trade_count and show_trade_count_badges %}
             <span class="absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-emerald-400 text-neutral-900 text-[10px] font-semibold px-1 text-center">{{ trade_count }}</span>
             {% endif %}
           </button>

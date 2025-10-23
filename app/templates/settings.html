@@ -30,6 +30,7 @@
   </div>
 {% endif %}
 {% set show_unrealized = cfg.ui.get('show_unrealized', True) %}
+{% set show_trade_count = cfg.ui.get('show_trade_count', True) %}
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
 <form method="post" action="/settings" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800"
@@ -79,6 +80,13 @@
       <select name="show_text" class="bg-neutral-800 rounded px-2 py-1 w-full">
         <option value="true" {% if cfg.ui.show_text %}selected{% endif %}>True</option>
         <option value="false" {% if not cfg.ui.show_text %}selected{% endif %}>False</option>
+      </select>
+    </label>
+    <label class="block">
+      <span class="block text-sm text-neutral-400">Show trade count badges</span>
+      <select name="show_trade_count" class="bg-neutral-800 rounded px-2 py-1 w-full">
+        <option value="true" {% if show_trade_count %}selected{% endif %}>Show</option>
+        <option value="false" {% if not show_trade_count %}selected{% endif %}>Hide</option>
       </select>
     </label>
     <div class="block">
