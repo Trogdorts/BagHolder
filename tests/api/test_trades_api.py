@@ -16,8 +16,10 @@ from app.api.routes_calendar import (  # noqa: E402
     get_trades_for_day,
     save_trades_for_day,
 )
+from app.api.routes_import import _persist_trade_rows  # noqa: E402
 from app.core import database as db  # noqa: E402
 from app.core.models import DailySummary, Trade  # noqa: E402
+from app.services.import_trades_csv import parse_trade_csv  # noqa: E402
 
 
 def _init_app(tmp_path, monkeypatch):
@@ -178,5 +180,53 @@ def test_clear_trades_for_day_removes_summary(tmp_path, monkeypatch):
             assert day2 is not None
             assert day2.realized == pytest.approx(0.0)
             assert day2.unrealized == pytest.approx(0.0)
+    finally:
+        db.dispose_engine()
+
+
+def test_import_trades_overwrites_existing_rows(tmp_path, monkeypatch):
+    _init_app(tmp_path, monkeypatch)
+    try:
+        with db.SessionLocal() as session:
+            session.add_all(
+                [
+                    Trade(date="2025-10-16", symbol="ORCL", action="SELL", qty=100.0, price=310.0, amount=31000.0),
+                    Trade(date="2025-10-16", symbol="MLTX", action="BUY", qty=50.0, price=8.0, amount=-400.0),
+                    Trade(date="2025-10-15", symbol="MSFT", action="SELL", qty=1.0, price=100.0, amount=100.0),
+                ]
+            )
+            session.commit()
+
+        csv_content = """date,symbol,action,qty,price,amount\n2025-10-16,ORCL,SELL,100,320.17,32017\n2025-10-16,MLTX,BUY,100,10,-1000\n"""
+        rows = parse_trade_csv(csv_content.encode("utf-8"))
+        assert len(rows) == 2
+
+        with db.SessionLocal() as session:
+            inserted = _persist_trade_rows(session, rows)
+            assert inserted == 2
+
+        with db.SessionLocal() as session:
+            day_rows = (
+                session.query(Trade)
+                .filter(Trade.date == "2025-10-16")
+                .order_by(Trade.symbol.asc())
+                .all()
+            )
+            assert len(day_rows) == 2
+            assert {row.symbol for row in day_rows} == {"ORCL", "MLTX"}
+            orcl = next(row for row in day_rows if row.symbol == "ORCL")
+            assert orcl.price == pytest.approx(320.17)
+            assert orcl.amount == pytest.approx(32017.0)
+            mltx = next(row for row in day_rows if row.symbol == "MLTX")
+            assert mltx.qty == pytest.approx(100.0)
+            assert mltx.amount == pytest.approx(-1000.0)
+
+            other_day = (
+                session.query(Trade)
+                .filter(Trade.date == "2025-10-15")
+                .one()
+            )
+            assert other_day.symbol == "MSFT"
+            assert other_day.price == pytest.approx(100.0)
     finally:
         db.dispose_engine()
