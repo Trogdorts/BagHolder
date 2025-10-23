@@ -132,7 +132,7 @@
             <span class="sr-only">View trades</span>
             {% set trade_count = d.trades|length %}
             {% if trade_count and show_trade_count_badges %}
-            <span class="absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-emerald-400 text-neutral-900 text-[10px] font-semibold px-1 text-center">{{ trade_count }}</span>
+            <span class="trade-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-emerald-400 text-neutral-900 text-[10px] font-semibold px-1 text-center">{{ trade_count }}</span>
             {% endif %}
           </button>
         </div>
@@ -263,6 +263,7 @@
     closeLabel: 'Close',
     saveLabel: 'Save',
     saving: false,
+    shouldReloadOnClose: false,
     init() {
       window.modalController = this;
       this.$watch('open', (value) => {
@@ -329,9 +330,14 @@
       this.closeLabel = 'Close';
       this.saveLabel = 'Save';
       this.saving = false;
+      this.shouldReloadOnClose = false;
     },
     close() {
+      const reload = this.shouldReloadOnClose;
       this.open = false;
+      if (reload) {
+        setTimeout(() => window.location.reload(), 0);
+      }
     },
   }"
   x-show="open"
@@ -402,6 +408,7 @@ function createTradeEditorHTML() {
   return `
     <div id="trade-editor" class="space-y-3">
       <p id="trade-error" class="text-sm text-red-400 hidden"></p>
+      <p id="trade-success" class="text-sm text-emerald-400 hidden"></p>
       <div id="trade-empty-message" class="text-sm text-neutral-400 hidden">No trades recorded for this date.</div>
       <div class="overflow-x-auto" style="max-height: 20rem; overflow-y: auto;">
         <table class="min-w-full text-sm text-left text-neutral-200 border border-neutral-800">
@@ -425,7 +432,7 @@ function createTradeEditorHTML() {
 }
 
 function setupTradeEditor(trades) {
-  clearTradeEditorError();
+  clearTradeEditorMessages();
   const tbody = document.getElementById('trade-table-body');
   if (!tbody) return;
 
@@ -437,6 +444,7 @@ function setupTradeEditor(trades) {
   const addButton = document.getElementById('add-trade-row');
   if (addButton) {
     addButton.onclick = () => {
+      hideTradeEditorSuccess();
       tbody.appendChild(createTradeRow({ action: 'BUY', symbol: '', qty: '', price: '' }));
       updateTradeEmptyState();
     };
@@ -464,6 +472,7 @@ function createTradeRow(trade) {
   });
   const actionValue = trade && trade.action ? String(trade.action).toUpperCase() : 'BUY';
   actionSelect.value = actionValue;
+  actionSelect.addEventListener('change', hideTradeEditorSuccess);
   actionCell.appendChild(actionSelect);
   row.appendChild(actionCell);
 
@@ -475,6 +484,7 @@ function createTradeRow(trade) {
   symbolInput.value = trade && trade.symbol ? trade.symbol : '';
   symbolInput.autocomplete = 'off';
   symbolInput.spellcheck = false;
+  symbolInput.addEventListener('input', hideTradeEditorSuccess);
   symbolCell.appendChild(symbolInput);
   row.appendChild(symbolCell);
 
@@ -487,6 +497,7 @@ function createTradeRow(trade) {
   qtyInput.inputMode = 'decimal';
   qtyInput.className = 'trade-qty w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
   qtyInput.value = trade && trade.qty !== undefined && trade.qty !== null ? trade.qty : '';
+  qtyInput.addEventListener('input', hideTradeEditorSuccess);
   qtyCell.appendChild(qtyInput);
   row.appendChild(qtyCell);
 
@@ -499,6 +510,7 @@ function createTradeRow(trade) {
   priceInput.inputMode = 'decimal';
   priceInput.className = 'trade-price w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
   priceInput.value = trade && trade.price !== undefined && trade.price !== null ? trade.price : '';
+  priceInput.addEventListener('input', hideTradeEditorSuccess);
   priceCell.appendChild(priceInput);
   row.appendChild(priceCell);
 
@@ -509,6 +521,7 @@ function createTradeRow(trade) {
   removeButton.className = 'remove-trade-row px-2 py-1 rounded border border-red-700 text-red-300 hover:bg-red-900/40 text-xs';
   removeButton.textContent = 'Remove';
   removeButton.addEventListener('click', () => {
+    hideTradeEditorSuccess();
     row.remove();
     updateTradeEmptyState();
   });
@@ -529,19 +542,42 @@ function updateTradeEmptyState() {
   }
 }
 
-function clearTradeEditorError() {
+function clearTradeEditorMessages() {
   const errorEl = document.getElementById('trade-error');
   if (errorEl) {
     errorEl.textContent = '';
     errorEl.classList.add('hidden');
   }
+  hideTradeEditorSuccess();
+}
+
+function hideTradeEditorSuccess() {
+  const successEl = document.getElementById('trade-success');
+  if (successEl) {
+    successEl.textContent = '';
+    successEl.classList.add('hidden');
+  }
 }
 
 function showTradeEditorError(message) {
+  hideTradeEditorSuccess();
   const errorEl = document.getElementById('trade-error');
   if (errorEl) {
     errorEl.textContent = message;
     errorEl.classList.remove('hidden');
+  }
+}
+
+function showTradeEditorSuccess(message) {
+  const errorEl = document.getElementById('trade-error');
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+  const successEl = document.getElementById('trade-success');
+  if (successEl) {
+    successEl.textContent = message;
+    successEl.classList.remove('hidden');
   }
 }
 
@@ -551,7 +587,7 @@ function saveTrades(dateStr) {
   const tbody = document.getElementById('trade-table-body');
   if (!tbody) return;
 
-  clearTradeEditorError();
+  clearTradeEditorMessages();
 
   const rows = Array.from(tbody.querySelectorAll('tr'));
   const trades = [];
@@ -596,6 +632,8 @@ function saveTrades(dateStr) {
     return;
   }
 
+  modal.saving = true;
+
   fetch('/api/trades/' + dateStr, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -610,13 +648,45 @@ function saveTrades(dateStr) {
       }
       return response.json();
     })
-    .then(() => {
-      modal.open = false;
-      location.reload();
+    .then(data => {
+      const savedTrades = data && Array.isArray(data.trades) ? data.trades : [];
+      setupTradeEditor(savedTrades);
+      showTradeEditorSuccess('Trades saved. You can continue adding stocks.');
+      modal.shouldReloadOnClose = true;
+      updateTradeIndicators(dateStr, savedTrades);
     })
     .catch(err => {
       showTradeEditorError(err.message || 'Failed to save trades.');
+    })
+    .finally(() => {
+      modal.saving = false;
     });
+}
+
+function updateTradeIndicators(dateStr, trades) {
+  const cell = document.querySelector(`[data-day-cell='${dateStr}']`);
+  if (!cell) {
+    return;
+  }
+  const trigger = cell.querySelector("button[aria-label='View trades']");
+  if (!trigger) {
+    return;
+  }
+
+  const tradeCount = Array.isArray(trades) ? trades.length : 0;
+  trigger.classList.toggle('icon-translucent', tradeCount === 0);
+
+  let badge = trigger.querySelector('.trade-count-badge');
+  if (tradeCount > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'trade-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-emerald-400 text-neutral-900 text-[10px] font-semibold px-1 text-center';
+      trigger.appendChild(badge);
+    }
+    badge.textContent = String(tradeCount);
+  } else if (badge) {
+    badge.remove();
+  }
 }
 
   function openManual(dateStr, realized, unrealized) {

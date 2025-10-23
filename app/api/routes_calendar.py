@@ -427,7 +427,25 @@ def save_trades_for_day(
             db.delete(trade)
 
     db.commit()
-    return {"ok": True}
+    updated = (
+        db.query(Trade)
+        .filter(Trade.date == date_str)
+        .order_by(Trade.id.asc())
+        .all()
+    )
+    return {
+        "ok": True,
+        "trades": [
+            {
+                "id": trade.id,
+                "symbol": trade.symbol,
+                "action": trade.action,
+                "qty": float(trade.qty),
+                "price": float(trade.price),
+            }
+            for trade in updated
+        ],
+    }
 
 
 @router.post("/api/daily/{date_str}")

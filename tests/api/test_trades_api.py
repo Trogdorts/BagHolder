@@ -62,7 +62,13 @@ def test_save_trades_updates_existing_and_removes_missing(tmp_path, monkeypatch)
                     TradeUpdate(symbol="tsla", action="SELL", qty=1.5, price=250),
                 ]
             )
-            save_trades_for_day("2024-05-01", payload=payload, db=session)
+            result = save_trades_for_day("2024-05-01", payload=payload, db=session)
+            assert result["ok"] is True
+            returned_symbols = [trade["symbol"] for trade in result["trades"]]
+            assert returned_symbols == ["AAPL", "TSLA"]
+            returned_qty = {trade["symbol"]: trade["qty"] for trade in result["trades"]}
+            assert returned_qty["AAPL"] == pytest.approx(3.0)
+            assert returned_qty["TSLA"] == pytest.approx(1.5)
 
         with db.SessionLocal() as session:
             rows = (
