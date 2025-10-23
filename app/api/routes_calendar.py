@@ -289,6 +289,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             "week_index": len(weeks) + 1,
             "week_year": iso_year,
             "week_number": iso_week,
+            "show_week_realized": not math.isclose(week_total_realized, 0.0, abs_tol=0.005),
             "note": "",
             "note_updated_at": "",
             "has_note": False,
