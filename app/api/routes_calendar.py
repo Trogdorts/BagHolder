@@ -104,7 +104,6 @@ def home(request: Request, db: Session = Depends(get_session)):
 @router.get("/calendar/{year}/{month}", response_class=HTMLResponse)
 def calendar_view(year: int, month: int, request: Request, db: Session = Depends(get_session)):
     # Save last viewed month
-    from app.core.models import Meta
     last = db.get(Meta, "last_viewed_month")
     if last:
         last.value = f"{year}-{month}"
@@ -185,7 +184,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     notes_by_day = {
         row.date: {
             "note": row.note or "",
-            "is_markdown": bool(getattr(row, "is_markdown", True)),
+            "updated_at": row.updated_at or "",
         }
         for row in note_rows
     }
@@ -222,7 +221,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             ds = by_day.get(day_key)
             note_entry = notes_by_day.get(day_key)
             note_text = note_entry["note"] if note_entry else ""
-            note_is_markdown = note_entry["is_markdown"] if note_entry else True
+            note_updated_at = note_entry["updated_at"] if note_entry else ""
             is_weekend = d.weekday() >= 5
             is_future_day = d > today
             if ds:
@@ -254,7 +253,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "unrealized": day_unrealized,
                 "has_values": bool(ds),
                 "note": note_text,
-                "note_is_markdown": note_is_markdown,
+                "note_updated_at": note_updated_at,
                 "has_note": bool(note_text.strip()),
                 "is_weekend": is_weekend,
                 "trades": trades_by_day.get(day_key, []),
@@ -275,6 +274,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             "week_year": iso_year,
             "week_number": iso_week,
             "note": "",
+            "note_updated_at": "",
             "has_note": False,
         })
 
@@ -286,11 +286,29 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             .filter(tuple_(NoteWeekly.year, NoteWeekly.week).in_(list(week_pairs)))
             .all()
         )
-    weekly_notes = {(row.year, row.week): row.note for row in weekly_note_rows}
+    weekly_notes = {
+        (row.year, row.week): {
+            "note": row.note or "",
+            "updated_at": row.updated_at or "",
+        }
+        for row in weekly_note_rows
+    }
     for week_entry in weeks:
-        note_text = weekly_notes.get((week_entry["week_year"], week_entry["week_number"]), "")
+        data = weekly_notes.get((week_entry["week_year"], week_entry["week_number"]))
+        note_text = data["note"] if data else ""
         week_entry["note"] = note_text
+        week_entry["note_updated_at"] = data["updated_at"] if data else ""
         week_entry["has_note"] = bool(note_text.strip())
+
+    month_note_row = (
+        db.query(NoteMonthly)
+        .filter(NoteMonthly.year == year, NoteMonthly.month == month)
+        .first()
+    )
+    month_note = {
+        "note": month_note_row.note if month_note_row and month_note_row.note else "",
+        "updated_at": month_note_row.updated_at if month_note_row and month_note_row.updated_at else "",
+    }
 
     # Monthly totals
     month_realized = sum(float(r.realized) for r in q)
@@ -311,6 +329,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "request": request,
         "year": year, "month": month,
         "weeks": weeks,
+        "month_note": month_note,
         "month_realized": month_realized,
         "month_unrealized": month_unrealized,
         "year_realized": year_realized,
