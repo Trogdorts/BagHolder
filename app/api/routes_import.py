@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_session
 from app.core.models import DailySummary, Trade
-from app.services.import_bagholder import parse_bagholder_csv
+from app.services.import_daily_summaries import parse_daily_summary_csv
 from app.services.import_thinkorswim import (
     compute_daily_pnl_records,
     parse_thinkorswim_csv,
 )
+from app.services.import_trades_csv import parse_trade_csv
 
 router = APIRouter()
 
@@ -24,67 +25,7 @@ def import_page(request: Request):
     return RedirectResponse("/settings#stock-data-import", status_code=307)
 
 
-@router.post("/import/bagholder")
-async def import_bagholder(
-    request: Request,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_session),
-):
-    content = await file.read()
-    rows = parse_bagholder_csv(content)
-
-    if not rows:
-        return RedirectResponse(
-            "/settings?bagholder_error=no_summaries#stock-data-import",
-            status_code=303,
-        )
-
-    now = datetime.utcnow().isoformat()
-    for row in rows:
-        date = row["date"]
-        realized = float(row.get("realized", 0.0))
-        unrealized = float(row.get("unrealized", 0.0))
-        total_invested = float(row.get("total_invested", unrealized))
-        updated_at = row.get("updated_at") or now
-
-        summary = db.get(DailySummary, date)
-        if summary is None:
-            db.add(
-                DailySummary(
-                    date=date,
-                    realized=realized,
-                    unrealized=unrealized,
-                    total_invested=total_invested,
-                    updated_at=updated_at,
-                )
-            )
-            continue
-
-        summary.realized = realized
-        summary.unrealized = unrealized
-        summary.total_invested = total_invested
-        summary.updated_at = updated_at
-
-    db.commit()
-
-    return RedirectResponse(url="/", status_code=303)
-
-
-@router.post("/import/thinkorswim")
-async def import_thinkorswim(
-    request: Request,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_session),
-):
-    content = await file.read()
-    rows = parse_thinkorswim_csv(content)
-
-    if not rows:
-        return RedirectResponse(
-            "/settings?thinkorswim_error=no_trades#stock-data-import",
-            status_code=303,
-        )
-
+def _persist_trade_rows(db: Session, rows):
     inserted = 0
     for r in rows:
         exists = (
@@ -104,12 +45,11 @@ async def import_thinkorswim(
         db.add(Trade(**r))
         inserted += 1
     db.commit()
+    return inserted
 
-    all_trades = (
-        db.query(Trade)
-        .order_by(Trade.date.asc(), Trade.id.asc())
-        .all()
-    )
+
+def _finalize_trade_import(request: Request, db: Session, inserted: int):
+    all_trades = db.query(Trade).order_by(Trade.date.asc(), Trade.id.asc()).all()
     trade_records = []
     for t in all_trades:
         try:
@@ -192,6 +132,90 @@ async def import_thinkorswim(
         )
 
     return RedirectResponse(url="/", status_code=303)
+
+
+@router.post("/import/daily-summaries")
+async def import_daily_summaries(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_session),
+):
+    content = await file.read()
+    rows = parse_daily_summary_csv(content)
+
+    if not rows:
+        return RedirectResponse(
+            "/settings?daily_summary_error=no_summaries#stock-data-import",
+            status_code=303,
+        )
+
+    now = datetime.utcnow().isoformat()
+    for row in rows:
+        date = row["date"]
+        realized = float(row.get("realized", 0.0))
+        unrealized = float(row.get("unrealized", 0.0))
+        total_invested = float(row.get("total_invested", unrealized))
+        updated_at = row.get("updated_at") or now
+
+        summary = db.get(DailySummary, date)
+        if summary is None:
+            db.add(
+                DailySummary(
+                    date=date,
+                    realized=realized,
+                    unrealized=unrealized,
+                    total_invested=total_invested,
+                    updated_at=updated_at,
+                )
+            )
+            continue
+
+        summary.realized = realized
+        summary.unrealized = unrealized
+        summary.total_invested = total_invested
+        summary.updated_at = updated_at
+
+    db.commit()
+
+    return RedirectResponse(url="/", status_code=303)
+
+
+@router.post("/import/trades")
+async def import_trades(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_session),
+):
+    content = await file.read()
+    rows = parse_trade_csv(content)
+
+    if not rows:
+        return RedirectResponse(
+            "/settings?trade_csv_error=no_trades#stock-data-import",
+            status_code=303,
+        )
+
+    inserted = _persist_trade_rows(db, rows)
+    return _finalize_trade_import(request, db, inserted)
+
+
+@router.post("/import/thinkorswim")
+async def import_thinkorswim(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_session),
+):
+    content = await file.read()
+    rows = parse_thinkorswim_csv(content)
+
+    if not rows:
+        return RedirectResponse(
+            "/settings?thinkorswim_error=no_trades#stock-data-import",
+            status_code=303,
+        )
+
+    inserted = _persist_trade_rows(db, rows)
+    return _finalize_trade_import(request, db, inserted)
 
 
 @router.post("/import/thinkorswim/conflicts", response_class=HTMLResponse)
