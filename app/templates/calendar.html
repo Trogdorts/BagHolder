@@ -305,7 +305,7 @@
       if (!dialog) {
         return;
       }
-      const focusable = dialog.querySelector('[data-autofocus], button, textarea, input, select, [tabindex]:not([tabindex="-1"])');
+      const focusable = dialog.querySelector('[data-autofocus], button, textarea, input, select, [tabindex]:not([tabindex=&quot;-1&quot;])');
       if (focusable && typeof focusable.focus === 'function') {
         focusable.focus();
       } else if (typeof dialog.focus === 'function') {
