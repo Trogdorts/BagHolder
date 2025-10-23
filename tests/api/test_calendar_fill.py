@@ -208,3 +208,23 @@ def test_unrealized_not_extended_past_today(tmp_path, monkeypatch):
         assert jan_fourth["unrealized"] == 0.0
 
     db.dispose_engine()
+
+
+def test_show_trade_badges_handles_string_values(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    app.state.config.raw["ui"]["show_trade_count"] = "false"
+    with db.SessionLocal() as session:
+        request = _build_request(app)
+        response = calendar_view(2024, 1, request, db=session)
+        assert response.context["show_trade_badges"] is False
+
+    app.state.config.raw["ui"]["show_trade_count"] = "TrUe"
+    with db.SessionLocal() as session:
+        request = _build_request(app)
+        response = calendar_view(2024, 1, request, db=session)
+        assert response.context["show_trade_badges"] is True
+
+    db.dispose_engine()
