@@ -140,10 +140,8 @@
         {% if show_text_default %}
         <div class="text-sm space-y-1">
           {% set realized_class = 'text-green-400' if d.realized > 0 else ('text-red-400' if d.realized < 0 else 'text-neutral-200') %}
-          {% if d.has_values %}
+          {% if d.show_realized %}
           <div class="{{ realized_class }}">Realized: {{ d.realized|money }}</div>
-          {% else %}
-          <div class="{{ realized_class }}" x-show="showUnrealized" x-cloak>Realized: {{ d.realized|money }}</div>
           {% endif %}
           <div class="{{ 'text-green-400' if d.unrealized > 0 else ('text-red-400' if d.unrealized < 0 else 'text-neutral-200') }}"
                x-show="showUnrealized" x-cloak>

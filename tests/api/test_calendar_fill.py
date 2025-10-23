@@ -12,7 +12,8 @@ if str(ROOT_DIR) not in sys.path:
 from app.main import create_app
 from app.api.routes_calendar import calendar_view
 from app.core import database as db
-from app.core.models import DailySummary, NoteWeekly
+from app.core.models import DailySummary, NoteWeekly, Trade
+from app.services.trade_summaries import recompute_daily_summaries
 
 
 def _build_request(app):
@@ -32,6 +33,50 @@ def _get_week(weeks, index):
         if week["week_index"] == index:
             return week
     raise AssertionError(f"Week index {index} not found in weeks data")
+
+
+def test_realized_hidden_for_buy_only_days(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    with db.SessionLocal() as session:
+        session.add_all(
+            [
+                Trade(
+                    date="2024-03-01",
+                    symbol="AAPL",
+                    action="BUY",
+                    qty=1.0,
+                    price=100.0,
+                    amount=-100.0,
+                ),
+                Trade(
+                    date="2024-03-02",
+                    symbol="AAPL",
+                    action="SELL",
+                    qty=1.0,
+                    price=100.0,
+                    amount=100.0,
+                ),
+            ]
+        )
+        session.commit()
+        recompute_daily_summaries(session)
+        session.commit()
+
+    with db.SessionLocal() as session:
+        request = _build_request(app)
+        response = calendar_view(2024, 3, request, db=session)
+        weeks = response.context["weeks"]
+        buy_day = _get_day(weeks, date(2024, 3, 1))
+        sell_day = _get_day(weeks, date(2024, 3, 2))
+
+        assert buy_day["show_realized"] is False
+        assert sell_day["show_realized"] is True
+        assert sell_day["realized"] == pytest.approx(0.0)
+
+    db.dispose_engine()
 
 
 def test_average_fill_for_missing_unrealized(tmp_path, monkeypatch):
