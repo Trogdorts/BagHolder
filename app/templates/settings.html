@@ -15,7 +15,39 @@
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
 <form method="post" action="/settings" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800"
-      x-data="{ showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }} }">
+      x-data="{
+        showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }},
+        hasChanges: false,
+        initialData: '',
+        formEl: null,
+        init() {
+          this.formEl = this.$el;
+          this.initialData = this.serializeForm();
+          this.$watch('showUnrealizedSetting', () => this.evaluateChanges());
+          this.formEl.addEventListener('input', () => this.evaluateChanges());
+          this.formEl.addEventListener('change', () => this.evaluateChanges());
+        },
+        serializeForm() {
+          if (!this.formEl) {
+            return '';
+          }
+          const formData = new FormData(this.formEl);
+          formData.set('show_unrealized', this.showUnrealizedSetting ? 'true' : 'false');
+          return new URLSearchParams(formData).toString();
+        },
+        evaluateChanges() {
+          this.hasChanges = this.serializeForm() !== this.initialData;
+        },
+        resetChanges() {
+          this.initialData = this.serializeForm();
+          this.hasChanges = false;
+        }
+      }"
+      @submit="resetChanges()">
+  <div x-show="hasChanges" x-cloak x-transition.opacity.duration.150ms
+       class="rounded border border-yellow-800 bg-yellow-900/40 px-4 py-3 text-sm text-yellow-100">
+    You have unsaved changes. Don't forget to save.
+  </div>
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
     <label class="block">
       <span class="block text-sm text-neutral-400">Theme</span>
