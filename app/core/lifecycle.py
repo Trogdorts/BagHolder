@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from fastapi import FastAPI
@@ -11,6 +12,18 @@ from fastapi.templating import Jinja2Templates
 from app.core.config import AppConfig
 from app.core.database import dispose_engine, init_db
 from app.core.seed import ensure_seed
+
+
+_HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def _parse_hex_color(color: str) -> tuple[int, int, int] | None:
+    if not isinstance(color, str):
+        return None
+    candidate = color.strip()
+    if not _HEX_COLOR_PATTERN.fullmatch(candidate):
+        return None
+    return int(candidate[1:3], 16), int(candidate[3:5], 16), int(candidate[5:7], 16)
 
 
 def _build_templates(cfg: AppConfig) -> Jinja2Templates:
@@ -38,6 +51,43 @@ def _build_templates(cfg: AppConfig) -> Jinja2Templates:
         return f"{sign}${abs(quantized):,.2f}"
 
     templates.env.filters["money"] = format_money
+
+    def hex_to_rgb(value: str) -> str:
+        components = _parse_hex_color(value)
+        if components is None:
+            return "0, 0, 0"
+        return f"{components[0]}, {components[1]}, {components[2]}"
+
+    def hex_to_rgba(value: str, alpha: float = 1.0) -> str:
+        components = _parse_hex_color(value)
+        alpha = max(0.0, min(1.0, alpha))
+        if components is None:
+            return f"rgba(0, 0, 0, {alpha:.2f})"
+        return f"rgba({components[0]}, {components[1]}, {components[2]}, {alpha:.2f})"
+
+    def mix_with_white(value: str, blend: float = 0.5) -> str:
+        components = _parse_hex_color(value)
+        blend = max(0.0, min(1.0, blend))
+        if components is None:
+            return "#ffffff"
+        r = round((1 - blend) * components[0] + blend * 255)
+        g = round((1 - blend) * components[1] + blend * 255)
+        b = round((1 - blend) * components[2] + blend * 255)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    def pick_contrast(value: str) -> str:
+        components = _parse_hex_color(value)
+        if components is None:
+            return "#ffffff"
+        r, g, b = components
+        # Relative luminance approximation (sRGB)
+        luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+        return "#000000" if luminance > 0.55 else "#ffffff"
+
+    templates.env.filters["hex_to_rgb"] = hex_to_rgb
+    templates.env.filters["hex_to_rgba"] = hex_to_rgba
+    templates.env.filters["mix_with_white"] = mix_with_white
+    templates.env.filters["pick_contrast"] = pick_contrast
     templates.env.globals["cfg"] = cfg.raw
     return templates
 

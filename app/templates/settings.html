@@ -2,30 +2,30 @@
 {% block content %}
 <h1 class="text-xl font-semibold mb-4">Settings</h1>
 {% if config_imported %}
-  <div class="mb-4 rounded border border-green-800 bg-green-900/40 px-4 py-3 text-sm text-green-100">
+  <div class="mb-4 rounded border alert alert-success px-4 py-3 text-sm">
     Configuration imported successfully.
   </div>
 {% elif config_error_message %}
-  <div class="mb-4 rounded border border-red-800 bg-red-900/40 px-4 py-3 text-sm text-red-100">
+  <div class="mb-4 rounded border alert alert-error px-4 py-3 text-sm">
     {{ config_error_message }}
   </div>
 {% endif %}
 {% if backup_restored %}
-  <div class="mb-4 rounded border border-green-800 bg-green-900/40 px-4 py-3 text-sm text-green-100">
+  <div class="mb-4 rounded border alert alert-success px-4 py-3 text-sm">
     Backup imported successfully.
   </div>
 {% elif backup_error_message %}
-  <div class="mb-4 rounded border border-red-800 bg-red-900/40 px-4 py-3 text-sm text-red-100">
+  <div class="mb-4 rounded border alert alert-error px-4 py-3 text-sm">
     {{ backup_error_message }}
   </div>
 {% endif %}
 {% if cleared %}
-  <div class="mb-4 rounded border border-green-800 bg-green-900/40 px-4 py-3 text-sm text-green-100">
+  <div class="mb-4 rounded border alert alert-success px-4 py-3 text-sm">
     All application data has been cleared.
   </div>
 {% endif %}
 {% if shutting_down %}
-  <div class="mb-4 rounded border border-yellow-800 bg-yellow-900/40 px-4 py-3 text-sm text-yellow-100">
+  <div class="mb-4 rounded border alert alert-warning px-4 py-3 text-sm">
     The server is shutting down. You may now close this window.
   </div>
 {% endif %}
@@ -64,7 +64,7 @@
       }"
       @submit="resetChanges()">
   <div x-show="hasChanges" x-cloak x-transition.opacity.duration.150ms
-       class="rounded border border-yellow-800 bg-yellow-900/40 px-4 py-3 text-sm text-yellow-100">
+       class="rounded border alert alert-warning px-4 py-3 text-sm">
     You have unsaved changes. Don't forget to save.
   </div>
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -131,11 +131,65 @@
         <option value="last_viewed" {% if cfg.view.default == 'last_viewed' %}selected{% endif %}>Last Viewed</option>
       </select>
     </label>
-    <label class="block">
-      <span class="block text-sm text-neutral-400">Action icon color</span>
-      <input type="color" name="icon_color" value="{{ cfg.ui.icon_color }}"
-             class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
-    </label>
+  </div>
+  <div class="pt-4 border-t border-neutral-800">
+    <h2 class="text-lg font-semibold mb-2">Color palette</h2>
+    <p class="text-sm text-neutral-500 mb-3">
+      Customize the accent colors used for buttons, alerts, and trade highlights.
+    </p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Action icon color</span>
+        <input type="color" name="icon_color" value="{{ cfg.ui.icon_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+      </label>
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Primary button color</span>
+        <input type="color" name="primary_color" value="{{ cfg.ui.primary_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+      </label>
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Primary hover color</span>
+        <input type="color" name="primary_hover_color" value="{{ cfg.ui.primary_hover_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+      </label>
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Success accent color</span>
+        <input type="color" name="success_color" value="{{ cfg.ui.success_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+      </label>
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Warning accent color</span>
+        <input type="color" name="warning_color" value="{{ cfg.ui.warning_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+      </label>
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Danger accent color</span>
+        <input type="color" name="danger_color" value="{{ cfg.ui.danger_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+      </label>
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Danger hover color</span>
+        <input type="color" name="danger_hover_color" value="{{ cfg.ui.danger_hover_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+      </label>
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Trade badge color</span>
+        <input type="color" name="trade_badge_color" value="{{ cfg.ui.trade_badge_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+      </label>
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Trade badge text color</span>
+        <input type="color" name="trade_badge_text_color" value="{{ cfg.ui.trade_badge_text_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+      </label>
+      <label class="block">
+        <span class="block text-sm text-neutral-400">Note icon highlight color</span>
+        <input type="color" name="note_icon_color" value="{{ cfg.notes.icon_has_note_color }}"
+               class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+        <p class="mt-1 text-xs text-neutral-500">Applies when a day or week already has a note.</p>
+      </label>
+    </div>
   </div>
   <div class="pt-4 border-t border-neutral-800">
     <h2 class="text-lg font-semibold mb-2">Export data</h2>
@@ -150,7 +204,7 @@
       </select>
     </label>
   </div>
-  <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Save</button>
+  <button class="btn btn-primary px-4 py-2">Save</button>
 </form>
 
 <div id="stock-data-import" class="mt-6 rounded border border-neutral-800 bg-neutral-950 p-4 space-y-6">
@@ -164,42 +218,42 @@
     <h3 class="text-base font-semibold">Stock buy &amp; sell CSV trade data</h3>
     <p class="text-sm text-neutral-400">Import executed stock trades from a CSV with columns: date, symbol, action, qty, price, amount.</p>
     {% if trade_csv_error_message %}
-    <div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
+    <div class="rounded border alert alert-error p-3 text-sm">
       {{ trade_csv_error_message }}
     </div>
     {% endif %}
     <form action="/import/trades" method="post" enctype="multipart/form-data" class="space-y-4">
       <input type="file" name="file" accept=".csv"
              class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
-      <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Upload</button>
+      <button class="btn btn-primary px-4 py-2">Upload</button>
     </form>
   </section>
   <section class="space-y-3 rounded border border-neutral-800 bg-neutral-900 p-4">
     <h3 class="text-base font-semibold">ThinkOrSwim account statement</h3>
     <p class="text-sm text-neutral-400">Only trade fields are persisted (date, symbol, action, qty, price, amount). Account identifiers are discarded after parsing.</p>
     {% if thinkorswim_error_message %}
-    <div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
+    <div class="rounded border alert alert-error p-3 text-sm">
       {{ thinkorswim_error_message }}
     </div>
     {% endif %}
     <form action="/import/thinkorswim" method="post" enctype="multipart/form-data" class="space-y-4">
       <input type="file" name="file" accept=".csv"
              class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
-      <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Upload</button>
+      <button class="btn btn-primary px-4 py-2">Upload</button>
     </form>
   </section>
   <section class="space-y-3 rounded border border-neutral-800 bg-neutral-900 p-4">
     <h3 class="text-base font-semibold">Daily summaries</h3>
     <p class="text-sm text-neutral-400">Restore daily realized and unrealized performance from a CSV export. Columns: date, realized, unrealized.</p>
     {% if daily_summary_error_message %}
-    <div class="rounded border border-red-700 bg-red-900/30 p-3 text-sm text-red-200">
+    <div class="rounded border alert alert-error p-3 text-sm">
       {{ daily_summary_error_message }}
     </div>
     {% endif %}
     <form action="/import/daily-summaries" method="post" enctype="multipart/form-data" class="space-y-4">
       <input type="file" name="file" accept=".csv"
              class="block w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-neutral-800 file:text-neutral-200 hover:file:bg-neutral-700">
-      <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Upload</button>
+      <button class="btn btn-primary px-4 py-2">Upload</button>
     </form>
   </section>
 </div>
@@ -211,7 +265,7 @@
   </p>
   <div class="grid gap-4 md:grid-cols-2">
     <a href="/settings/config/export"
-       class="w-full inline-flex items-center justify-center rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-500"
+       class="btn btn-primary w-full px-4 py-2"
        download>
       Download config (JSON)
     </a>
@@ -225,7 +279,7 @@
       <p class="text-xs text-neutral-500">
         Upload a JSON file exported from BagHolder. Missing values revert to their defaults.
       </p>
-      <button type="submit" class="w-full inline-flex items-center justify-center rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-500">
+      <button type="submit" class="btn btn-primary w-full px-4 py-2">
         Import config
       </button>
     </form>
@@ -239,7 +293,7 @@
   </p>
   <div class="grid gap-4 md:grid-cols-2">
     <a href="/settings/backup/export"
-       class="w-full inline-flex items-center justify-center rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-500"
+       class="btn btn-primary w-full px-4 py-2"
        download>
       Download full backup (ZIP)
     </a>
@@ -253,29 +307,29 @@
       <p class="text-xs text-neutral-500">
         Upload a ZIP file generated by BagHolder. The current database, notes, and configuration will be replaced.
       </p>
-      <button class="w-full inline-flex items-center justify-center rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-500">
+      <button class="btn btn-primary w-full px-4 py-2">
         Import backup
       </button>
     </form>
   </div>
 </div>
 
-<div class="mt-6 space-y-3 rounded border border-red-900 bg-red-950/40 p-4">
+<div class="danger-zone mt-6 space-y-3 rounded border p-4">
   <div>
-    <h2 class="text-lg font-semibold text-red-200">Danger zone</h2>
-    <p class="text-sm text-red-100/80">
+    <h2 class="text-lg font-semibold danger-text">Danger zone</h2>
+    <p class="text-sm danger-text-subtle">
       Clearing data removes every imported trade, calculated summary, and saved note. This action cannot be undone.
     </p>
   </div>
   <form method="post" action="/settings/clear-data"
         onsubmit="return confirm('This will delete all trades, summaries, and notes. Continue?');"
         class="space-y-2">
-    <button class="w-full px-4 py-2 rounded bg-red-600 text-white hover:bg-red-500">Clear all data</button>
+    <button class="btn btn-danger w-full px-4 py-2">Clear all data</button>
   </form>
   <form method="post" action="/settings/shutdown"
         onsubmit="return confirm('This will stop the server. Continue?');"
         class="space-y-2">
-    <button class="w-full px-4 py-2 rounded border border-red-500 text-red-100 hover:bg-red-900/60">
+    <button class="btn btn-outline-danger w-full px-4 py-2">
       Shut down server
     </button>
   </form>

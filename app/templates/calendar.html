@@ -78,7 +78,7 @@
           </div>
           <div class="flex items-center justify-end gap-2 pt-2 border-t border-neutral-800">
             <button type="button" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800" @click="exportOpen = false">Cancel</button>
-            <button type="submit" class="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-500">Download</button>
+            <button type="submit" class="btn btn-primary px-3 py-1 text-sm">Download</button>
           </div>
         </form>
       </div>
@@ -116,7 +116,7 @@
         <div class="flex items-center gap-1 text-xs text-neutral-400">
           <span>{{ d.date.day }}</span>
           {% set trade_button_classes = [
-            'relative inline-flex items-center justify-center rounded-full bg-emerald-900/20 p-1 text-emerald-400 hover:bg-emerald-800/30 focus:outline-none focus:ring-2 focus:ring-emerald-500'
+            'relative inline-flex items-center justify-center rounded-full p-1 trade-button focus:outline-none focus-ring-success transition'
           ] %}
           {% if not d.has_trades %}
             {% set trade_button_classes = trade_button_classes + ['icon-translucent'] %}
@@ -132,18 +132,18 @@
             <span class="sr-only">View trades</span>
             {% set trade_count = d.trades|length %}
             {% if trade_count and show_trade_count_badges %}
-            <span class="trade-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-emerald-400 text-neutral-900 text-[10px] font-semibold px-1 text-center">{{ trade_count }}</span>
+            <span class="trade-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full text-[10px] font-semibold px-1 text-center">{{ trade_count }}</span>
             {% endif %}
           </button>
         </div>
 
         {% if show_text_default %}
         <div class="text-sm space-y-1">
-          {% set realized_class = 'text-green-400' if d.realized > 0 else ('text-red-400' if d.realized < 0 else 'text-neutral-200') %}
+          {% set realized_class = 'text-profit' if d.realized > 0 else ('text-loss' if d.realized < 0 else 'text-neutral-200') %}
           {% if d.show_realized %}
           <div class="{{ realized_class }}">Realized: {{ d.realized|money }}</div>
           {% endif %}
-          <div class="{{ 'text-green-400' if d.unrealized > 0 else ('text-red-400' if d.unrealized < 0 else 'text-neutral-200') }}"
+          <div class="{{ 'text-profit' if d.unrealized > 0 else ('text-loss' if d.unrealized < 0 else 'text-neutral-200') }}"
                x-show="showUnrealized" x-cloak>
             Unrealized: {{ d.unrealized|money }}
           </div>
@@ -183,9 +183,9 @@
       <div class="text-xs text-neutral-400">Week {{ week.week_index }}</div>
       <div class="mt-2 text-sm space-y-1 text-right">
         {% if week.show_week_realized %}
-        <div class="{{ 'text-green-400' if week.week_realized > 0 else ('text-red-400' if week.week_realized < 0 else 'text-neutral-200') }}">Realized: {{ week.week_realized|money }}</div>
+        <div class="{{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}">Realized: {{ week.week_realized|money }}</div>
         {% endif %}
-        <div class="{{ 'text-green-400' if week.week_unrealized > 0 else ('text-red-400' if week.week_unrealized < 0 else 'text-neutral-200') }}"
+        <div class="{{ 'text-profit' if week.week_unrealized > 0 else ('text-loss' if week.week_unrealized < 0 else 'text-neutral-200') }}"
              x-show="showUnrealized" x-cloak>
           Unrealized: {{ week.week_unrealized|money }}
         </div>
@@ -200,7 +200,7 @@
          data-note-text="{{ week.note | default('', true) | e }}"
          data-note-updated="{{ week.note_updated_at | default('', true) }}"
          onclick="openWeeklyNote({{ week.week_year }}, {{ week.week_number }}); return false;">
-        <svg class="w-4 h-4 action-icon{% if week.has_note %} text-amber-400{% endif %}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
         </svg>
         <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
@@ -217,9 +217,9 @@
   <div class="grid gap-4 sm:grid-cols-2">
     <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative">
       <h2 class="font-semibold">Monthly summary</h2>
-      <div>Realized: <span class="{{ 'text-green-400' if month_realized > 0 else ('text-red-400' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span></div>
+      <div>Realized: <span class="{{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span></div>
       <div x-show="showUnrealized" x-cloak>
-        Unrealized (invested): <span class="{{ 'text-green-400' if month_unrealized > 0 else ('text-red-400' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
+        Unrealized (invested): <span class="{{ 'text-profit' if month_unrealized > 0 else ('text-loss' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
       </div>
         {% set month_note_text = month_note.note | default('', true) %}
         {% set month_note_has = month_note_text.strip() %}
@@ -230,7 +230,7 @@
            data-note-text="{{ month_note_text | e }}"
            data-note-updated="{{ month_note.updated_at | default('', true) }}"
            onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
-          <svg class="w-4 h-4 action-icon{% if month_note_has %} text-amber-400{% endif %}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
           </svg>
           <div class="note-tooltip absolute bottom-6 right-0 z-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg w-fit">
@@ -241,9 +241,9 @@
     </div>
     <div class="rounded border border-neutral-800 p-3 bg-neutral-950">
       <h2 class="font-semibold">Yearly summary</h2>
-      <div>Realized: <span class="{{ 'text-green-400' if year_realized > 0 else ('text-red-400' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
+      <div>Realized: <span class="{{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
       <div x-show="showUnrealized" x-cloak>
-        Unrealized (invested): <span class="{{ 'text-green-400' if year_unrealized > 0 else ('text-red-400' if year_unrealized < 0 else 'text-neutral-200') }}">{{ year_unrealized|money }}</span>
+        Unrealized (invested): <span class="{{ 'text-profit' if year_unrealized > 0 else ('text-loss' if year_unrealized < 0 else 'text-neutral-200') }}">{{ year_unrealized|money }}</span>
       </div>
     </div>
   </div>
@@ -375,7 +375,7 @@
       <button type="button" class="px-3 py-1 rounded border border-neutral-700" @click="close()" x-text="closeLabel"></button>
       <button
         type="button"
-        class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-500"
+        class="btn btn-primary px-3 py-1 text-sm"
         :class="{ 'opacity-60 cursor-not-allowed': saving || !save }"
         :disabled="saving || !save"
         @click="if (!saving && save) save()"
@@ -411,7 +411,7 @@ function openTrades(dateStr) {
       const modal = getModalController();
       if (!modal) return;
       modal.title = 'Trades ' + dateStr;
-      modal.body = `<p class="text-sm text-red-400">${err.message || 'Failed to load trades.'}</p>`;
+      modal.body = `<p class="text-sm text-danger">${err.message || 'Failed to load trades.'}</p>`;
       modal.save = null;
       modal.open = true;
     });
@@ -420,9 +420,9 @@ function openTrades(dateStr) {
 function createTradeEditorHTML() {
   return `
     <div id="trade-editor" class="space-y-3">
-      <p id="trade-error" class="text-sm text-red-400 hidden"></p>
-      <p id="trade-success" class="text-sm text-emerald-400 hidden"></p>
-      <p id="trade-unsaved" class="text-xs text-amber-400 hidden">Unsaved changes. Save your trades to keep them.</p>
+      <p id="trade-error" class="text-sm text-danger hidden"></p>
+      <p id="trade-success" class="text-sm text-success hidden"></p>
+      <p id="trade-unsaved" class="text-xs text-warning hidden">Unsaved changes. Save your trades to keep them.</p>
       <div id="trade-empty-message" class="text-sm text-neutral-400 hidden">No trades recorded for this date.</div>
       <div class="overflow-x-auto" style="max-height: 20rem; overflow-y: auto;">
         <table class="min-w-full text-sm text-left text-neutral-200 border border-neutral-800">
@@ -442,12 +442,12 @@ function createTradeEditorHTML() {
         <div class="flex items-center justify-between flex-wrap gap-2">
           <div class="flex items-center gap-2 flex-wrap">
             <button type="button" id="add-trade-row" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-sm">Add trade</button>
-            <button type="button" id="clear-trades" class="px-3 py-1 rounded border border-red-700 text-red-300 hover:bg-red-900/40 text-sm">Clear all trades</button>
+            <button type="button" id="clear-trades" class="btn btn-outline-danger px-3 py-1 text-sm">Clear all trades</button>
           </div>
           <div class="flex items-center gap-2 flex-wrap">
             <input type="file" id="trade-import-input" accept=".csv,text/csv" class="hidden">
             <button type="button" id="export-trades" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-sm">Export CSV</button>
-            <button type="button" id="import-trades" class="px-3 py-1 rounded border border-blue-700 text-blue-200 hover:bg-blue-900/40 text-sm">Import CSV</button>
+            <button type="button" id="import-trades" class="btn btn-outline-primary px-3 py-1 text-sm">Import CSV</button>
           </div>
         </div>
         <span class="text-xs text-neutral-500">Remove a row to delete a trade. Amounts are calculated on save.</span>
@@ -665,7 +665,7 @@ function createTradeRow(trade) {
   actionsCell.className = 'px-2 py-1 border border-neutral-800 text-right';
   const removeButton = document.createElement('button');
   removeButton.type = 'button';
-  removeButton.className = 'remove-trade-row px-2 py-1 rounded border border-red-700 text-red-300 hover:bg-red-900/40 text-xs';
+  removeButton.className = 'remove-trade-row btn btn-outline-danger px-2 py-1 text-xs';
   removeButton.textContent = 'Remove';
   removeButton.addEventListener('click', () => {
     hideTradeEditorSuccess();
@@ -1067,19 +1067,19 @@ function saveTrades(dateStr) {
     const isEmpty = !symbol && !qtyRaw && !priceRaw;
 
     if (isEmpty) {
-      row.classList.remove('bg-red-900/40');
+      row.classList.remove('bg-danger-soft');
       return;
     }
 
     const qty = parseFloat(qtyRaw);
     const price = parseFloat(priceRaw);
     if (!symbol || Number.isNaN(qty) || Number.isNaN(price) || qty <= 0 || price <= 0) {
-      row.classList.add('bg-red-900/40');
+      row.classList.add('bg-danger-soft');
       hasError = true;
       return;
     }
 
-    row.classList.remove('bg-red-900/40');
+    row.classList.remove('bg-danger-soft');
     trades.push({
       id: row.dataset.tradeId ? Number(row.dataset.tradeId) : null,
       symbol: symbol.toUpperCase(),
@@ -1184,7 +1184,7 @@ function updateTradeIndicators(dateStr, trades) {
   if (tradeCount > 0) {
     if (!badge) {
       badge = document.createElement('span');
-      badge.className = 'trade-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full bg-emerald-400 text-neutral-900 text-[10px] font-semibold px-1 text-center';
+      badge.className = 'trade-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full text-[10px] font-semibold px-1 text-center';
       trigger.appendChild(badge);
     }
     badge.textContent = String(tradeCount);
@@ -1206,7 +1206,7 @@ function updateTradeIndicators(dateStr, trades) {
     modal.saving = false;
     modal.body = `
       <form id="manual-form" class="space-y-3">
-        <p class="text-sm text-red-400 hidden" data-manual-error></p>
+        <p class="text-sm text-danger hidden" data-manual-error></p>
         <label class="block text-sm space-y-1">
           <span class="text-neutral-300">Realized</span>
           <input type="number" step="0.01" inputmode="decimal" name="realized" value="${normalizedRealized}" class="w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500">
@@ -1406,7 +1406,7 @@ function openNoteEditor(config) {
     .catch((error) => {
       console.error(error);
       const message = error && error.message ? error.message : 'Failed to load note.';
-      modal.body = `<p class="text-sm text-red-400">${escapeHtml(message)}</p>`;
+      modal.body = `<p class="text-sm text-danger">${escapeHtml(message)}</p>`;
       modal.closeLabel = 'Close';
       modal.saveLabel = 'Save';
       modal.save = null;
@@ -1438,15 +1438,15 @@ function renderNoteEditor(modal, config) {
       <div class="space-y-2">
         <label class="block text-sm text-neutral-300" for="note-field">
           <span class="mb-2 block text-neutral-400">Note</span>
-          <textarea id="note-field" data-autofocus class="w-full min-h-[14rem] rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="${placeholderText}" spellcheck="true"></textarea>
+          <textarea id="note-field" data-autofocus class="w-full min-h-[14rem] rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-neutral-100 focus:outline-none focus-ring-primary" placeholder="${placeholderText}" spellcheck="true"></textarea>
         </label>
         <div class="flex items-center justify-between text-xs text-neutral-500">
           <span>Notes are saved as plain text.</span>
           <span data-note-char-count>0 characters</span>
         </div>
-        <p class="text-xs text-amber-400 hidden" data-note-unsaved-warning>Unsaved changes. Save your note to keep it.</p>
+        <p class="text-xs text-warning hidden" data-note-unsaved-warning>Unsaved changes. Save your note to keep it.</p>
       </div>
-      <p class="text-sm text-red-400 hidden" data-note-error></p>
+      <p class="text-sm text-danger hidden" data-note-error></p>
       <div class="flex items-center justify-between border-t border-neutral-800 pt-3">
         <button type="button" class="text-xs text-neutral-400 transition hover:text-neutral-100" data-note-clear>Clear note</button>
         <span class="text-xs text-neutral-500" data-note-updated-display-secondary></span>
@@ -1684,10 +1684,6 @@ function updateWeeklyNoteIndicator(year, week, noteText, updatedAt) {
   trigger.classList.toggle('has-note', hasNote);
   trigger.classList.toggle('icon-translucent', !hasNote);
   trigger.setAttribute('aria-label', hasNote ? 'Edit weekly note' : 'Add weekly note');
-  const svg = trigger.querySelector('svg');
-  if (svg) {
-    svg.classList.toggle('text-amber-400', hasNote);
-  }
   const tooltipBody = trigger.querySelector('.note-tooltip [data-note-tooltip-body]');
   if (tooltipBody) {
     tooltipBody.textContent = normalized;
@@ -1734,10 +1730,6 @@ function updateMonthlyNoteIndicator(year, month, noteText, updatedAt) {
   trigger.classList.toggle('has-note', hasNote);
   trigger.classList.toggle('icon-translucent', !hasNote);
   trigger.setAttribute('aria-label', hasNote ? 'Edit monthly note' : 'Add monthly note');
-  const svg = trigger.querySelector('svg');
-  if (svg) {
-    svg.classList.toggle('text-amber-400', hasNote);
-  }
   const tooltipBody = trigger.querySelector('.note-tooltip [data-note-tooltip-body]');
   if (tooltipBody) {
     tooltipBody.textContent = normalized;
