@@ -26,7 +26,7 @@
           <div>Unrealized: {{ conflict.existing.unrealized|money }}</div>
         </div>
       </label>
-      <label class="flex cursor-pointer flex-col gap-1 rounded border border-blue-700 bg-blue-900/30 p-3">
+      <label class="flex cursor-pointer flex-col gap-1 rounded border conflict-option-new p-3">
         <input type="radio" name="choice_{{ conflict.date }}" value="new" class="h-4 w-4">
         <span class="text-sm font-semibold">Use imported values</span>
         <div class="text-xs text-neutral-200">
@@ -39,7 +39,7 @@
   {% endfor %}
   <div class="flex justify-end gap-2">
     <a href="/" class="rounded border border-neutral-700 px-4 py-2 text-sm">Cancel</a>
-    <button class="rounded bg-blue-600 px-4 py-2 text-sm font-semibold hover:bg-blue-500">Save selections</button>
+    <button class="btn btn-primary px-4 py-2 text-sm">Save selections</button>
   </div>
 </form>
 {% endblock %}
