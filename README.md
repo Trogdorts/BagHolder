@@ -25,7 +25,7 @@ A volume is mounted at `/app/data` (or `./app/data` in local dev) containing:
 
 ## Import
 
-- Go to **Import** from the navbar
+- Open **Settings → Stock data importing**
 - Choose **ThinkOrSwim → Account Statement** CSV
 - Only trade fields are persisted: date, symbol, action, qty, price, amount
 - Account numbers or names are discarded in-memory after parsing
