@@ -165,12 +165,20 @@
            aria-label="{{ 'Edit daily note' if d.has_note else 'Add daily note' }}"
            data-note-text="{{ d.note | e }}"
            data-note-updated="{{ d.note_updated_at | default('', true) }}"
+           data-note-label-empty="Add daily note"
+           data-note-label-filled="Edit daily note"
            onclick="openDailyNote('{{ d.date.strftime('%Y-%m-%d') }}'); return false;">
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
           </svg>
-          <div class="note-tooltip absolute bottom-6 right-0 z-20 h-[14rem] w-[14rem] overflow-auto rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg">
-            <p class="whitespace-pre-line" data-note-tooltip-body>{{ d.note | e }}</p>
+          <div class="note-tooltip absolute bottom-7 right-0 z-20 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left text-sm text-neutral-100 shadow-xl ring-1 ring-black/40">
+            <div class="flex flex-col gap-2">
+              <div>
+                <p class="text-[10px] uppercase tracking-wide text-neutral-500">Daily note</p>
+                <p class="text-[11px] text-neutral-400" data-note-tooltip-updated>Not saved yet</p>
+              </div>
+              <div class="max-h-48 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed" data-note-tooltip-body>{{ d.note | e }}</div>
+            </div>
           </div>
         </a>
         {% endif %}
@@ -199,12 +207,20 @@
          data-week-index="{{ week.week_number }}"
          data-note-text="{{ week.note | default('', true) | e }}"
          data-note-updated="{{ week.note_updated_at | default('', true) }}"
+         data-note-label-empty="Add weekly note"
+         data-note-label-filled="Edit weekly note"
          onclick="openWeeklyNote({{ week.week_year }}, {{ week.week_number }}); return false;">
         <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
         </svg>
-        <div class="note-tooltip absolute bottom-6 right-0 z-20 h-[14rem] w-[14rem] overflow-auto rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg">
-          <p class="whitespace-pre-line" data-note-tooltip-body>{{ week.note | default('', true) | e }}</p>
+        <div class="note-tooltip absolute bottom-7 right-0 z-20 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left text-sm text-neutral-100 shadow-xl ring-1 ring-black/40">
+          <div class="flex flex-col gap-2">
+            <div>
+              <p class="text-[10px] uppercase tracking-wide text-neutral-500">Weekly note</p>
+              <p class="text-[11px] text-neutral-400" data-note-tooltip-updated>Not saved yet</p>
+            </div>
+            <div class="max-h-48 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed" data-note-tooltip-body>{{ week.note | default('', true) | e }}</div>
+          </div>
         </div>
       </a>
     </div>
@@ -229,12 +245,20 @@
            data-month-key="{{ year }}-{{ '%02d'|format(month) }}"
            data-note-text="{{ month_note_text | e }}"
            data-note-updated="{{ month_note.updated_at | default('', true) }}"
+           data-note-label-empty="Add monthly note"
+           data-note-label-filled="Edit monthly note"
            onclick="openMonthlyNote({{ year }}, {{ month }}); return false;">
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
           </svg>
-          <div class="note-tooltip absolute bottom-6 right-0 z-20 h-[14rem] w-[14rem] overflow-auto rounded border border-neutral-700 bg-neutral-900 p-2 text-xs text-neutral-100 shadow-lg">
-            <p class="whitespace-pre-line" data-note-tooltip-body>{{ month_note_text | e }}</p>
+          <div class="note-tooltip absolute bottom-7 right-0 z-20 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left text-sm text-neutral-100 shadow-xl ring-1 ring-black/40">
+            <div class="flex flex-col gap-2">
+              <div>
+                <p class="text-[10px] uppercase tracking-wide text-neutral-500">Monthly note</p>
+                <p class="text-[11px] text-neutral-400" data-note-tooltip-updated>Not saved yet</p>
+              </div>
+              <div class="max-h-48 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed" data-note-tooltip-body>{{ month_note_text | e }}</div>
+            </div>
           </div>
         </a>
         {% endif %}
@@ -1675,16 +1699,24 @@ function getModalController() {
   return modal;
 }
 
-function updateWeeklyNoteIndicator(year, week, noteText, updatedAt) {
-  const selector = `[data-week-year='${year}'][data-week-index='${week}']`;
-  const trigger = document.querySelector(selector);
+function updateNoteTrigger(trigger, options = {}) {
   if (!trigger) {
-    return;
+    return false;
   }
+
+  const { noteText, updatedAt, emptyLabel, filledLabel } = options;
   const normalized = typeof noteText === 'string' ? noteText : '';
-  const hasNote = normalized.trim().length > 0;
+  const trimmed = normalized.trim();
+  const hasNote = trimmed.length > 0;
+  const updatedValue = typeof updatedAt === 'string' ? updatedAt : '';
+
   trigger.dataset.noteText = normalized;
-  trigger.dataset.noteUpdated = updatedAt || '';
+  trigger.dataset.noteUpdated = updatedValue;
+
+  if (typeof emptyLabel === 'string' && typeof filledLabel === 'string') {
+    trigger.setAttribute('aria-label', hasNote ? filledLabel : emptyLabel);
+  }
+
   trigger.classList.toggle('has-note', hasNote);
   trigger.classList.toggle('icon-translucent', !hasNote);
   trigger.setAttribute('aria-label', hasNote ? 'Edit weekly note' : 'Add weekly note');
@@ -1692,10 +1724,41 @@ function updateWeeklyNoteIndicator(year, week, noteText, updatedAt) {
   if (tooltipBody) {
     tooltipBody.textContent = normalized;
   }
+
+  const tooltipUpdated = trigger.querySelector('.note-tooltip [data-note-tooltip-updated]');
+  if (tooltipUpdated) {
+    if (updatedValue) {
+      const formatted = formatNoteTimestamp(updatedValue);
+      tooltipUpdated.textContent = formatted ? `Updated ${formatted}` : `Updated ${updatedValue}`;
+    } else {
+      tooltipUpdated.textContent = 'Not saved yet';
+    }
+  }
+
   if (hasNote) {
     trigger.setAttribute('title', normalized);
   } else {
     trigger.removeAttribute('title');
+  }
+
+  return hasNote;
+}
+
+function updateWeeklyNoteIndicator(year, week, noteText, updatedAt) {
+  const selector = `[data-week-year='${year}'][data-week-index='${week}']`;
+  const trigger = document.querySelector(selector);
+  if (!trigger) {
+    return;
+  }
+  const hasNote = updateNoteTrigger(trigger, {
+    noteText,
+    updatedAt,
+    emptyLabel: 'Add weekly note',
+    filledLabel: 'Edit weekly note',
+  });
+  const svg = trigger.querySelector('svg');
+  if (svg) {
+    svg.classList.toggle('text-amber-400', hasNote);
   }
 }
 
@@ -1708,17 +1771,12 @@ function updateDailyNoteIndicator(dateStr, noteText, updatedAt) {
   if (!trigger) {
     return;
   }
-  const normalized = typeof noteText === 'string' ? noteText : '';
-  const hasNote = normalized.trim().length > 0;
-  trigger.dataset.noteText = normalized;
-  trigger.dataset.noteUpdated = updatedAt || '';
-  trigger.classList.toggle('has-note', hasNote);
-  trigger.classList.toggle('icon-translucent', !hasNote);
-  trigger.setAttribute('aria-label', hasNote ? 'Edit daily note' : 'Add daily note');
-  const tooltipBody = trigger.querySelector('.note-tooltip [data-note-tooltip-body]');
-  if (tooltipBody) {
-    tooltipBody.textContent = normalized;
-  }
+  updateNoteTrigger(trigger, {
+    noteText,
+    updatedAt,
+    emptyLabel: 'Add daily note',
+    filledLabel: 'Edit daily note',
+  });
 }
 
 function updateMonthlyNoteIndicator(year, month, noteText, updatedAt) {
@@ -1739,5 +1797,14 @@ function updateMonthlyNoteIndicator(year, month, noteText, updatedAt) {
     tooltipBody.textContent = normalized;
   }
 }
+
+document.querySelectorAll('.note-trigger').forEach((trigger) => {
+  updateNoteTrigger(trigger, {
+    noteText: trigger.dataset.noteText || '',
+    updatedAt: trigger.dataset.noteUpdated || '',
+    emptyLabel: trigger.dataset.noteLabelEmpty,
+    filledLabel: trigger.dataset.noteLabelFilled,
+  });
+});
 </script>
 {% endblock %}
