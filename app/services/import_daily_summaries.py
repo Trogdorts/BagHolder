@@ -1,4 +1,4 @@
-"""Utilities for importing BagHolder-exported CSV data."""
+"""Utilities for importing daily summary CSV data."""
 
 import csv
 import io
@@ -83,8 +83,8 @@ def _parse_number(value: Any) -> Optional[float]:
         return None
 
 
-def parse_bagholder_csv(content: bytes) -> List[Dict[str, Any]]:
-    """Parse a BagHolder-exported CSV into normalized daily summary rows."""
+def parse_daily_summary_csv(content: bytes) -> List[Dict[str, Any]]:
+    """Parse a CSV export of daily summaries into normalized rows."""
     text = _decode_content(content)
     if not text.strip():
         return []
