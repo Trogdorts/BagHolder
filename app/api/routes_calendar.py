@@ -17,40 +17,11 @@ from sqlalchemy.orm import Session
 import calendar
 from app.core.database import get_session
 from app.core.models import DailySummary, Meta, NoteDaily, NoteMonthly, NoteWeekly, Trade
-from app.core.utils import month_bounds
+from app.core.utils import coerce_bool, month_bounds
 from app.services.trade_summaries import recompute_daily_summaries
 from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter()
-
-
-def _coerce_bool(value, default: bool = True) -> bool:
-    """Best-effort conversion of configuration values to booleans.
-
-    The configuration file can occasionally contain string representations of
-    truthy or falsy values (for example when edited manually). Jinja treats any
-    non-empty string as truthy which would cause UI toggles such as
-    ``show_trade_count`` to render incorrectly. This helper normalizes those
-    values before they reach the template so the UI behaves as expected.
-    """
-
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"true", "1", "yes", "on"}:
-            return True
-        if normalized in {"false", "0", "no", "off"}:
-            return False
-        return default
-    if value is None:
-        return default
-    try:
-        return bool(int(value))
-    except (TypeError, ValueError):
-        return bool(value) if value is not None else default
-
-
 class TradeUpdate(BaseModel):
     id: Optional[int] = None
     symbol: str
@@ -115,12 +86,12 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     cfg = request.app.state.config.raw
     ui_cfg = cfg.get("ui", {})
     fill_strategy = ui_cfg.get("unrealized_fill_strategy", "carry_forward")
-    show_trade_badges = _coerce_bool(ui_cfg.get("show_trade_count", True), True)
-    show_unrealized_default = _coerce_bool(ui_cfg.get("show_unrealized", True), True)
-    show_text_default = _coerce_bool(ui_cfg.get("show_text", True), True)
-    show_weekends_default = _coerce_bool(ui_cfg.get("show_weekends", False), False)
+    show_trade_badges = coerce_bool(ui_cfg.get("show_trade_count", True), True)
+    show_unrealized_default = coerce_bool(ui_cfg.get("show_unrealized", True), True)
+    show_text_default = coerce_bool(ui_cfg.get("show_text", True), True)
+    show_weekends_default = coerce_bool(ui_cfg.get("show_weekends", False), False)
     notes_cfg = cfg.get("notes", {})
-    notes_enabled = _coerce_bool(notes_cfg.get("enabled", True), True)
+    notes_enabled = coerce_bool(notes_cfg.get("enabled", True), True)
     today = date.today()
 
     start, end, days = month_bounds(year, month)

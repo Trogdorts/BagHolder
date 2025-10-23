@@ -50,6 +50,11 @@ DEFAULT_CONFIG = {
     "export": {
         "fill_empty_with_zero": True,
     },
+    "diagnostics": {
+        "debug_logging": False,
+        "log_max_bytes": 1_048_576,
+        "log_retention": 5,
+    },
 }
 
 @dataclass
