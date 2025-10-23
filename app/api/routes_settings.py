@@ -3,6 +3,7 @@ import os
 import re
 import signal
 from datetime import datetime
+from typing import Any
 from urllib.parse import quote_plus
 from zipfile import BadZipFile
 
@@ -10,7 +11,7 @@ from fastapi import APIRouter, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from starlette.background import BackgroundTask
 
-from app.core.config import AppConfig
+from app.core.config import AppConfig, DEFAULT_CONFIG
 from app.core.lifecycle import reload_application_state
 from app.services.data_backup import create_backup_archive, restore_backup_archive
 from app.services.data_reset import clear_all_data
@@ -36,6 +37,143 @@ def _sanitize_hex_color(value: str, default: str, existing: str | None = None) -
         if _HEX_COLOR_PATTERN.fullmatch(candidate):
             return candidate.lower()
     return fallback.lower()
+
+
+_COLOR_GROUPS = [
+    {
+        "title": "Interface accents",
+        "description": "Buttons, icons, and other reusable interface controls.",
+        "fields": [
+            {
+                "name": "icon_color",
+                "label": "Action icon color",
+                "description": "Applied to interactive glyphs such as the calendar gear icon.",
+                "config_path": ("ui", "icon_color"),
+                "default": DEFAULT_CONFIG["ui"]["icon_color"].lower(),
+            },
+            {
+                "name": "primary_color",
+                "label": "Primary button color",
+                "description": "The baseline accent for confirm buttons and focused controls.",
+                "config_path": ("ui", "primary_color"),
+                "default": DEFAULT_CONFIG["ui"]["primary_color"].lower(),
+            },
+            {
+                "name": "primary_hover_color",
+                "label": "Primary hover color",
+                "description": "A darker shade used for hover and focus states on primary actions.",
+                "config_path": ("ui", "primary_hover_color"),
+                "default": DEFAULT_CONFIG["ui"]["primary_hover_color"].lower(),
+            },
+        ],
+    },
+    {
+        "title": "Profit & risk feedback",
+        "description": "Colors that communicate gains, warnings, and losses on the calendar.",
+        "fields": [
+            {
+                "name": "success_color",
+                "label": "Success accent color",
+                "description": "Used for positive profit figures and confirming states.",
+                "config_path": ("ui", "success_color"),
+                "default": DEFAULT_CONFIG["ui"]["success_color"].lower(),
+            },
+            {
+                "name": "warning_color",
+                "label": "Warning accent color",
+                "description": "Highlights cells that need attention without indicating a loss.",
+                "config_path": ("ui", "warning_color"),
+                "default": DEFAULT_CONFIG["ui"]["warning_color"].lower(),
+            },
+            {
+                "name": "danger_color",
+                "label": "Danger accent color",
+                "description": "The base color for loss states and destructive actions.",
+                "config_path": ("ui", "danger_color"),
+                "default": DEFAULT_CONFIG["ui"]["danger_color"].lower(),
+            },
+            {
+                "name": "danger_hover_color",
+                "label": "Danger hover color",
+                "description": "A deeper shade for hover and focus states on danger actions.",
+                "config_path": ("ui", "danger_hover_color"),
+                "default": DEFAULT_CONFIG["ui"]["danger_hover_color"].lower(),
+            },
+        ],
+    },
+    {
+        "title": "Trade & note indicators",
+        "description": "Badges and note indicators that supplement the calendar view.",
+        "fields": [
+            {
+                "name": "trade_badge_color",
+                "label": "Trade badge color",
+                "description": "Background color for the trade count badge shown on each day.",
+                "config_path": ("ui", "trade_badge_color"),
+                "default": DEFAULT_CONFIG["ui"]["trade_badge_color"].lower(),
+            },
+            {
+                "name": "trade_badge_text_color",
+                "label": "Trade badge text color",
+                "description": "Text color inside the trade count badge for contrast.",
+                "config_path": ("ui", "trade_badge_text_color"),
+                "default": DEFAULT_CONFIG["ui"]["trade_badge_text_color"].lower(),
+            },
+            {
+                "name": "note_icon_color",
+                "label": "Note icon highlight color",
+                "description": "Applied when a day or week already contains a saved note.",
+                "config_path": ("notes", "icon_has_note_color"),
+                "default": DEFAULT_CONFIG["notes"]["icon_has_note_color"].lower(),
+            },
+        ],
+    },
+]
+
+_COLOR_FIELD_INDEX = {
+    field["name"]: field
+    for group in _COLOR_GROUPS
+    for field in group["fields"]
+}
+
+
+def _build_color_context(cfg: AppConfig) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Return structured color configuration data for the settings template."""
+
+    color_groups: list[dict[str, Any]] = []
+    for group in _COLOR_GROUPS:
+        fields = []
+        for field in group["fields"]:
+            current_value: Any = cfg.raw
+            for key in field["config_path"]:
+                if isinstance(current_value, dict):
+                    current_value = current_value.get(key)
+                else:
+                    current_value = None
+                    break
+            if isinstance(current_value, str) and _HEX_COLOR_PATTERN.fullmatch(current_value.strip()):
+                current_value = current_value.strip().lower()
+            if not isinstance(current_value, str) or not current_value:
+                current_value = field["default"]
+            fields.append({
+                "name": field["name"],
+                "label": field["label"],
+                "description": field["description"],
+                "config_path": field["config_path"],
+                "default": field["default"],
+                "current": current_value,
+            })
+        color_groups.append({
+            "title": group["title"],
+            "description": group["description"],
+            "fields": fields,
+        })
+
+    color_defaults = {
+        name: field["default"] for name, field in _COLOR_FIELD_INDEX.items()
+    }
+    return color_groups, color_defaults
+
 
 @router.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
@@ -72,6 +210,8 @@ def settings_page(request: Request):
     thinkorswim_error_message = None
     if thinkorswim_error_code == "no_trades":
         thinkorswim_error_message = "No trades were detected in the uploaded statement."
+    color_groups, color_defaults = _build_color_context(cfg)
+
     context = {
         "request": request,
         "cfg": cfg.raw,
@@ -83,6 +223,8 @@ def settings_page(request: Request):
         "backup_error_message": backup_error_message,
         "trade_csv_error_message": trade_csv_error_message,
         "thinkorswim_error_message": thinkorswim_error_message,
+        "color_groups": color_groups,
+        "color_defaults": color_defaults,
     }
     return request.app.state.templates.TemplateResponse("settings.html", context)
 
@@ -96,11 +238,11 @@ def save_settings(request: Request,
                   default_view: str = Form("latest"),
                   icon_color: str = Form("#6b7280"),
                   primary_color: str = Form("#2563eb"),
-                  primary_hover_color: str = Form("#3b82f6"),
+                  primary_hover_color: str = Form("#1d4ed8"),
                   success_color: str = Form("#22c55e"),
                   warning_color: str = Form("#f59e0b"),
                   danger_color: str = Form("#dc2626"),
-                  danger_hover_color: str = Form("#ef4444"),
+                  danger_hover_color: str = Form("#b91c1c"),
                   trade_badge_color: str = Form("#34d399"),
                   trade_badge_text_color: str = Form("#111827"),
                   note_icon_color: str = Form("#80cbc4"),
@@ -108,21 +250,30 @@ def save_settings(request: Request,
                   export_empty_values: str = Form("zero")):
     cfg: AppConfig = request.app.state.config
     ui_section = cfg.raw.setdefault("ui", {})
+    notes_section = cfg.raw.setdefault("notes", {})
     ui_section["theme"] = theme
     ui_section["show_text"] = (show_text.lower() == "true")
     ui_section["show_unrealized"] = (show_unrealized.lower() == "true")
     ui_section["show_trade_count"] = (show_trade_count.lower() == "true")
     ui_section["show_weekends"] = (show_weekends.lower() == "true")
     cfg.raw["view"]["default"] = default_view
-    ui_section["icon_color"] = _sanitize_hex_color(icon_color, "#6b7280", ui_section.get("icon_color"))
-    ui_section["primary_color"] = _sanitize_hex_color(primary_color, "#2563eb", ui_section.get("primary_color"))
-    ui_section["primary_hover_color"] = _sanitize_hex_color(primary_hover_color, "#3b82f6", ui_section.get("primary_hover_color"))
-    ui_section["success_color"] = _sanitize_hex_color(success_color, "#22c55e", ui_section.get("success_color"))
-    ui_section["warning_color"] = _sanitize_hex_color(warning_color, "#f59e0b", ui_section.get("warning_color"))
-    ui_section["danger_color"] = _sanitize_hex_color(danger_color, "#dc2626", ui_section.get("danger_color"))
-    ui_section["danger_hover_color"] = _sanitize_hex_color(danger_hover_color, "#ef4444", ui_section.get("danger_hover_color"))
-    ui_section["trade_badge_color"] = _sanitize_hex_color(trade_badge_color, "#34d399", ui_section.get("trade_badge_color"))
-    ui_section["trade_badge_text_color"] = _sanitize_hex_color(trade_badge_text_color, "#111827", ui_section.get("trade_badge_text_color"))
+    color_sections = {
+        "ui": ui_section,
+        "notes": notes_section,
+    }
+    color_inputs = {name: locals().get(name) for name in _COLOR_FIELD_INDEX.keys()}
+    for name, raw_value in color_inputs.items():
+        field = _COLOR_FIELD_INDEX[name]
+        section_key, option_key = field["config_path"]
+        target_section = color_sections.get(section_key)
+        if target_section is None:
+            target_section = cfg.raw.setdefault(section_key, {})
+            color_sections[section_key] = target_section
+        target_section[option_key] = _sanitize_hex_color(
+            raw_value,
+            field["default"],
+            target_section.get(option_key),
+        )
     fill_options = {"carry_forward", "average_neighbors"}
     if unrealized_fill_strategy not in fill_options:
         unrealized_fill_strategy = "carry_forward"
@@ -130,12 +281,6 @@ def save_settings(request: Request,
     export_preference = export_empty_values.lower()
     cfg.raw.setdefault("export", {})
     cfg.raw["export"]["fill_empty_with_zero"] = export_preference != "empty"
-    notes_section = cfg.raw.setdefault("notes", {})
-    notes_section["icon_has_note_color"] = _sanitize_hex_color(
-        note_icon_color,
-        "#80cbc4",
-        notes_section.get("icon_has_note_color"),
-    )
     cfg.save()
     return RedirectResponse(url="/settings", status_code=303)
 
@@ -226,11 +371,14 @@ def shutdown_application(request: Request):
         sig = getattr(signal, "SIGTERM", signal.SIGINT)
         os.kill(os.getpid(), sig)
 
+    color_groups, color_defaults = _build_color_context(cfg)
     context = {
         "request": request,
         "cfg": cfg.raw,
         "cleared": False,
         "shutting_down": True,
+        "color_groups": color_groups,
+        "color_defaults": color_defaults,
     }
 
     background = BackgroundTask(_trigger_shutdown)
