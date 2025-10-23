@@ -19,16 +19,9 @@ def _is_close(a: float, b: float, tol: float = 0.01) -> bool:
     return abs(float(a) - float(b)) <= tol
 
 
-@router.get("/import", response_class=HTMLResponse)
+@router.get("/import", response_class=RedirectResponse)
 def import_page(request: Request):
-    return request.app.state.templates.TemplateResponse(
-        "import.html",
-        {
-            "request": request,
-            "bagholder_error": None,
-            "thinkorswim_error": None,
-        },
-    )
+    return RedirectResponse("/settings#stock-data-import", status_code=307)
 
 
 @router.post("/import/bagholder")
@@ -41,13 +34,9 @@ async def import_bagholder(
     rows = parse_bagholder_csv(content)
 
     if not rows:
-        return request.app.state.templates.TemplateResponse(
-            "import.html",
-            {
-                "request": request,
-                "bagholder_error": "No daily summaries detected in the uploaded file.",
-                "thinkorswim_error": None,
-            },
+        return RedirectResponse(
+            "/settings?bagholder_error=no_summaries#stock-data-import",
+            status_code=303,
         )
 
     now = datetime.utcnow().isoformat()
@@ -91,13 +80,9 @@ async def import_thinkorswim(
     rows = parse_thinkorswim_csv(content)
 
     if not rows:
-        return request.app.state.templates.TemplateResponse(
-            "import.html",
-            {
-                "request": request,
-                "thinkorswim_error": "No trades detected in the uploaded statement.",
-                "bagholder_error": None,
-            },
+        return RedirectResponse(
+            "/settings?thinkorswim_error=no_trades#stock-data-import",
+            status_code=303,
         )
 
     inserted = 0
