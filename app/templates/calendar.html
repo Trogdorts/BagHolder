@@ -392,7 +392,7 @@ function openTrades(dateStr) {
       modal.body = createTradeEditorHTML();
       modal.save = () => saveTrades(dateStr);
       modal.open = true;
-      setTimeout(() => setupTradeEditor(js.trades || []), 0);
+      setTimeout(() => setupTradeEditor(js.trades || [], dateStr), 0);
     })
     .catch(err => {
       const modal = getModalController();
@@ -424,14 +424,17 @@ function createTradeEditorHTML() {
           <tbody id="trade-table-body"></tbody>
         </table>
       </div>
-      <div class="flex items-center justify-between">
-        <button type="button" id="add-trade-row" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-sm">Add trade</button>
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-2">
+          <button type="button" id="add-trade-row" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-sm">Add trade</button>
+          <button type="button" id="clear-trades" class="px-3 py-1 rounded border border-red-700 text-red-300 hover:bg-red-900/40 text-sm">Clear all trades</button>
+        </div>
         <span class="text-xs text-neutral-500">Remove a row to delete a trade. Amounts are calculated on save.</span>
       </div>
     </div>`;
 }
 
-function setupTradeEditor(trades) {
+function setupTradeEditor(trades, dateStr) {
   clearTradeEditorMessages();
   const tbody = document.getElementById('trade-table-body');
   if (!tbody) return;
@@ -447,6 +450,14 @@ function setupTradeEditor(trades) {
       hideTradeEditorSuccess();
       tbody.appendChild(createTradeRow({ action: 'BUY', symbol: '', qty: '', price: '' }));
       updateTradeEmptyState();
+    };
+  }
+
+  const clearButton = document.getElementById('clear-trades');
+  if (clearButton) {
+    clearButton.onclick = () => {
+      hideTradeEditorSuccess();
+      clearTrades(dateStr);
     };
   }
 
@@ -650,13 +661,55 @@ function saveTrades(dateStr) {
     })
     .then(data => {
       const savedTrades = data && Array.isArray(data.trades) ? data.trades : [];
-      setupTradeEditor(savedTrades);
+      setupTradeEditor(savedTrades, dateStr);
       showTradeEditorSuccess('Trades saved. You can continue adding stocks.');
       modal.shouldReloadOnClose = true;
       updateTradeIndicators(dateStr, savedTrades);
     })
     .catch(err => {
       showTradeEditorError(err.message || 'Failed to save trades.');
+    })
+    .finally(() => {
+      modal.saving = false;
+    });
+}
+
+function clearTrades(dateStr) {
+  if (!dateStr) {
+    return;
+  }
+
+  const modal = getModalController();
+  if (!modal) {
+    return;
+  }
+
+  const confirmed = window.confirm(`Clear all trades for ${dateStr}? This action cannot be undone.`);
+  if (!confirmed) {
+    return;
+  }
+
+  modal.saving = true;
+  clearTradeEditorMessages();
+
+  fetch('/api/trades/' + dateStr, { method: 'DELETE' })
+    .then(response => {
+      if (!response.ok) {
+        return response.json().catch(() => ({})).then(data => {
+          const message = data && data.detail ? data.detail : 'Failed to clear trades.';
+          throw new Error(message);
+        });
+      }
+      return response.json();
+    })
+    .then(data => {
+      setupTradeEditor([], dateStr);
+      showTradeEditorSuccess('All trades cleared for this date.');
+      updateTradeIndicators(dateStr, []);
+      modal.shouldReloadOnClose = true;
+    })
+    .catch(err => {
+      showTradeEditorError(err && err.message ? err.message : 'Failed to clear trades.');
     })
     .finally(() => {
       modal.saving = false;

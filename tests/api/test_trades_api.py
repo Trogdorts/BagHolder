@@ -12,11 +12,12 @@ from app.main import create_app  # noqa: E402
 from app.api.routes_calendar import (  # noqa: E402
     TradeUpdate,
     TradeUpdatePayload,
+    clear_trades_for_day,
     get_trades_for_day,
     save_trades_for_day,
 )
 from app.core import database as db  # noqa: E402
-from app.core.models import Trade  # noqa: E402
+from app.core.models import DailySummary, Trade  # noqa: E402
 
 
 def _init_app(tmp_path, monkeypatch):
@@ -64,6 +65,9 @@ def test_save_trades_updates_existing_and_removes_missing(tmp_path, monkeypatch)
             )
             result = save_trades_for_day("2024-05-01", payload=payload, db=session)
             assert result["ok"] is True
+            assert isinstance(result.get("summary"), dict)
+            assert result["summary"]["realized"] == pytest.approx(0.0)
+            assert result["summary"]["unrealized"] == pytest.approx(0.0)
             returned_symbols = [trade["symbol"] for trade in result["trades"]]
             assert returned_symbols == ["AAPL", "TSLA"]
             returned_qty = {trade["symbol"]: trade["qty"] for trade in result["trades"]}
@@ -87,6 +91,10 @@ def test_save_trades_updates_existing_and_removes_missing(tmp_path, monkeypatch)
             new_trade = next(row for row in rows if row.symbol == "TSLA")
             assert new_trade.action == "SELL"
             assert new_trade.amount == pytest.approx(375.0)
+            summary_row = session.get(DailySummary, "2024-05-01")
+            assert summary_row is not None
+            assert summary_row.realized == pytest.approx(0.0)
+            assert summary_row.unrealized == pytest.approx(0.0)
     finally:
         db.dispose_engine()
 
@@ -105,5 +113,70 @@ def test_save_trades_unknown_id_raises(tmp_path, monkeypatch):
             with pytest.raises(HTTPException) as excinfo:
                 save_trades_for_day("2024-06-01", payload=payload, db=session)
             assert excinfo.value.status_code == 404
+    finally:
+        db.dispose_engine()
+
+
+def test_save_trades_recomputes_following_day_summary(tmp_path, monkeypatch):
+    _init_app(tmp_path, monkeypatch)
+    try:
+        with db.SessionLocal() as session:
+            buy = Trade(date="2024-01-02", symbol="AAPL", action="BUY", qty=1.0, price=100.0, amount=-100.0)
+            sell = Trade(date="2024-01-03", symbol="AAPL", action="SELL", qty=1.0, price=120.0, amount=120.0)
+            session.add_all([buy, sell])
+            session.commit()
+            buy_id = buy.id
+
+        with db.SessionLocal() as session:
+            payload = TradeUpdatePayload(
+                trades=[TradeUpdate(id=buy_id, symbol="AAPL", action="BUY", qty=1.0, price=110.0)]
+            )
+            result = save_trades_for_day("2024-01-02", payload=payload, db=session)
+            assert result["ok"] is True
+            assert result["summary"]["realized"] == pytest.approx(0.0)
+            assert result["summary"]["unrealized"] == pytest.approx(0.0)
+
+        with db.SessionLocal() as session:
+            day1 = session.get(DailySummary, "2024-01-02")
+            day2 = session.get(DailySummary, "2024-01-03")
+            assert day1 is not None
+            assert day1.realized == pytest.approx(0.0)
+            assert day1.unrealized == pytest.approx(0.0)
+            assert day2 is not None
+            assert day2.realized == pytest.approx(10.0)
+            assert day2.unrealized == pytest.approx(0.0)
+    finally:
+        db.dispose_engine()
+
+
+def test_clear_trades_for_day_removes_summary(tmp_path, monkeypatch):
+    _init_app(tmp_path, monkeypatch)
+    try:
+        with db.SessionLocal() as session:
+            buy = Trade(date="2024-03-05", symbol="AAPL", action="BUY", qty=2.0, price=100.0, amount=-200.0)
+            sell = Trade(date="2024-03-06", symbol="AAPL", action="SELL", qty=2.0, price=120.0, amount=240.0)
+            session.add_all([buy, sell])
+            session.commit()
+            buy_id = buy.id
+
+        with db.SessionLocal() as session:
+            payload = TradeUpdatePayload(
+                trades=[TradeUpdate(id=buy_id, symbol="AAPL", action="BUY", qty=2.0, price=100.0)]
+            )
+            save_trades_for_day("2024-03-05", payload=payload, db=session)
+
+        with db.SessionLocal() as session:
+            result = clear_trades_for_day("2024-03-05", db=session)
+            assert result["ok"] is True
+            assert result["deleted"] == 1
+
+        with db.SessionLocal() as session:
+            remaining = session.query(Trade).filter(Trade.date == "2024-03-05").count()
+            assert remaining == 0
+            assert session.get(DailySummary, "2024-03-05") is None
+            day2 = session.get(DailySummary, "2024-03-06")
+            assert day2 is not None
+            assert day2.realized == pytest.approx(0.0)
+            assert day2.unrealized == pytest.approx(0.0)
     finally:
         db.dispose_engine()

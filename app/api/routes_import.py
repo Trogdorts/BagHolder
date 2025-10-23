@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Dict
 
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -7,11 +8,9 @@ from sqlalchemy.orm import Session
 from app.core.database import get_session
 from app.core.models import DailySummary, Trade
 from app.services.import_daily_summaries import parse_daily_summary_csv
-from app.services.import_thinkorswim import (
-    compute_daily_pnl_records,
-    parse_thinkorswim_csv,
-)
+from app.services.import_thinkorswim import parse_thinkorswim_csv
 from app.services.import_trades_csv import parse_trade_csv
+from app.services.trade_summaries import calculate_daily_trade_map, upsert_daily_summaries
 
 router = APIRouter()
 
@@ -50,59 +49,21 @@ def _persist_trade_rows(db: Session, rows):
 
 def _finalize_trade_import(request: Request, db: Session, inserted: int):
     all_trades = db.query(Trade).order_by(Trade.date.asc(), Trade.id.asc()).all()
-    trade_records = []
-    for t in all_trades:
-        try:
-            dt = datetime.strptime(t.date, "%Y-%m-%d").date()
-        except ValueError:
-            continue
-        trade_records.append(
-            {
-                "date": dt,
-                "side": t.action.upper(),
-                "symbol": t.symbol.upper(),
-                "quantity": float(t.qty),
-                "price": float(t.price),
-            }
-        )
-
-    daily_df = compute_daily_pnl_records(trade_records)
-    daily_map = {}
-    for record in daily_df.to_dict("records"):
-        date_value = record["date"]
-        day_key = (
-            date_value.strftime("%Y-%m-%d")
-            if hasattr(date_value, "strftime")
-            else str(date_value)
-        )
-        daily_map[day_key] = {
-            "realized": float(record.get("realized_pl", 0.0)),
-            "unrealized": float(record.get("unrealized_pl", 0.0)),
-        }
+    daily_map = calculate_daily_trade_map(all_trades)
 
     now = datetime.utcnow().isoformat()
     conflicts = []
+    resolved: Dict[str, Dict[str, float]] = {}
     for day, values in daily_map.items():
         realized = values["realized"]
         unrealized = values["unrealized"]
         ds = db.get(DailySummary, day)
         if ds is None:
-            db.add(
-                DailySummary(
-                    date=day,
-                    realized=realized,
-                    unrealized=unrealized,
-                    total_invested=unrealized,
-                    updated_at=now,
-                )
-            )
+            resolved[day] = values
             continue
 
         if _is_close(ds.realized, realized) and _is_close(ds.unrealized, unrealized):
-            ds.realized = realized
-            ds.unrealized = unrealized
-            ds.total_invested = unrealized
-            ds.updated_at = now
+            resolved[day] = values
         else:
             conflicts.append(
                 {
@@ -119,6 +80,8 @@ def _finalize_trade_import(request: Request, db: Session, inserted: int):
                 }
             )
 
+    if resolved:
+        upsert_daily_summaries(db, resolved, timestamp=now)
     db.commit()
 
     if conflicts:

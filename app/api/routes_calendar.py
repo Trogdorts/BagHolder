@@ -18,6 +18,7 @@ import calendar
 from app.core.database import get_session
 from app.core.models import DailySummary, Meta, NoteDaily, NoteMonthly, NoteWeekly, Trade
 from app.core.utils import month_bounds
+from app.services.trade_summaries import recompute_daily_summaries
 from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter()
@@ -389,6 +390,7 @@ def save_trades_for_day(
     )
     existing_map = {trade.id: trade for trade in existing}
     seen_ids = set()
+    had_existing_trades = bool(existing)
 
     for trade_update in payload.trades:
         trade = None
@@ -426,25 +428,75 @@ def save_trades_for_day(
         if trade.id not in seen_ids:
             db.delete(trade)
 
-    db.commit()
+    db.flush()
+
+    remaining = (
+        db.query(Trade)
+        .filter(Trade.date == date_str)
+        .count()
+    )
+    if remaining == 0 and had_existing_trades:
+        summary_row = db.get(DailySummary, date_str)
+        if summary_row:
+            db.delete(summary_row)
+
+    db.flush()
+
+    daily_map = recompute_daily_summaries(db)
     updated = (
         db.query(Trade)
         .filter(Trade.date == date_str)
         .order_by(Trade.id.asc())
         .all()
     )
+    response_trades = [
+        {
+            "id": trade.id,
+            "symbol": trade.symbol,
+            "action": trade.action,
+            "qty": float(trade.qty),
+            "price": float(trade.price),
+        }
+        for trade in updated
+    ]
+
+    db.commit()
+
     return {
         "ok": True,
-        "trades": [
-            {
-                "id": trade.id,
-                "symbol": trade.symbol,
-                "action": trade.action,
-                "qty": float(trade.qty),
-                "price": float(trade.price),
-            }
-            for trade in updated
-        ],
+        "trades": response_trades,
+        "summary": daily_map.get(date_str),
+    }
+
+
+@router.delete("/api/trades/{date_str}")
+def clear_trades_for_day(date_str: str, db: Session = Depends(get_session)):
+    trades = (
+        db.query(Trade)
+        .filter(Trade.date == date_str)
+        .order_by(Trade.id.asc())
+        .all()
+    )
+    deleted = 0
+    for trade in trades:
+        db.delete(trade)
+        deleted += 1
+
+    summary_row = db.get(DailySummary, date_str)
+    if summary_row is not None:
+        db.delete(summary_row)
+
+    db.flush()
+
+    daily_map = recompute_daily_summaries(db)
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "deleted": deleted,
+        "trades": [],
+        "summary": daily_map.get(date_str),
     }
 
 
