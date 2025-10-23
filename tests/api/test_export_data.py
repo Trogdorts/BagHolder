@@ -1,6 +1,7 @@
 import asyncio
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -39,8 +40,11 @@ def test_export_data_excludes_total_and_updated_at(tmp_path, monkeypatch):
         )
         session.commit()
 
+    request = SimpleNamespace(app=_app)
+
     with db.SessionLocal() as session:
         response = export_data(
+            request=request,
             start="2024-03-01",
             end="2024-03-02",
             db=session,
@@ -59,6 +63,59 @@ def test_export_data_excludes_total_and_updated_at(tmp_path, monkeypatch):
     assert lines[1:] == [
         "2024-03-01,10.00,5.00",
         "2024-03-02,-3.50,0.00",
+    ]
+
+    db.dispose_engine()
+
+
+def test_export_data_leaves_empty_values_when_configured(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+
+    _app = create_app()
+
+    _app.state.config.raw["export"]["fill_empty_with_zero"] = False
+
+    request = SimpleNamespace(app=_app)
+
+    class DummySummary:
+        date = "2024-04-01"
+        realized = None
+        unrealized = None
+
+    class DummyQuery:
+        def filter(self, *args, **kwargs):
+            return self
+
+        def order_by(self, *args, **kwargs):
+            return self
+
+        def all(self):
+            return [DummySummary()]
+
+    class DummySession:
+        def query(self, *args, **kwargs):
+            return DummyQuery()
+
+    response = export_data(
+        request=request,
+        start="2024-04-01",
+        end="2024-04-01",
+        db=DummySession(),
+    )
+
+    async def gather_body(resp):
+        chunks = []
+        async for chunk in resp.body_iterator:
+            chunks.append(chunk)
+        return b"".join(chunks)
+
+    content = asyncio.run(gather_body(response))
+    lines = content.decode("utf-8").strip().splitlines()
+
+    assert lines[0] == "date,realized,unrealized"
+    assert lines[1:] == [
+        "2024-04-01,,",
     ]
 
     db.dispose_engine()

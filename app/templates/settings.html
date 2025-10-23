@@ -13,6 +13,7 @@
 {% endif %}
 {% set show_unrealized = cfg.ui.get('show_unrealized', True) %}
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
+{% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
 <form method="post" action="/settings" class="space-y-4 bg-neutral-950 p-4 rounded border border-neutral-800"
       x-data="{ showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }} }">
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -76,6 +77,19 @@
       <span class="block text-sm text-neutral-400">Action icon color</span>
       <input type="color" name="icon_color" value="{{ cfg.ui.icon_color }}"
              class="bg-neutral-800 rounded px-2 py-1 w-full h-10 p-1 cursor-pointer">
+    </label>
+  </div>
+  <div class="pt-4 border-t border-neutral-800">
+    <h2 class="text-lg font-semibold mb-2">Export data</h2>
+    <p class="text-sm text-neutral-500 mb-3">
+      Choose how empty values should appear when exporting daily summaries.
+    </p>
+    <label class="block md:w-1/2">
+      <span class="block text-sm text-neutral-400">Empty value handling</span>
+      <select name="export_empty_values" class="bg-neutral-800 rounded px-2 py-1 w-full">
+        <option value="zero" {% if export_fill_empty %}selected{% endif %}>Fill with 0</option>
+        <option value="empty" {% if not export_fill_empty %}selected{% endif %}>Leave empty</option>
+      </select>
     </label>
   </div>
   <button class="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500">Save</button>

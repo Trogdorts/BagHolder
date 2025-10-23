@@ -38,6 +38,9 @@ DEFAULT_CONFIG = {
     },
     "view": {"default": "latest", "remember_last_view": True, "month_start_day": "monday"},
     "backup": {"enable_auto_backup": True, "retention_days": 7},
+    "export": {
+        "fill_empty_with_zero": True,
+    },
 }
 
 @dataclass

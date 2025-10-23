@@ -1,5 +1,6 @@
 import csv
 import io
+import math
 from bisect import bisect_right
 from datetime import date, datetime, timedelta
 from typing import List, Optional
@@ -366,12 +367,18 @@ def overwrite_daily(date_str: str, realized: float = Form(...), unrealized: floa
 
 @router.get("/export")
 def export_data(
+    request: Request,
     start: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
     db: Session = Depends(get_session),
 ):
     fmt = "%Y-%m-%d"
     today = date.today()
+
+    cfg = getattr(request.app.state, "config", None)
+    fill_empty_with_zero = True
+    if cfg is not None:
+        fill_empty_with_zero = cfg.raw.get("export", {}).get("fill_empty_with_zero", True)
 
     def parse(value: Optional[str], fallback: date) -> date:
         if value:
@@ -400,12 +407,31 @@ def export_data(
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(["date", "realized", "unrealized"])
+
+    def format_value(value: Optional[float]) -> str:
+        if value is None:
+            return "0.00" if fill_empty_with_zero else ""
+        if isinstance(value, str):
+            stripped = value.strip()
+            if not stripped:
+                return "0.00" if fill_empty_with_zero else ""
+            candidate = stripped
+        else:
+            candidate = value
+        try:
+            number = float(candidate)
+        except (TypeError, ValueError):
+            return "0.00" if fill_empty_with_zero else ""
+        if math.isnan(number):  # pragma: no cover - defensive guard
+            return "0.00" if fill_empty_with_zero else ""
+        return f"{number:.2f}"
+
     for summary in summaries:
         writer.writerow(
             [
                 summary.date,
-                f"{float(summary.realized):.2f}",
-                f"{float(summary.unrealized):.2f}",
+                format_value(summary.realized),
+                format_value(summary.unrealized),
             ]
         )
 
