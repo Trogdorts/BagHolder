@@ -358,6 +358,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     )
     year_realized = sum(float(r.realized) for r in year_rows)
     year_unrealized = sum(float(r.unrealized) for r in year_rows)
+    year_trading_days = sum(1 for r in year_rows if r)
 
     # Rolling 12 month totals ending at the current month
     rolling_rows = (
@@ -367,6 +368,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     )
     rolling_realized = sum(float(r.realized) for r in rolling_rows)
     rolling_unrealized = sum(float(r.unrealized) for r in rolling_rows)
+    rolling_trading_days = sum(1 for r in rolling_rows if r)
 
     ctx = {
         "request": request,
@@ -378,8 +380,10 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "month_percent": month_percent,
         "year_realized": year_realized,
         "year_unrealized": year_unrealized,
+        "year_trading_days": year_trading_days,
         "rolling_year_realized": rolling_realized,
         "rolling_year_unrealized": rolling_unrealized,
+        "rolling_year_trading_days": rolling_trading_days,
         "cfg": request.app.state.config.raw,
         "show_trade_badges": show_trade_badges,
         "show_unrealized_flag": show_unrealized_default,
