@@ -265,9 +265,21 @@
     </div>
     <div class="rounded border border-neutral-800 p-3 bg-neutral-950">
       <h2 class="font-semibold">Yearly summary</h2>
-      <div>Realized: <span class="{{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
-      <div x-show="showUnrealized" x-cloak>
-        Unrealized (invested): <span class="{{ 'text-profit' if year_unrealized > 0 else ('text-loss' if year_unrealized < 0 else 'text-neutral-200') }}">{{ year_unrealized|money }}</span>
+      <div class="mt-2 space-y-4 text-sm">
+        <div class="space-y-1">
+          <p class="text-[11px] uppercase tracking-wide text-neutral-400">Last 12 months</p>
+          <div>Realized: <span class="{{ 'text-profit' if rolling_year_realized > 0 else ('text-loss' if rolling_year_realized < 0 else 'text-neutral-200') }}">{{ rolling_year_realized|money }}</span></div>
+          <div x-show="showUnrealized" x-cloak>
+            Unrealized (invested): <span class="{{ 'text-profit' if rolling_year_unrealized > 0 else ('text-loss' if rolling_year_unrealized < 0 else 'text-neutral-200') }}">{{ rolling_year_unrealized|money }}</span>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <p class="text-[11px] uppercase tracking-wide text-neutral-400">Since Jan 1</p>
+          <div>Realized: <span class="{{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
+          <div x-show="showUnrealized" x-cloak>
+            Unrealized (invested): <span class="{{ 'text-profit' if year_unrealized > 0 else ('text-loss' if year_unrealized < 0 else 'text-neutral-200') }}">{{ year_unrealized|money }}</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
