@@ -8,45 +8,16 @@
 {% set default_view = cfg.view.get('default', 'latest') %}
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
-<div class="settings-page">
-  <header class="settings-header settings-card" aria-label="Settings overview">
-    <div class="space-y-2">
-      <h1 class="settings-header-title">Settings</h1>
-      <p class="settings-muted">Control BagHolder's appearance, calculations, and data safety from a single place.</p>
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+  <header class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+    <div class="flex flex-col gap-2">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-blue-300">BagHolder</p>
+        <h1 class="text-2xl font-semibold text-neutral-50 sm:text-3xl">Settings</h1>
+      </div>
+      <p class="max-w-2xl text-sm text-neutral-400">Fine-tune how BagHolder looks, calculates totals, and manages data without scrolling through empty space.</p>
     </div>
-    <aside>
-      <dl class="settings-summary-grid" aria-label="Current configuration summary">
-        <div class="settings-summary-item">
-          <dt>Active theme</dt>
-          <dd>{{ cfg.ui.theme | default('dark') | replace('_', ' ') | title }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Calendar start</dt>
-          <dd>{{ 'Latest month' if default_view == 'latest' else 'Last viewed' }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Weekends</dt>
-          <dd>{{ 'Shown' if show_weekends else 'Hidden' }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Unrealized P&amp;L</dt>
-          <dd>{{ 'Visible by default' if show_unrealized else 'Hidden by default' }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Trade badges</dt>
-          <dd>{{ 'Enabled' if show_trade_count else 'Disabled' }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Percentages</dt>
-          <dd>{{ 'Shown' if show_percentages else 'Hidden' }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Diagnostics</dt>
-          <dd>{{ 'Logging on' if debug_logging_enabled else 'Logging off' }}</dd>
-        </div>
-      </dl>
-    </aside>
-  </section>
+  </header>
 
   <div class="space-y-3">
     {% if config_imported %}
@@ -70,77 +41,69 @@
     {% endif %}
   </div>
 
-  <div class="settings-content settings-layout">
-    <form method="post" action="/settings" class="settings-form settings-form-stack"
-          x-data="settingsForm()"
-          @submit="resetChanges()">
-      <div x-show="hasChanges" x-cloak x-transition.opacity.duration.200ms class="alert alert-warning px-4 py-3 text-sm">
+  <div class="grid gap-6 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] xl:gap-8">
+    <form method="post" action="/settings" class="flex flex-col gap-6" x-data="settingsForm()" @submit="resetChanges()">
+      <div x-show="hasChanges" x-cloak x-transition.opacity.duration.200ms class="rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
         You have unsaved changes. Don't forget to save before leaving this page.
       </div>
 
-      <section id="display-settings" class="settings-card settings-section space-y-5">
-        <header class="space-y-1">
-          <h2 class="settings-section-title text-neutral-100">Appearance &amp; calendar</h2>
-          <p class="settings-muted">Configure the default look and feel of the calendar.</p>
+      <section id="display-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <header class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-semibold text-neutral-50">Appearance &amp; calendar</h2>
+          <p class="text-sm text-neutral-400">Configure the default look and feel of the calendar.</p>
         </header>
-        <div class="settings-field-stack">
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Theme</span>
+        <div class="grid gap-5">
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="theme" class="block text-sm font-medium text-neutral-200">Theme</label>
+              <p class="mt-1 text-xs text-neutral-500">Switch between the dark and light presentation.</p>
             </div>
-            <div class="settings-field-control">
-              <select name="theme" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-                <option value="dark" {% if cfg.ui.theme == 'dark' %}selected{% endif %}>Dark</option>
-                <option value="light" {% if cfg.ui.theme == 'light' %}selected{% endif %}>Light</option>
-              </select>
-            </div>
+            <select id="theme" name="theme" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="dark" {% if cfg.ui.theme == 'dark' %}selected{% endif %}>Dark</option>
+              <option value="light" {% if cfg.ui.theme == 'light' %}selected{% endif %}>Light</option>
+            </select>
           </div>
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Show daily profit and loss</span>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="show_text" class="block text-sm font-medium text-neutral-200">Daily profit and loss</label>
+              <p class="mt-1 text-xs text-neutral-500">Choose whether calendar cells show the numeric values.</p>
             </div>
-            <div class="settings-field-control">
-              <select name="show_text" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-                <option value="true" {% if show_text %}selected{% endif %}>Show values</option>
-                <option value="false" {% if not show_text %}selected{% endif %}>Hide values</option>
-              </select>
-            </div>
+            <select id="show_text" name="show_text" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="true" {% if show_text %}selected{% endif %}>Show values</option>
+              <option value="false" {% if not show_text %}selected{% endif %}>Hide values</option>
+            </select>
           </div>
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Show trade count badges</span>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="show_trade_count" class="block text-sm font-medium text-neutral-200">Trade count badges</label>
+              <p class="mt-1 text-xs text-neutral-500">Show how many trades occurred each day.</p>
             </div>
-            <div class="settings-field-control">
-              <select name="show_trade_count" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-                <option value="true" {% if show_trade_count %}selected{% endif %}>Show badges</option>
-                <option value="false" {% if not show_trade_count %}selected{% endif %}>Hide badges</option>
-              </select>
-            </div>
+            <select id="show_trade_count" name="show_trade_count" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="true" {% if show_trade_count %}selected{% endif %}>Show badges</option>
+              <option value="false" {% if not show_trade_count %}selected{% endif %}>Hide badges</option>
+            </select>
           </div>
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Show percentage change</span>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="show_percentages" class="block text-sm font-medium text-neutral-200">Percentage change</label>
+              <p class="mt-1 text-xs text-neutral-500">Display percent change badges alongside totals.</p>
             </div>
-            <div class="settings-field-control">
-              <select name="show_percentages" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-                <option value="true" {% if show_percentages %}selected{% endif %}>Show percentages</option>
-                <option value="false" {% if not show_percentages %}selected{% endif %}>Hide percentages</option>
-              </select>
-            </div>
+            <select id="show_percentages" name="show_percentages" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="true" {% if show_percentages %}selected{% endif %}>Show percentages</option>
+              <option value="false" {% if not show_percentages %}selected{% endif %}>Hide percentages</option>
+            </select>
           </div>
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Unrealized values</span>
-              <p class="settings-field-description" x-show="!showUnrealizedSetting" x-cloak>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <p class="block text-sm font-medium text-neutral-200">Unrealized values</p>
+              <p class="mt-1 text-xs text-neutral-500" x-show="!showUnrealizedSetting" x-cloak>
                 Unrealized gains and losses remain hidden until toggled from the calendar toolbar.
               </p>
             </div>
-            <div class="settings-field-control">
-              <input type="hidden" name="show_unrealized" value="{{ 'true' if show_unrealized else 'false' }}"
-                     :value="showUnrealizedSetting ? 'true' : 'false'">
-              <button type="button"
-                      class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium transition"
-                      :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showUnrealizedSetting }"
+            <div>
+              <input type="hidden" name="show_unrealized" value="{{ 'true' if show_unrealized else 'false' }}" :value="showUnrealizedSetting ? 'true' : 'false'">
+              <button type="button" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-100 transition"
+                      :class="{ 'bg-neutral-800 text-neutral-50 border-neutral-600': !showUnrealizedSetting }"
                       @click="showUnrealizedSetting = !showUnrealizedSetting"
                       aria-pressed="{{ 'true' if show_unrealized else 'false' }}"
                       :aria-pressed="showUnrealizedSetting.toString()">
@@ -150,72 +113,65 @@
               </button>
             </div>
           </div>
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Display weekends</span>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="show_weekends" class="block text-sm font-medium text-neutral-200">Display weekends</label>
+              <p class="mt-1 text-xs text-neutral-500">Choose whether Saturday and Sunday appear in the grid.</p>
             </div>
-            <div class="settings-field-control">
-              <select name="show_weekends" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-                <option value="false" {% if not show_weekends %}selected{% endif %}>Hide weekends</option>
-                <option value="true" {% if show_weekends %}selected{% endif %}>Show weekends</option>
-              </select>
-            </div>
+            <select id="show_weekends" name="show_weekends" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="false" {% if not show_weekends %}selected{% endif %}>Hide weekends</option>
+              <option value="true" {% if show_weekends %}selected{% endif %}>Show weekends</option>
+            </select>
           </div>
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Default month view</span>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="default_view" class="block text-sm font-medium text-neutral-200">Default month view</label>
+              <p class="mt-1 text-xs text-neutral-500">Decide where the calendar opens when you sign in.</p>
             </div>
-            <div class="settings-field-control">
-              <select name="default_view" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-                <option value="latest" {% if default_view == 'latest' %}selected{% endif %}>Jump to latest month</option>
-                <option value="last_viewed" {% if default_view == 'last_viewed' %}selected{% endif %}>Remember last viewed</option>
-              </select>
-            </div>
+            <select id="default_view" name="default_view" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="latest" {% if default_view == 'latest' %}selected{% endif %}>Jump to latest month</option>
+              <option value="last_viewed" {% if default_view == 'last_viewed' %}selected{% endif %}>Remember last viewed</option>
+            </select>
           </div>
         </div>
       </section>
 
-      <section id="calculation-settings" class="settings-card settings-section space-y-5">
-        <header class="space-y-1">
-          <h2 class="settings-section-title text-neutral-100">Data handling</h2>
-          <p class="settings-muted">Decide how missing values are calculated and exported.</p>
+      <section id="calculation-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <header class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-semibold text-neutral-50">Data handling</h2>
+          <p class="text-sm text-neutral-400">Decide how missing values are calculated and exported.</p>
         </header>
-        <div class="settings-field-stack">
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Missing unrealized values</span>
-              <p class="settings-field-description">Determines how empty calendar days are filled when no unrealized value was imported.</p>
+        <div class="grid gap-5">
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="unrealized_fill_strategy" class="block text-sm font-medium text-neutral-200">Missing unrealized values</label>
+              <p class="mt-1 text-xs text-neutral-500">Determines how empty calendar days are filled when no unrealized value was imported.</p>
             </div>
-            <div class="settings-field-control">
-              <select name="unrealized_fill_strategy" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-                <option value="carry_forward" {% if unrealized_fill == 'carry_forward' %}selected{% endif %}>Carry forward last known</option>
-                <option value="average_neighbors" {% if unrealized_fill == 'average_neighbors' %}selected{% endif %}>Average nearest values</option>
-              </select>
-            </div>
+            <select id="unrealized_fill_strategy" name="unrealized_fill_strategy" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="carry_forward" {% if unrealized_fill == 'carry_forward' %}selected{% endif %}>Carry forward last known</option>
+              <option value="average_neighbors" {% if unrealized_fill == 'average_neighbors' %}selected{% endif %}>Average nearest values</option>
+            </select>
           </div>
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Empty values in exports</span>
-              <p class="settings-field-description">Control whether missing values export as zeros or blank cells.</p>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="export_empty_values" class="block text-sm font-medium text-neutral-200">Empty values in exports</label>
+              <p class="mt-1 text-xs text-neutral-500">Control whether missing values export as zeros or blank cells.</p>
             </div>
-            <div class="settings-field-control">
-              <select name="export_empty_values" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-                <option value="zero" {% if export_fill_empty %}selected{% endif %}>Fill with 0</option>
-                <option value="empty" {% if not export_fill_empty %}selected{% endif %}>Leave empty</option>
-              </select>
-            </div>
+            <select id="export_empty_values" name="export_empty_values" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="zero" {% if export_fill_empty %}selected{% endif %}>Fill with 0</option>
+              <option value="empty" {% if not export_fill_empty %}selected{% endif %}>Leave empty</option>
+            </select>
           </div>
         </div>
       </section>
 
-      <section id="palette-settings" class="settings-card settings-section space-y-5">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="space-y-1">
-            <h2 class="settings-section-title text-neutral-100">Color palette</h2>
-            <p class="settings-muted">Adjust the interface accents used across the calendar, actions, and notes.</p>
+      <section id="palette-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-neutral-50">Color palette</h2>
+            <p class="mt-1 text-sm text-neutral-400">Adjust the interface accents used across the calendar, actions, and notes.</p>
           </div>
-          <button type="button"
-                  class="btn btn-outline-primary px-3 py-2 text-sm"
+          <button type="button" class="btn btn-outline-primary px-3 py-2 text-sm"
                   @click="resetAllColors()"
                   :class="{ 'opacity-50 cursor-not-allowed pointer-events-none': colorsAreDefault() }"
                   :aria-disabled="colorsAreDefault().toString()"
@@ -223,29 +179,27 @@
             Reset palette
           </button>
         </div>
-        <div class="space-y-4">
+        <div class="grid gap-4">
           {% for group in color_groups | default([], true) %}
-          <div class="settings-subcard space-y-4">
-            <div>
+          <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+            <div class="mb-4 space-y-1">
               <h3 class="text-sm font-semibold text-neutral-100">{{ group.title }}</h3>
-              <p class="settings-muted text-xs leading-snug">{{ group.description }}</p>
+              <p class="text-xs text-neutral-500 leading-relaxed">{{ group.description }}</p>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {% for field in group.fields %}
-              <label class="space-y-2 block">
+              <label class="flex flex-col gap-2">
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-sm font-medium text-neutral-200">{{ field.label }}</span>
-                  <button type="button"
-                          class="text-xs text-neutral-400 hover:text-neutral-100 transition"
+                  <button type="button" class="text-xs text-neutral-400 transition hover:text-neutral-100"
                           @click.prevent="resetColor('{{ field.name }}')"
                           :class="{ 'opacity-40 pointer-events-none': isColorDefault('{{ field.name }}') }"
                           :aria-disabled="isColorDefault('{{ field.name }}').toString()">
                     Reset
                   </button>
                 </div>
-                <input type="color" name="{{ field.name }}" value="{{ field.current }}"
-                       class="h-10 w-full cursor-pointer rounded border border-neutral-700 bg-transparent p-1">
-                <p class="settings-muted text-xs leading-snug">
+                <input type="color" name="{{ field.name }}" value="{{ field.current }}" class="h-10 w-full cursor-pointer rounded border border-neutral-700 bg-transparent p-1">
+                <p class="text-xs text-neutral-500 leading-snug">
                   {{ field.description }}
                   <span class="ml-1 uppercase tracking-wide text-[11px]">Default: {{ field.default | upper }}</span>
                 </p>
@@ -257,28 +211,26 @@
         </div>
       </section>
 
-      <section id="diagnostic-settings" class="settings-card settings-section space-y-5">
-        <header class="space-y-1">
-          <h2 class="settings-section-title text-neutral-100">Diagnostics</h2>
-          <p class="settings-muted">Persist detailed logs for troubleshooting and share them with support.</p>
+      <section id="diagnostic-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <header class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-semibold text-neutral-50">Diagnostics</h2>
+          <p class="text-sm text-neutral-400">Persist detailed logs for troubleshooting and share them with support.</p>
         </header>
-        <div class="settings-field-stack">
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Debug logging</span>
-              <p class="settings-field-description">When enabled, verbose diagnostic entries are stored in the persistent log file.</p>
+        <div class="grid gap-5">
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="debug_logging" class="block text-sm font-medium text-neutral-200">Debug logging</label>
+              <p class="mt-1 text-xs text-neutral-500">When enabled, verbose diagnostic entries are stored in the persistent log file.</p>
             </div>
-            <div class="settings-field-control">
-              <select name="debug_logging" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-                <option value="true" {% if debug_logging_enabled %}selected{% endif %}>Enabled</option>
-                <option value="false" {% if not debug_logging_enabled %}selected{% endif %}>Disabled</option>
-              </select>
-            </div>
+            <select id="debug_logging" name="debug_logging" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="true" {% if debug_logging_enabled %}selected{% endif %}>Enabled</option>
+              <option value="false" {% if not debug_logging_enabled %}selected{% endif %}>Disabled</option>
+            </select>
           </div>
-          <div class="settings-field-row">
-            <div class="settings-field-label">
-              <span class="settings-field-title">Export debug log</span>
-              <p class="settings-field-description">
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <p class="block text-sm font-medium text-neutral-200">Export debug log</p>
+              <p class="mt-1 text-xs text-neutral-500">
                 {% if log_export_available %}
                   Download the latest log for sharing with support.
                 {% else %}
@@ -286,21 +238,17 @@
                 {% endif %}
               </p>
             </div>
-            <div class="settings-field-control settings-field-control--stacked">
-              <a href="/settings/logs/export"
-                 class="btn btn-outline-primary px-4 py-2 text-sm {% if not log_export_available %}opacity-60 cursor-not-allowed pointer-events-none{% endif %}"
-                 {% if not log_export_available %}aria-disabled="true" tabindex="-1"{% endif %}>
-                Download log
-              </a>
-            </div>
+            <a href="/settings/logs/export" class="btn btn-outline-primary w-full px-4 py-2 text-sm {% if not log_export_available %}opacity-60 cursor-not-allowed pointer-events-none{% endif %}"
+               {% if not log_export_available %}aria-disabled="true" tabindex="-1"{% endif %}>
+              Download log
+            </a>
           </div>
         </div>
       </section>
 
-      <div class="settings-form-footer">
-        <p class="settings-muted text-xs" x-show="!hasChanges" x-cloak>All changes are synced with the current configuration.</p>
-        <button type="submit"
-                class="btn btn-primary px-5 py-2.5"
+      <div class="flex flex-col items-stretch justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900/80 p-5 shadow-sm sm:flex-row sm:items-center">
+        <p class="text-xs text-neutral-500" x-show="!hasChanges" x-cloak>All changes are synced with the current configuration.</p>
+        <button type="submit" class="btn btn-primary w-full px-5 py-2.5 sm:w-auto"
                 :class="{ 'opacity-60 cursor-not-allowed': !hasChanges }"
                 :disabled="!hasChanges">
           Save changes
@@ -308,112 +256,87 @@
       </div>
     </form>
 
-    <aside class="settings-aside settings-sidebar">
-      <section class="settings-card space-y-4">
-        <header class="space-y-1">
-          <h2 class="settings-section-title text-neutral-100">Quick actions</h2>
-          <p class="settings-muted">Frequently used tools for managing your data.</p>
+    <aside class="flex flex-col gap-6">
+      <section id="stock-data-import" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <header class="mb-4">
+          <h2 class="text-lg font-semibold text-neutral-50">Import trade history</h2>
+          <p class="mt-1 text-sm text-neutral-400">Upload CSV trade summaries or ThinkOrSwim statements.</p>
         </header>
-        <nav class="settings-quicklinks-list settings-quicklinks-bar" aria-label="Settings shortcuts">
-          <a href="#stock-data-import">Import trades</a>
-          <a href="#configuration-settings">Export configuration</a>
-          <a href="#backup-settings">Download a backup</a>
-          <a href="#danger-zone">Reset or shut down</a>
-        </nav>
-      </section>
-
-      <section id="stock-data-import" class="settings-card settings-section space-y-4">
-        <header class="space-y-1">
-          <h2 class="settings-section-title text-neutral-100">Stock data importing</h2>
-          <p class="settings-muted">Upload CSV trade summaries or ThinkOrSwim statements.</p>
-        </header>
-        <div class="settings-subcard space-y-3">
-          <h3 class="text-sm font-semibold text-neutral-100">Stock buy &amp; sell CSV trade data</h3>
-          <p class="settings-muted text-xs">Import executed trades from a CSV with the columns date, symbol, action, qty, price, amount.</p>
-          {% if trade_csv_error_message %}
-          <div class="alert alert-error px-3 py-2 text-xs">{{ trade_csv_error_message }}</div>
-          {% endif %}
-          <form action="/import/trades" method="post" enctype="multipart/form-data" class="space-y-3">
-            <input type="file" name="file" accept=".csv"
-                   class="block w-full text-sm text-neutral-300 file:mr-4 file:rounded file:border-0 file:bg-neutral-800 file:px-4 file:py-2 file:text-neutral-200 hover:file:bg-neutral-700">
-            <button class="btn btn-primary px-4 py-2">Upload</button>
-          </form>
-        </div>
-        <div class="settings-subcard space-y-3">
-          <h3 class="text-sm font-semibold text-neutral-100">ThinkOrSwim account statement</h3>
-          <p class="settings-muted text-xs">Only trade fields are persisted (date, symbol, action, qty, price, amount). Account identifiers are discarded after parsing.</p>
-          {% if thinkorswim_error_message %}
-          <div class="alert alert-error px-3 py-2 text-xs">{{ thinkorswim_error_message }}</div>
-          {% endif %}
-          <form action="/import/thinkorswim" method="post" enctype="multipart/form-data" class="space-y-3">
-            <input type="file" name="file" accept=".csv"
-                   class="block w-full text-sm text-neutral-300 file:mr-4 file:rounded file:border-0 file:bg-neutral-800 file:px-4 file:py-2 file:text-neutral-200 hover:file:bg-neutral-700">
-            <button class="btn btn-primary px-4 py-2">Upload</button>
-          </form>
+        <div class="space-y-5">
+          <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+            <h3 class="text-sm font-semibold text-neutral-100">Stock buy &amp; sell CSV data</h3>
+            <p class="mt-1 text-xs text-neutral-500">Import executed trades from a CSV with the columns date, symbol, action, qty, price, amount.</p>
+            {% if trade_csv_error_message %}
+            <div class="mt-3 rounded border border-red-500/60 bg-red-500/10 px-3 py-2 text-xs text-red-200">{{ trade_csv_error_message }}</div>
+            {% endif %}
+            <form action="/import/trades" method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3">
+              <input type="file" name="file" accept=".csv" class="block w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 file:mr-4 file:rounded-md file:border-0 file:bg-neutral-800 file:px-4 file:py-2 file:text-neutral-200 hover:file:bg-neutral-700">
+              <button class="btn btn-primary px-4 py-2">Upload</button>
+            </form>
+          </div>
+          <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+            <h3 class="text-sm font-semibold text-neutral-100">ThinkOrSwim account statement</h3>
+            <p class="mt-1 text-xs text-neutral-500">Only trade fields are persisted (date, symbol, action, qty, price, amount). Account identifiers are discarded after parsing.</p>
+            {% if thinkorswim_error_message %}
+            <div class="mt-3 rounded border border-red-500/60 bg-red-500/10 px-3 py-2 text-xs text-red-200">{{ thinkorswim_error_message }}</div>
+            {% endif %}
+            <form action="/import/thinkorswim" method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3">
+              <input type="file" name="file" accept=".csv" class="block w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 file:mr-4 file:rounded-md file:border-0 file:bg-neutral-800 file:px-4 file:py-2 file:text-neutral-200 hover:file:bg-neutral-700">
+              <button class="btn btn-primary px-4 py-2">Upload</button>
+            </form>
+          </div>
         </div>
       </section>
 
-      <section id="configuration-settings" class="settings-card settings-section space-y-4">
-        <header class="space-y-1">
-          <h2 class="settings-section-title text-neutral-100">Configuration</h2>
-          <p class="settings-muted">Export the current configuration or apply a previously exported JSON file.</p>
+      <section id="configuration-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <header class="mb-4">
+          <h2 class="text-lg font-semibold text-neutral-50">Configuration</h2>
+          <p class="mt-1 text-sm text-neutral-400">Export the current configuration or apply a previously exported JSON file.</p>
         </header>
-        <div class="grid gap-3">
-          <a href="/settings/config/export"
-             class="btn btn-primary px-4 py-2 text-center"
-             download>
+        <div class="flex flex-col gap-4">
+          <a href="/settings/config/export" class="btn btn-primary px-4 py-2 text-center" download>
             Download config (JSON)
           </a>
-          <form method="post" action="/settings/config/import" class="space-y-2" enctype="multipart/form-data">
-            <label class="space-y-2 block">
-              <span class="text-sm font-medium text-neutral-200">Import configuration file</span>
-              <input type="file" name="config_file" accept=".json,application/json"
-                     class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
-                     required>
+          <form method="post" action="/settings/config/import" class="flex flex-col gap-3" enctype="multipart/form-data">
+            <label class="flex flex-col gap-2 text-sm font-medium text-neutral-200">
+              Import configuration file
+              <input type="file" name="config_file" accept=".json,application/json" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" required>
             </label>
-            <p class="settings-muted text-xs">Upload a JSON file exported from BagHolder. Missing values revert to their defaults.</p>
+            <p class="text-xs text-neutral-500">Upload a JSON file exported from BagHolder. Missing values revert to their defaults.</p>
             <button type="submit" class="btn btn-primary w-full px-4 py-2">Import config</button>
           </form>
         </div>
       </section>
 
-      <section id="backup-settings" class="settings-card settings-section space-y-4">
-        <header class="space-y-1">
-          <h2 class="settings-section-title text-neutral-100">Full backup</h2>
-          <p class="settings-muted">Create or restore a ZIP archive containing all application data.</p>
+      <section id="backup-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <header class="mb-4">
+          <h2 class="text-lg font-semibold text-neutral-50">Full backup</h2>
+          <p class="mt-1 text-sm text-neutral-400">Create or restore a ZIP archive containing all application data.</p>
         </header>
-        <div class="grid gap-3">
-          <a href="/settings/backup/export"
-             class="btn btn-primary px-4 py-2 text-center"
-             download>
+        <div class="flex flex-col gap-4">
+          <a href="/settings/backup/export" class="btn btn-primary px-4 py-2 text-center" download>
             Download full backup (ZIP)
           </a>
-          <form method="post" action="/settings/backup/import" class="space-y-2" enctype="multipart/form-data">
-            <label class="space-y-2 block">
-              <span class="text-sm font-medium text-neutral-200">Import backup archive</span>
-              <input type="file" name="backup_file" accept=".zip"
-                     class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100"
-                     required>
+          <form method="post" action="/settings/backup/import" class="flex flex-col gap-3" enctype="multipart/form-data">
+            <label class="flex flex-col gap-2 text-sm font-medium text-neutral-200">
+              Import backup archive
+              <input type="file" name="backup_file" accept=".zip" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" required>
             </label>
-            <p class="settings-muted text-xs">Upload a ZIP file generated by BagHolder. Existing data will be replaced.</p>
+            <p class="text-xs text-neutral-500">Upload a ZIP file generated by BagHolder. Existing data will be replaced.</p>
             <button class="btn btn-primary w-full px-4 py-2">Import backup</button>
           </form>
         </div>
       </section>
 
-      <section id="danger-zone" class="settings-card danger-zone settings-section space-y-4">
-        <header class="space-y-1">
-          <h2 class="settings-section-title danger-text">Danger zone</h2>
-          <p class="settings-muted danger-text-subtle">Clearing data removes every imported trade, calculated summary, and saved note. This action cannot be undone.</p>
+      <section id="danger-zone" class="rounded-xl border border-red-900/60 bg-red-950/40 p-6 shadow-sm">
+        <header class="mb-4">
+          <h2 class="text-lg font-semibold text-red-200">Danger zone</h2>
+          <p class="mt-1 text-sm text-red-200/80">Clearing data removes every imported trade, calculated summary, and saved note. This action cannot be undone.</p>
         </header>
-        <form method="post" action="/settings/clear-data"
-              onsubmit="return confirm('This will delete all trades, summaries, and notes. Continue?');"
-              class="space-y-2">
+        <form method="post" action="/settings/clear-data" onsubmit="return confirm('This will delete all trades, summaries, and notes. Continue?');" class="flex flex-col gap-3">
           <button class="btn btn-danger w-full px-4 py-2">Clear all data</button>
         </form>
-        <form method="post" action="/settings/shutdown"
-              onsubmit="return confirm('This will stop the server. Continue?');"
-              class="space-y-2">
+        <form method="post" action="/settings/shutdown" onsubmit="return confirm('This will stop the server. Continue?');" class="mt-2 flex flex-col gap-3">
           <button class="btn btn-outline-danger w-full px-4 py-2">Shut down server</button>
         </form>
       </section>
