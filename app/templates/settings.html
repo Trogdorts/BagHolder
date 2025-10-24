@@ -70,8 +70,8 @@
     {% endif %}
   </div>
 
-  <div class="settings-content">
-    <form method="post" action="/settings" class="settings-form space-y-6"
+  <div class="settings-content settings-layout">
+    <form method="post" action="/settings" class="settings-form settings-form-stack"
           x-data="settingsForm()"
           @submit="resetChanges()">
       <div x-show="hasChanges" x-cloak x-transition.opacity.duration.200ms class="alert alert-warning px-4 py-3 text-sm">
@@ -83,67 +83,95 @@
           <h2 class="settings-section-title text-neutral-100">Appearance &amp; calendar</h2>
           <p class="settings-muted">Configure the default look and feel of the calendar.</p>
         </header>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label class="space-y-2 block">
-            <span class="text-sm font-medium text-neutral-200">Theme</span>
-            <select name="theme" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="dark" {% if cfg.ui.theme == 'dark' %}selected{% endif %}>Dark</option>
-              <option value="light" {% if cfg.ui.theme == 'light' %}selected{% endif %}>Light</option>
-            </select>
-          </label>
-          <label class="space-y-2 block">
-            <span class="text-sm font-medium text-neutral-200">Show daily profit and loss</span>
-            <select name="show_text" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="true" {% if show_text %}selected{% endif %}>Show values</option>
-              <option value="false" {% if not show_text %}selected{% endif %}>Hide values</option>
-            </select>
-          </label>
-          <label class="space-y-2 block">
-            <span class="text-sm font-medium text-neutral-200">Show trade count badges</span>
-            <select name="show_trade_count" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="true" {% if show_trade_count %}selected{% endif %}>Show badges</option>
-              <option value="false" {% if not show_trade_count %}selected{% endif %}>Hide badges</option>
-            </select>
-          </label>
-          <label class="space-y-2 block">
-            <span class="text-sm font-medium text-neutral-200">Show percentage change</span>
-            <select name="show_percentages" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="true" {% if show_percentages %}selected{% endif %}>Show percentages</option>
-              <option value="false" {% if not show_percentages %}selected{% endif %}>Hide percentages</option>
-            </select>
-          </label>
-          <div class="space-y-2 block">
-            <span class="text-sm font-medium text-neutral-200">Unrealized values</span>
-            <input type="hidden" name="show_unrealized" value="{{ 'true' if show_unrealized else 'false' }}"
-                   :value="showUnrealizedSetting ? 'true' : 'false'">
-            <button type="button"
-                    class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium transition"
-                    :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showUnrealizedSetting }"
-                    @click="showUnrealizedSetting = !showUnrealizedSetting"
-                    aria-pressed="{{ 'true' if show_unrealized else 'false' }}"
-                    :aria-pressed="showUnrealizedSetting.toString()">
-              <span x-text="showUnrealizedSetting ? 'Hide by default' : 'Show by default'">
-                {% if show_unrealized %}Hide by default{% else %}Show by default{% endif %}
-              </span>
-            </button>
-            <p class="settings-muted text-xs" x-show="!showUnrealizedSetting" x-cloak>
-              Unrealized gains and losses remain hidden until toggled from the calendar toolbar.
-            </p>
+        <div class="settings-field-stack">
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Theme</span>
+            </div>
+            <div class="settings-field-control">
+              <select name="theme" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+                <option value="dark" {% if cfg.ui.theme == 'dark' %}selected{% endif %}>Dark</option>
+                <option value="light" {% if cfg.ui.theme == 'light' %}selected{% endif %}>Light</option>
+              </select>
+            </div>
           </div>
-          <label class="space-y-2 block">
-            <span class="text-sm font-medium text-neutral-200">Display weekends</span>
-            <select name="show_weekends" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="false" {% if not show_weekends %}selected{% endif %}>Hide weekends</option>
-              <option value="true" {% if show_weekends %}selected{% endif %}>Show weekends</option>
-            </select>
-          </label>
-          <label class="space-y-2 block">
-            <span class="text-sm font-medium text-neutral-200">Default month view</span>
-            <select name="default_view" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="latest" {% if default_view == 'latest' %}selected{% endif %}>Jump to latest month</option>
-              <option value="last_viewed" {% if default_view == 'last_viewed' %}selected{% endif %}>Remember last viewed</option>
-            </select>
-          </label>
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Show daily profit and loss</span>
+            </div>
+            <div class="settings-field-control">
+              <select name="show_text" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+                <option value="true" {% if show_text %}selected{% endif %}>Show values</option>
+                <option value="false" {% if not show_text %}selected{% endif %}>Hide values</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Show trade count badges</span>
+            </div>
+            <div class="settings-field-control">
+              <select name="show_trade_count" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+                <option value="true" {% if show_trade_count %}selected{% endif %}>Show badges</option>
+                <option value="false" {% if not show_trade_count %}selected{% endif %}>Hide badges</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Show percentage change</span>
+            </div>
+            <div class="settings-field-control">
+              <select name="show_percentages" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+                <option value="true" {% if show_percentages %}selected{% endif %}>Show percentages</option>
+                <option value="false" {% if not show_percentages %}selected{% endif %}>Hide percentages</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Unrealized values</span>
+              <p class="settings-field-description" x-show="!showUnrealizedSetting" x-cloak>
+                Unrealized gains and losses remain hidden until toggled from the calendar toolbar.
+              </p>
+            </div>
+            <div class="settings-field-control">
+              <input type="hidden" name="show_unrealized" value="{{ 'true' if show_unrealized else 'false' }}"
+                     :value="showUnrealizedSetting ? 'true' : 'false'">
+              <button type="button"
+                      class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium transition"
+                      :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showUnrealizedSetting }"
+                      @click="showUnrealizedSetting = !showUnrealizedSetting"
+                      aria-pressed="{{ 'true' if show_unrealized else 'false' }}"
+                      :aria-pressed="showUnrealizedSetting.toString()">
+                <span x-text="showUnrealizedSetting ? 'Hide by default' : 'Show by default'">
+                  {% if show_unrealized %}Hide by default{% else %}Show by default{% endif %}
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Display weekends</span>
+            </div>
+            <div class="settings-field-control">
+              <select name="show_weekends" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+                <option value="false" {% if not show_weekends %}selected{% endif %}>Hide weekends</option>
+                <option value="true" {% if show_weekends %}selected{% endif %}>Show weekends</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Default month view</span>
+            </div>
+            <div class="settings-field-control">
+              <select name="default_view" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+                <option value="latest" {% if default_view == 'latest' %}selected{% endif %}>Jump to latest month</option>
+                <option value="last_viewed" {% if default_view == 'last_viewed' %}selected{% endif %}>Remember last viewed</option>
+              </select>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -152,23 +180,31 @@
           <h2 class="settings-section-title text-neutral-100">Data handling</h2>
           <p class="settings-muted">Decide how missing values are calculated and exported.</p>
         </header>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label class="space-y-2 block md:col-span-1">
-            <span class="text-sm font-medium text-neutral-200">Missing unrealized values</span>
-            <select name="unrealized_fill_strategy" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="carry_forward" {% if unrealized_fill == 'carry_forward' %}selected{% endif %}>Carry forward last known</option>
-              <option value="average_neighbors" {% if unrealized_fill == 'average_neighbors' %}selected{% endif %}>Average nearest values</option>
-            </select>
-            <p class="settings-muted text-xs">Determines how empty calendar days are filled when no unrealized value was imported.</p>
-          </label>
-          <label class="space-y-2 block md:col-span-1">
-            <span class="text-sm font-medium text-neutral-200">Empty values in exports</span>
-            <select name="export_empty_values" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="zero" {% if export_fill_empty %}selected{% endif %}>Fill with 0</option>
-              <option value="empty" {% if not export_fill_empty %}selected{% endif %}>Leave empty</option>
-            </select>
-            <p class="settings-muted text-xs">Control whether missing values export as zeros or blank cells.</p>
-          </label>
+        <div class="settings-field-stack">
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Missing unrealized values</span>
+              <p class="settings-field-description">Determines how empty calendar days are filled when no unrealized value was imported.</p>
+            </div>
+            <div class="settings-field-control">
+              <select name="unrealized_fill_strategy" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+                <option value="carry_forward" {% if unrealized_fill == 'carry_forward' %}selected{% endif %}>Carry forward last known</option>
+                <option value="average_neighbors" {% if unrealized_fill == 'average_neighbors' %}selected{% endif %}>Average nearest values</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Empty values in exports</span>
+              <p class="settings-field-description">Control whether missing values export as zeros or blank cells.</p>
+            </div>
+            <div class="settings-field-control">
+              <select name="export_empty_values" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+                <option value="zero" {% if export_fill_empty %}selected{% endif %}>Fill with 0</option>
+                <option value="empty" {% if not export_fill_empty %}selected{% endif %}>Leave empty</option>
+              </select>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -226,29 +262,37 @@
           <h2 class="settings-section-title text-neutral-100">Diagnostics</h2>
           <p class="settings-muted">Persist detailed logs for troubleshooting and share them with support.</p>
         </header>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <label class="space-y-2 block">
-            <span class="text-sm font-medium text-neutral-200">Debug logging</span>
-            <select name="debug_logging" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="true" {% if debug_logging_enabled %}selected{% endif %}>Enabled</option>
-              <option value="false" {% if not debug_logging_enabled %}selected{% endif %}>Disabled</option>
-            </select>
-            <p class="settings-muted text-xs">When enabled, verbose diagnostic entries are stored in the persistent log file.</p>
-          </label>
-          <div class="space-y-2">
-            <span class="text-sm font-medium text-neutral-200 block">Export debug log</span>
-            <a href="/settings/logs/export"
-               class="btn btn-outline-primary px-4 py-2 text-sm w-full md:w-auto {% if not log_export_available %}opacity-60 cursor-not-allowed pointer-events-none{% endif %}"
-               {% if not log_export_available %}aria-disabled="true" tabindex="-1"{% endif %}>
-              Download log
-            </a>
-            <p class="settings-muted text-xs">
-              {% if log_export_available %}
-                Download the latest log for sharing with support.
-              {% else %}
-                A log file appears here once the app records diagnostic events.
-              {% endif %}
-            </p>
+        <div class="settings-field-stack">
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Debug logging</span>
+              <p class="settings-field-description">When enabled, verbose diagnostic entries are stored in the persistent log file.</p>
+            </div>
+            <div class="settings-field-control">
+              <select name="debug_logging" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+                <option value="true" {% if debug_logging_enabled %}selected{% endif %}>Enabled</option>
+                <option value="false" {% if not debug_logging_enabled %}selected{% endif %}>Disabled</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-field-row">
+            <div class="settings-field-label">
+              <span class="settings-field-title">Export debug log</span>
+              <p class="settings-field-description">
+                {% if log_export_available %}
+                  Download the latest log for sharing with support.
+                {% else %}
+                  A log file appears here once the app records diagnostic events.
+                {% endif %}
+              </p>
+            </div>
+            <div class="settings-field-control settings-field-control--stacked">
+              <a href="/settings/logs/export"
+                 class="btn btn-outline-primary px-4 py-2 text-sm {% if not log_export_available %}opacity-60 cursor-not-allowed pointer-events-none{% endif %}"
+                 {% if not log_export_available %}aria-disabled="true" tabindex="-1"{% endif %}>
+                Download log
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -264,18 +308,18 @@
       </div>
     </form>
 
-    <aside class="settings-aside">
+    <aside class="settings-aside settings-sidebar">
       <section class="settings-card space-y-4">
         <header class="space-y-1">
           <h2 class="settings-section-title text-neutral-100">Quick actions</h2>
           <p class="settings-muted">Frequently used tools for managing your data.</p>
         </header>
-        <div class="settings-quicklinks-list">
+        <nav class="settings-quicklinks-list settings-quicklinks-bar" aria-label="Settings shortcuts">
           <a href="#stock-data-import">Import trades</a>
           <a href="#configuration-settings">Export configuration</a>
           <a href="#backup-settings">Download a backup</a>
           <a href="#danger-zone">Reset or shut down</a>
-        </div>
+        </nav>
       </section>
 
       <section id="stock-data-import" class="settings-card settings-section space-y-4">
