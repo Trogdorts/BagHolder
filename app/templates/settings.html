@@ -8,50 +8,38 @@
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
 <div class="settings-page">
-  <section class="settings-hero">
-    <div>
-      <h1 class="text-neutral-50">Settings</h1>
-      <p>Fine-tune BagHolder's appearance, data workflows, and diagnostics. Use the quick links below to jump to a section, or review the current defaults in the summary panel.</p>
-      <nav class="settings-quicknav" aria-label="Settings quick navigation">
-        <a href="#display-settings">Display &amp; calendar</a>
-        <a href="#calculation-settings">Calculations</a>
-        <a href="#palette-settings">Color palette</a>
-        <a href="#diagnostic-settings">Diagnostics</a>
-        <a href="#stock-data-import">Imports</a>
-        <a href="#configuration-settings">Configuration</a>
-        <a href="#backup-settings">Backups</a>
-        <a href="#danger-zone">Danger zone</a>
-      </nav>
+  <header class="settings-header settings-card" aria-label="Settings overview">
+    <div class="space-y-2">
+      <h1 class="settings-header-title">Settings</h1>
+      <p class="settings-muted">Control BagHolder's appearance, calculations, and data safety from a single place.</p>
     </div>
-    <aside>
-      <dl class="settings-summary-grid" aria-label="Current configuration summary">
-        <div class="settings-summary-item">
-          <dt>Active theme</dt>
-          <dd>{{ cfg.ui.theme | default('dark') | replace('_', ' ') | title }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Calendar start</dt>
-          <dd>{{ 'Latest month' if default_view == 'latest' else 'Last viewed' }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Weekends</dt>
-          <dd>{{ 'Shown' if show_weekends else 'Hidden' }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Unrealized P&amp;L</dt>
-          <dd>{{ 'Visible by default' if show_unrealized else 'Hidden by default' }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Trade badges</dt>
-          <dd>{{ 'Enabled' if show_trade_count else 'Disabled' }}</dd>
-        </div>
-        <div class="settings-summary-item">
-          <dt>Diagnostics</dt>
-          <dd>{{ 'Logging on' if debug_logging_enabled else 'Logging off' }}</dd>
-        </div>
-      </dl>
-    </aside>
-  </section>
+    <dl class="settings-summary-grid" aria-label="Current configuration summary">
+      <div class="settings-summary-item">
+        <dt>Active theme</dt>
+        <dd>{{ cfg.ui.theme | default('dark') | replace('_', ' ') | title }}</dd>
+      </div>
+      <div class="settings-summary-item">
+        <dt>Calendar start</dt>
+        <dd>{{ 'Latest month' if default_view == 'latest' else 'Last viewed' }}</dd>
+      </div>
+      <div class="settings-summary-item">
+        <dt>Weekends</dt>
+        <dd>{{ 'Shown' if show_weekends else 'Hidden' }}</dd>
+      </div>
+      <div class="settings-summary-item">
+        <dt>Unrealized P&amp;L</dt>
+        <dd>{{ 'Visible by default' if show_unrealized else 'Hidden by default' }}</dd>
+      </div>
+      <div class="settings-summary-item">
+        <dt>Trade badges</dt>
+        <dd>{{ 'Enabled' if show_trade_count else 'Disabled' }}</dd>
+      </div>
+      <div class="settings-summary-item">
+        <dt>Diagnostics</dt>
+        <dd>{{ 'Logging on' if debug_logging_enabled else 'Logging off' }}</dd>
+      </div>
+    </dl>
+  </header>
 
   <div class="space-y-3">
     {% if config_imported %}
@@ -75,86 +63,19 @@
     {% endif %}
   </div>
 
-  <div class="settings-grid two-column lg:grid-cols-4">
-    <form method="post" action="/settings" class="space-y-8 lg:col-span-3"
-          x-data="{
-            showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }},
-            hasChanges: false,
-            initialData: '',
-            formEl: null,
-            defaultColors: {{ color_defaults | default({}, true) | tojson }},
-            init() {
-              this.formEl = this.$el;
-              this.initialData = this.serializeForm();
-              this.$watch('showUnrealizedSetting', () => this.evaluateChanges());
-              this.formEl.addEventListener('input', () => this.evaluateChanges());
-              this.formEl.addEventListener('change', () => this.evaluateChanges());
-            },
-            serializeForm() {
-              if (!this.formEl) {
-                return '';
-              }
-              const formData = new FormData(this.formEl);
-              formData.set('show_unrealized', this.showUnrealizedSetting ? 'true' : 'false');
-              return new URLSearchParams(formData).toString();
-            },
-            evaluateChanges() {
-              this.hasChanges = this.serializeForm() !== this.initialData;
-            },
-            resetChanges() {
-              this.initialData = this.serializeForm();
-              this.hasChanges = false;
-            },
-            isColorDefault(field) {
-              const defaultValue = this.defaultColors[field];
-              if (!this.formEl || typeof defaultValue !== 'string') {
-                return false;
-              }
-              const input = this.formEl.querySelector(`[name='${field}']`);
-              if (!input) {
-                return false;
-              }
-              return input.value.toLowerCase() === defaultValue.toLowerCase();
-            },
-            resetColor(field) {
-              const defaultValue = this.defaultColors[field];
-              if (typeof defaultValue !== 'string' || !this.formEl) {
-                return;
-              }
-              const input = this.formEl.querySelector(`[name='${field}']`);
-              if (!input) {
-                return;
-              }
-              input.value = defaultValue.toLowerCase();
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-              input.dispatchEvent(new Event('change', { bubbles: true }));
-              this.evaluateChanges();
-            },
-            resetAllColors() {
-              if (!this.formEl) {
-                return;
-              }
-              Object.keys(this.defaultColors).forEach((field) => {
-                this.resetColor(field);
-              });
-            },
-            colorsAreDefault() {
-              if (!this.formEl) {
-                return false;
-              }
-              return Object.keys(this.defaultColors).every((field) => this.isColorDefault(field));
-            }
-          }"
+  <div class="settings-content">
+    <form method="post" action="/settings" class="settings-form space-y-6"
+          x-data="settingsForm()"
           @submit="resetChanges()">
       <div x-show="hasChanges" x-cloak x-transition.opacity.duration.200ms class="alert alert-warning px-4 py-3 text-sm">
         You have unsaved changes. Don't forget to save before leaving this page.
       </div>
 
-      <section id="display-settings" class="settings-card settings-section space-y-6">
-        <div>
-          <h2 class="settings-section-title text-neutral-100">Display &amp; calendar</h2>
-          <p class="settings-muted">Choose how the calendar renders by default across views.</p>
-        </div>
+      <section id="display-settings" class="settings-card settings-section space-y-5">
+        <header class="space-y-1">
+          <h2 class="settings-section-title text-neutral-100">Appearance &amp; calendar</h2>
+          <p class="settings-muted">Configure the default look and feel of the calendar.</p>
+        </header>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label class="space-y-2 block">
             <span class="text-sm font-medium text-neutral-200">Theme</span>
@@ -212,11 +133,11 @@
         </div>
       </section>
 
-      <section id="calculation-settings" class="settings-card settings-section space-y-6">
-        <div>
-          <h2 class="settings-section-title text-neutral-100">Calculations &amp; export</h2>
-          <p class="settings-muted">Define how gaps are filled and how CSV exports treat empty values.</p>
-        </div>
+      <section id="calculation-settings" class="settings-card settings-section space-y-5">
+        <header class="space-y-1">
+          <h2 class="settings-section-title text-neutral-100">Data handling</h2>
+          <p class="settings-muted">Decide how missing values are calculated and exported.</p>
+        </header>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label class="space-y-2 block md:col-span-1">
             <span class="text-sm font-medium text-neutral-200">Missing unrealized values</span>
@@ -237,9 +158,9 @@
         </div>
       </section>
 
-      <section id="palette-settings" class="settings-card settings-section space-y-6">
+      <section id="palette-settings" class="settings-card settings-section space-y-5">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
+          <div class="space-y-1">
             <h2 class="settings-section-title text-neutral-100">Color palette</h2>
             <p class="settings-muted">Adjust the interface accents used across the calendar, actions, and notes.</p>
           </div>
@@ -286,11 +207,11 @@
         </div>
       </section>
 
-      <section id="diagnostic-settings" class="settings-card settings-section space-y-6">
-        <div>
+      <section id="diagnostic-settings" class="settings-card settings-section space-y-5">
+        <header class="space-y-1">
           <h2 class="settings-section-title text-neutral-100">Diagnostics</h2>
           <p class="settings-muted">Persist detailed logs for troubleshooting and share them with support.</p>
-        </div>
+        </header>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <label class="space-y-2 block">
             <span class="text-sm font-medium text-neutral-200">Debug logging</span>
@@ -329,14 +250,14 @@
       </div>
     </form>
 
-    <div class="settings-aside lg:col-span-1">
+    <aside class="settings-aside">
       <section class="settings-card space-y-4">
-        <div>
+        <header class="space-y-1">
           <h2 class="settings-section-title text-neutral-100">Quick actions</h2>
-          <p class="settings-muted">Jump directly to the tools used most often.</p>
-        </div>
+          <p class="settings-muted">Frequently used tools for managing your data.</p>
+        </header>
         <div class="settings-quicklinks-list">
-          <a href="#stock-data-import">Import new trades</a>
+          <a href="#stock-data-import">Import trades</a>
           <a href="#configuration-settings">Export configuration</a>
           <a href="#backup-settings">Download a backup</a>
           <a href="#danger-zone">Reset or shut down</a>
@@ -344,10 +265,10 @@
       </section>
 
       <section id="stock-data-import" class="settings-card settings-section space-y-4">
-        <div>
+        <header class="space-y-1">
           <h2 class="settings-section-title text-neutral-100">Stock data importing</h2>
           <p class="settings-muted">Upload CSV trade summaries or ThinkOrSwim statements.</p>
-        </div>
+        </header>
         <div class="settings-subcard space-y-3">
           <h3 class="text-sm font-semibold text-neutral-100">Stock buy &amp; sell CSV trade data</h3>
           <p class="settings-muted text-xs">Import executed trades from a CSV with the columns date, symbol, action, qty, price, amount.</p>
@@ -375,10 +296,10 @@
       </section>
 
       <section id="configuration-settings" class="settings-card settings-section space-y-4">
-        <div>
+        <header class="space-y-1">
           <h2 class="settings-section-title text-neutral-100">Configuration</h2>
           <p class="settings-muted">Export the current configuration or apply a previously exported JSON file.</p>
-        </div>
+        </header>
         <div class="grid gap-3">
           <a href="/settings/config/export"
              class="btn btn-primary px-4 py-2 text-center"
@@ -399,10 +320,10 @@
       </section>
 
       <section id="backup-settings" class="settings-card settings-section space-y-4">
-        <div>
+        <header class="space-y-1">
           <h2 class="settings-section-title text-neutral-100">Full backup</h2>
           <p class="settings-muted">Create or restore a ZIP archive containing all application data.</p>
-        </div>
+        </header>
         <div class="grid gap-3">
           <a href="/settings/backup/export"
              class="btn btn-primary px-4 py-2 text-center"
@@ -423,10 +344,10 @@
       </section>
 
       <section id="danger-zone" class="settings-card danger-zone settings-section space-y-4">
-        <div>
+        <header class="space-y-1">
           <h2 class="settings-section-title danger-text">Danger zone</h2>
           <p class="settings-muted danger-text-subtle">Clearing data removes every imported trade, calculated summary, and saved note. This action cannot be undone.</p>
-        </div>
+        </header>
         <form method="post" action="/settings/clear-data"
               onsubmit="return confirm('This will delete all trades, summaries, and notes. Continue?');"
               class="space-y-2">
@@ -438,7 +359,79 @@
           <button class="btn btn-outline-danger w-full px-4 py-2">Shut down server</button>
         </form>
       </section>
-    </div>
+    </aside>
   </div>
 </div>
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('settingsForm', () => ({
+      showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }},
+      hasChanges: false,
+      initialData: '',
+      formEl: null,
+      defaultColors: {{ color_defaults | default({}, true) | tojson | safe }},
+      init() {
+        this.formEl = this.$el;
+        this.initialData = this.serializeForm();
+        this.$watch('showUnrealizedSetting', () => this.evaluateChanges());
+        this.formEl.addEventListener('input', () => this.evaluateChanges());
+        this.formEl.addEventListener('change', () => this.evaluateChanges());
+      },
+      serializeForm() {
+        if (!this.formEl) {
+          return '';
+        }
+        const formData = new FormData(this.formEl);
+        formData.set('show_unrealized', this.showUnrealizedSetting ? 'true' : 'false');
+        return new URLSearchParams(formData).toString();
+      },
+      evaluateChanges() {
+        this.hasChanges = this.serializeForm() !== this.initialData;
+      },
+      resetChanges() {
+        this.initialData = this.serializeForm();
+        this.hasChanges = false;
+      },
+      isColorDefault(field) {
+        const defaultValue = this.defaultColors[field];
+        if (!this.formEl || typeof defaultValue !== 'string') {
+          return false;
+        }
+        const input = this.formEl.querySelector(`[name='${field}']`);
+        if (!input) {
+          return false;
+        }
+        return input.value.toLowerCase() === defaultValue.toLowerCase();
+      },
+      resetColor(field) {
+        const defaultValue = this.defaultColors[field];
+        if (typeof defaultValue !== 'string' || !this.formEl) {
+          return;
+        }
+        const input = this.formEl.querySelector(`[name='${field}']`);
+        if (!input) {
+          return;
+        }
+        input.value = defaultValue.toLowerCase();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        this.evaluateChanges();
+      },
+      resetAllColors() {
+        if (!this.formEl) {
+          return;
+        }
+        Object.keys(this.defaultColors).forEach((field) => {
+          this.resetColor(field);
+        });
+      },
+      colorsAreDefault() {
+        if (!this.formEl) {
+          return false;
+        }
+        return Object.keys(this.defaultColors).every((field) => this.isColorDefault(field));
+      }
+    }));
+  });
+</script>
 {% endblock %}

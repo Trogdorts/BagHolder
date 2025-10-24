@@ -63,33 +63,15 @@
       gap: 2rem;
     }
 
-    .settings-hero {
-      background: linear-gradient(135deg, var(--primary-soft-bg) 0%, rgba(15, 23, 42, 0.92) 65%);
-      border: 1px solid var(--primary-soft-bg);
-      border-radius: 1.25rem;
-      box-shadow: 0 30px 60px -35px rgba(37, 99, 235, 0.55);
-      padding: 2.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-    }
-
-    .settings-hero h1 {
-      font-size: 2.25rem;
-      font-weight: 700;
-      margin-bottom: 0.75rem;
-    }
-
-    .settings-hero p {
-      color: var(--text-muted);
-      max-width: 42rem;
-      font-size: 1rem;
-      line-height: 1.6;
-    }
-
-    .settings-hero aside {
+    .settings-header {
       display: grid;
-      gap: 1rem;
+      gap: 1.5rem;
+    }
+
+    .settings-header-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 0;
     }
 
     .settings-summary-grid {
@@ -120,39 +102,7 @@
       margin: 0;
     }
 
-    .settings-quicknav {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      margin-top: 0.75rem;
-    }
-
-    .settings-quicknav a {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.55rem 0.9rem;
-      border-radius: 9999px;
-      background-color: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(37, 99, 235, 0.3);
-      font-size: 0.85rem;
-      color: #dbeafe;
-      transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
-    }
-
-    .settings-quicknav a:hover,
-    .settings-quicknav a:focus {
-      background-color: rgba(37, 99, 235, 0.18);
-      border-color: rgba(37, 99, 235, 0.45);
-      transform: translateY(-1px);
-    }
-
-    .settings-quicknav a:focus-visible {
-      outline: 2px solid var(--primary-color);
-      outline-offset: 2px;
-    }
-
-    .settings-grid {
+    .settings-content {
       display: grid;
       gap: 1.75rem;
     }
@@ -164,22 +114,18 @@
     }
 
     @media (min-width: 1024px) {
-      .settings-grid.two-column {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-
-      .settings-hero {
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-      }
-
-      .settings-hero aside {
-        max-width: 21rem;
-      }
-
       .settings-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .settings-header {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr);
+        align-items: start;
+      }
+
+      .settings-content {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        align-items: start;
       }
     }
 
