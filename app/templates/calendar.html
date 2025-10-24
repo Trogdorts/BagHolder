@@ -31,6 +31,15 @@
           }
         }
       }" class="space-y-4">
+<style>
+  .day-excluded {
+    opacity: 0.4;
+  }
+
+  .day-toggle-label {
+    cursor: pointer;
+  }
+</style>
 <div class="flex items-center justify-between">
   <div class="text-lg font-semibold">{{ year }}-{{ "%02d"|format(month) }}</div>
   <div class="flex items-center gap-2 flex-wrap justify-end" @keydown.escape.window="exportOpen = false">
@@ -113,7 +122,20 @@
   {% for d in week.days %}
     {% if show_weekends or not d.is_weekend %}
       {% set cls = (d.realized > 0) and 'cell-bg-pos' or (d.realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
-      <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }} flex flex-col gap-2" data-day-cell="{{ d.date.strftime('%Y-%m-%d') }}">
+      {% set day_identifier = d.date.strftime('%Y-%m-%d') %}
+      {% set week_key = week.week_year ~ '-' ~ week.week_number %}
+      {% set toggle_id = 'day-toggle-' ~ day_identifier %}
+      <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }} flex flex-col gap-2"
+           data-day-cell="{{ day_identifier }}"
+           data-day-realized="{{ '%.10g'|format(d.realized) }}"
+           data-day-unrealized="{{ '%.10g'|format(d.unrealized) }}"
+           data-day-invested="{{ '%.10g'|format(d.invested) }}"
+           data-day-has-values="{{ 'true' if d.has_values else 'false' }}"
+           data-day-in-month="{{ 'true' if d.in_month else 'false' }}"
+           data-day-in-rolling="{{ 'true' if d.in_rolling else 'false' }}"
+           data-day-belongs-year="{{ 'true' if d.belongs_to_year else 'false' }}"
+           data-week-key="{{ week_key }}"
+           data-week-position="{{ loop.index0 }}">
         <div class="flex items-center gap-1 text-xs text-neutral-400">
           <span>{{ d.date.day }}</span>
           {% set trade_button_classes = [
@@ -164,6 +186,14 @@
             <path d="M19.14,12.94a7.43,7.43,0,0,0,.05-.94,7.43,7.43,0,0,0-.05-.94l2.11-1.65a.5.5,0,0,0,.12-.64l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.3,7.3,0,0,0-1.63-.94l-.38-2.65A.5.5,0,0,0,12.64,1H9.36a.5.5,0,0,0-.49.41L8.49,4.06a7.3,7.3,0,0,0-1.63.94l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.64L3.94,11.06a7.43,7.43,0,0,0-.05.94,7.43,7.43,0,0,0,.05.94L1.83,14.59a.5.5,0,0,0-.12.64l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.3,7.3,0,0,0,1.63.94l.38,2.65a.5.5,0,0,0,.49.41h3.28a.5.5,0,0,0,.49-.41l.38-2.65a7.3,7.3,0,0,0,1.63-.94l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.64Zm-7.14,2.56A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" fill="currentColor" />
           </svg>
         </a>
+        <div class="absolute bottom-1 left-1 flex items-center gap-1 text-[10px] text-neutral-400">
+          <input type="checkbox"
+                 id="{{ toggle_id }}"
+                 class="day-include-toggle h-3 w-3 rounded border-neutral-600 bg-neutral-900 text-neutral-100 focus:ring-neutral-500"
+                 data-day-toggle="{{ day_identifier }}"
+                 {% if d.in_month %}checked{% else %}checked disabled{% endif %}>
+          <label for="{{ toggle_id }}" class="day-toggle-label">Include</label>
+        </div>
         {% if notes_enabled %}
         <!-- Note icon -->
         <a class="note-trigger absolute bottom-1 right-1 icon-translucent z-10{% if d.has_note %} has-note{% endif %}"
@@ -191,22 +221,24 @@
       </div>
     {% endif %}
   {% endfor %}
+  {% set week_key = week.week_year ~ '-' ~ week.week_number %}
   {% set week_cls = (week.week_realized > 0) and 'cell-bg-pos' or (week.week_realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
-  <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 flex flex-col justify-between {{ week_cls }}">
+  <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 flex flex-col justify-between {{ week_cls }}"
+       data-week-summary="{{ week_key }}">
     <div>
       <div class="text-xs text-neutral-400">Week {{ week.week_index }}</div>
       <div class="mt-2 text-sm space-y-1 text-right">
-        {% if week.show_week_realized %}
-        <div class="{{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}">
-          Realized: {{ week.week_realized|money }}
-          {% if show_percentages_default and week.week_percent is not none %}
-          <span class="block text-[11px] text-neutral-300">{{ '{:+.2f}%'.format(week.week_percent) }}</span>
-          {% endif %}
+        <div data-week-realized
+             class="{{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}{% if not week.show_week_realized %} hidden{% endif %}">
+          Realized: <span data-week-realized-value>{{ week.week_realized|money }}</span>
+          <span data-week-percent class="block text-[11px] text-neutral-300 md:inline md:ml-1{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %}">
+            {% if show_percentages_default and week.week_percent is not none %}{{ '{:+.2f}%'.format(week.week_percent) }}{% endif %}
+          </span>
         </div>
-        {% endif %}
-        <div class="{{ 'text-profit' if week.week_unrealized > 0 else ('text-loss' if week.week_unrealized < 0 else 'text-neutral-200') }}"
+        <div data-week-unrealized
+             class="{{ 'text-profit' if week.week_unrealized > 0 else ('text-loss' if week.week_unrealized < 0 else 'text-neutral-200') }}"
              x-show="showUnrealized" x-cloak>
-          Unrealized: {{ week.week_unrealized|money }}
+          Unrealized: <span data-week-unrealized-value>{{ week.week_unrealized|money }}</span>
         </div>
       </div>
     </div>
@@ -242,16 +274,19 @@
 
 <div class="mt-6 max-w-3xl">
   <div class="grid gap-4 sm:grid-cols-2">
-    <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative">
+    <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative"
+         data-month-summary
+         data-base-realized="{{ '%.10g'|format(month_realized) }}"
+         data-base-unrealized="{{ '%.10g'|format(month_unrealized) }}">
       <h2 class="font-semibold">Monthly summary</h2>
       <div>
-        Realized: <span class="{{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span>
-        {% if show_percentages_default and month_percent is not none %}
-        <span class="block text-[12px] text-neutral-300">{{ '{:+.2f}%'.format(month_percent) }}</span>
-        {% endif %}
+        Realized: <span data-month-realized-value class="{{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span>
+        <span data-month-percent class="block text-[12px] text-neutral-300{% if not (show_percentages_default and month_percent is not none) %} hidden{% endif %}">
+          {% if show_percentages_default and month_percent is not none %}{{ '{:+.2f}%'.format(month_percent) }}{% endif %}
+        </span>
       </div>
       <div x-show="showUnrealized" x-cloak>
-        Unrealized (invested): <span class="{{ 'text-profit' if month_unrealized > 0 else ('text-loss' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
+        Unrealized (invested): <span data-month-unrealized-value class="{{ 'text-profit' if month_unrealized > 0 else ('text-loss' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
       </div>
         {% set month_note_text = month_note.note | default('', true) %}
         {% set month_note_has = month_note_text.strip() %}
@@ -282,18 +317,24 @@
     <div class="rounded border border-neutral-800 p-3 bg-neutral-950">
       <h2 class="font-semibold">Yearly summary</h2>
       <div class="mt-2 space-y-4 text-sm">
-        <div class="space-y-1">
+        <div class="space-y-1"
+             data-rolling-summary
+             data-base-realized="{{ '%.10g'|format(rolling_year_realized) }}"
+             data-base-unrealized="{{ '%.10g'|format(rolling_year_unrealized) }}">
           <p class="text-[11px] uppercase tracking-wide text-neutral-400">Last 12 months</p>
-          <div>Realized: <span class="{{ 'text-profit' if rolling_year_realized > 0 else ('text-loss' if rolling_year_realized < 0 else 'text-neutral-200') }}">{{ rolling_year_realized|money }}</span></div>
+          <div>Realized: <span data-rolling-realized-value class="{{ 'text-profit' if rolling_year_realized > 0 else ('text-loss' if rolling_year_realized < 0 else 'text-neutral-200') }}">{{ rolling_year_realized|money }}</span></div>
           <div x-show="showUnrealized" x-cloak>
-            Unrealized (invested): <span class="{{ 'text-profit' if rolling_year_unrealized > 0 else ('text-loss' if rolling_year_unrealized < 0 else 'text-neutral-200') }}">{{ rolling_year_unrealized|money }}</span>
+            Unrealized (invested): <span data-rolling-unrealized-value class="{{ 'text-profit' if rolling_year_unrealized > 0 else ('text-loss' if rolling_year_unrealized < 0 else 'text-neutral-200') }}">{{ rolling_year_unrealized|money }}</span>
           </div>
         </div>
-        <div class="space-y-1">
+        <div class="space-y-1"
+             data-year-summary
+             data-base-realized="{{ '%.10g'|format(year_realized) }}"
+             data-base-unrealized="{{ '%.10g'|format(year_unrealized) }}">
           <p class="text-[11px] uppercase tracking-wide text-neutral-400">Since Jan 1</p>
-          <div>Realized: <span class="{{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
+          <div>Realized: <span data-year-realized-value class="{{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
           <div x-show="showUnrealized" x-cloak>
-            Unrealized (invested): <span class="{{ 'text-profit' if year_unrealized > 0 else ('text-loss' if year_unrealized < 0 else 'text-neutral-200') }}">{{ year_unrealized|money }}</span>
+            Unrealized (invested): <span data-year-unrealized-value class="{{ 'text-profit' if year_unrealized > 0 else ('text-loss' if year_unrealized < 0 else 'text-neutral-200') }}">{{ year_unrealized|money }}</span>
           </div>
         </div>
       </div>
@@ -439,6 +480,342 @@
 </div>
 
 <script>
+const dayImpactSimulator = (() => {
+  const cells = Array.from(document.querySelectorAll('[data-day-cell]'));
+  if (!cells.length) {
+    return null;
+  }
+
+  const parseNumber = (value) => {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === 'string' && value.trim() !== '') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  };
+
+  const isApproximatelyZero = (value) => Math.abs(value) <= 0.005;
+
+  const formatMoney = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return '$0.00';
+    }
+    const sign = numeric < 0 ? '-' : '';
+    const absolute = Math.abs(numeric);
+    return `${sign}$${absolute.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  const formatPercentage = (value) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return '';
+    }
+    const rounded = Math.round(numeric * 100) / 100;
+    const sign = rounded >= 0 ? '+' : '';
+    return `${sign}${rounded.toFixed(2)}%`;
+  };
+
+  const calculatePercentageValue = (realized, samples) => {
+    const valid = [];
+    samples.forEach((sample) => {
+      const numeric = Math.abs(Number(sample));
+      if (Number.isFinite(numeric) && !isApproximatelyZero(numeric)) {
+        valid.push(numeric);
+      }
+    });
+    if (!valid.length) {
+      return null;
+    }
+    const denominator = Math.max(...valid);
+    if (!Number.isFinite(denominator) || isApproximatelyZero(denominator)) {
+      return null;
+    }
+    const result = (Number(realized) / denominator) * 100;
+    if (!Number.isFinite(result)) {
+      return null;
+    }
+    return Math.round(result * 100) / 100;
+  };
+
+  const dayMap = new Map();
+  const weekStructure = new Map();
+
+  cells.forEach((cell) => {
+    const dateStr = cell.dataset.dayCell;
+    if (!dateStr) {
+      return;
+    }
+    const day = {
+      cell,
+      realized: parseNumber(cell.dataset.dayRealized),
+      unrealized: parseNumber(cell.dataset.dayUnrealized),
+      invested: parseNumber(cell.dataset.dayInvested),
+      hasValues: cell.dataset.dayHasValues === 'true',
+      inMonth: cell.dataset.dayInMonth === 'true',
+      inRolling: cell.dataset.dayInRolling === 'true',
+      belongsToYear: cell.dataset.dayBelongsYear === 'true',
+      weekKey: cell.dataset.weekKey || '',
+      weekPosition: Number(cell.dataset.weekPosition || '0'),
+      included: true,
+    };
+    dayMap.set(dateStr, day);
+
+    if (day.weekKey) {
+      if (!weekStructure.has(day.weekKey)) {
+        weekStructure.set(day.weekKey, []);
+      }
+      weekStructure.get(day.weekKey).push({ date: dateStr, position: day.weekPosition });
+    }
+
+    const toggle = cell.querySelector('[data-day-toggle]');
+    if (toggle) {
+      const isDisabled = toggle.disabled;
+      day.included = isDisabled ? true : !!toggle.checked;
+      if (!isDisabled) {
+        if (!day.included && day.inMonth) {
+          cell.classList.add('day-excluded');
+        }
+        toggle.addEventListener('change', () => {
+          day.included = !!toggle.checked;
+          const shouldExclude = !day.included && day.inMonth;
+          cell.classList.toggle('day-excluded', shouldExclude);
+          updateSummaries();
+        });
+      }
+    }
+  });
+
+  if (!dayMap.size) {
+    return null;
+  }
+
+  weekStructure.forEach((entries) => {
+    entries.sort((a, b) => a.position - b.position);
+  });
+
+  const monthSummaryEl = document.querySelector('[data-month-summary]');
+  const monthRealizedEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-realized-value]') : null;
+  const monthPercentEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-percent]') : null;
+  const monthUnrealizedEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-unrealized-value]') : null;
+
+  const rollingSummaryEl = document.querySelector('[data-rolling-summary]');
+  const rollingRealizedEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-realized-value]') : null;
+  const rollingUnrealizedEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-unrealized-value]') : null;
+
+  const yearSummaryEl = document.querySelector('[data-year-summary]');
+  const yearRealizedEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-realized-value]') : null;
+  const yearUnrealizedEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-unrealized-value]') : null;
+
+  const weekSummaries = new Map();
+  document.querySelectorAll('[data-week-summary]').forEach((weekEl) => {
+    const key = weekEl.dataset.weekSummary;
+    if (!key) {
+      return;
+    }
+    weekSummaries.set(key, {
+      element: weekEl,
+      realizedContainer: weekEl.querySelector('[data-week-realized]'),
+      realizedValue: weekEl.querySelector('[data-week-realized-value]'),
+      percent: weekEl.querySelector('[data-week-percent]'),
+      unrealizedContainer: weekEl.querySelector('[data-week-unrealized]'),
+      unrealizedValue: weekEl.querySelector('[data-week-unrealized-value]'),
+    });
+  });
+
+  const yearBaseRealized = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseRealized);
+  const yearBaseUnrealized = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseUnrealized);
+  const rollingBaseRealized = parseNumber(rollingSummaryEl && rollingSummaryEl.dataset.baseRealized);
+  const rollingBaseUnrealized = parseNumber(rollingSummaryEl && rollingSummaryEl.dataset.baseUnrealized);
+
+  let monthInitialRealized = 0;
+  let monthInitialUnrealized = 0;
+  let rollingMonthRealized = 0;
+  let rollingMonthUnrealized = 0;
+
+  dayMap.forEach((day) => {
+    if (day.inMonth && day.hasValues) {
+      monthInitialRealized += day.realized;
+      monthInitialUnrealized += day.unrealized;
+      if (day.inRolling) {
+        rollingMonthRealized += day.realized;
+        rollingMonthUnrealized += day.unrealized;
+      }
+    }
+  });
+
+  const yearOtherRealized = yearBaseRealized - monthInitialRealized;
+  const yearOtherUnrealized = yearBaseUnrealized - monthInitialUnrealized;
+  const rollingOtherRealized = rollingBaseRealized - rollingMonthRealized;
+  const rollingOtherUnrealized = rollingBaseUnrealized - rollingMonthUnrealized;
+
+  function applySignClass(element, value) {
+    if (!element) {
+      return;
+    }
+    element.classList.remove('text-profit', 'text-loss', 'text-neutral-200');
+    if (value > 0.005) {
+      element.classList.add('text-profit');
+    } else if (value < -0.005) {
+      element.classList.add('text-loss');
+    } else {
+      element.classList.add('text-neutral-200');
+    }
+  }
+
+  function applyBackgroundClass(element, value) {
+    if (!element) {
+      return;
+    }
+    element.classList.remove('cell-bg-pos', 'cell-bg-neg', 'bg-neutral-900');
+    if (value > 0.005) {
+      element.classList.add('cell-bg-pos');
+    } else if (value < -0.005) {
+      element.classList.add('cell-bg-neg');
+    } else {
+      element.classList.add('bg-neutral-900');
+    }
+  }
+
+  function updateWeekSummary(key, state) {
+    const dom = weekSummaries.get(key);
+    if (!dom) {
+      return;
+    }
+
+    const realizedValue = state.hasIncluded ? state.realized : 0;
+    if (dom.realizedContainer) {
+      const shouldShow = state.hasIncluded && !isApproximatelyZero(realizedValue);
+      dom.realizedContainer.classList.toggle('hidden', !shouldShow);
+      if (dom.realizedValue) {
+        dom.realizedValue.textContent = formatMoney(realizedValue);
+      }
+      applySignClass(dom.realizedContainer, realizedValue);
+      if (dom.percent) {
+        const percentValue = shouldShow ? calculatePercentageValue(realizedValue, state.investedSamples) : null;
+        if (percentValue === null) {
+          dom.percent.textContent = '';
+          dom.percent.classList.add('hidden');
+        } else {
+          dom.percent.textContent = formatPercentage(percentValue);
+          dom.percent.classList.remove('hidden');
+        }
+      }
+    }
+
+    if (dom.unrealizedContainer && dom.unrealizedValue) {
+      const unrealizedValue = state.hasIncluded ? state.lastUnrealized : 0;
+      dom.unrealizedContainer.classList.toggle('hidden', !state.hasIncluded);
+      dom.unrealizedValue.textContent = formatMoney(unrealizedValue);
+      applySignClass(dom.unrealizedContainer, unrealizedValue);
+    }
+
+    applyBackgroundClass(dom.element, realizedValue);
+  }
+
+  function updateSummaries() {
+    let monthRealized = 0;
+    let monthUnrealized = 0;
+    const monthInvested = [];
+    let yearRealized = yearOtherRealized;
+    let yearUnrealized = yearOtherUnrealized;
+    let rollingRealized = rollingOtherRealized;
+    let rollingUnrealized = rollingOtherUnrealized;
+
+    dayMap.forEach((day) => {
+      if (!day.included) {
+        return;
+      }
+      if (day.inMonth && day.hasValues) {
+        monthRealized += day.realized;
+        monthUnrealized += day.unrealized;
+        monthInvested.push(day.invested);
+      }
+      if (day.inMonth && day.hasValues && day.belongsToYear) {
+        yearRealized += day.realized;
+        yearUnrealized += day.unrealized;
+      }
+      if (day.inRolling && day.hasValues) {
+        rollingRealized += day.realized;
+        rollingUnrealized += day.unrealized;
+      }
+    });
+
+    if (monthRealizedEl) {
+      monthRealizedEl.textContent = formatMoney(monthRealized);
+      applySignClass(monthRealizedEl, monthRealized);
+    }
+    if (monthPercentEl) {
+      const percentValue = calculatePercentageValue(monthRealized, monthInvested);
+      if (percentValue === null) {
+        monthPercentEl.textContent = '';
+        monthPercentEl.classList.add('hidden');
+      } else {
+        monthPercentEl.textContent = formatPercentage(percentValue);
+        monthPercentEl.classList.remove('hidden');
+      }
+    }
+    if (monthUnrealizedEl) {
+      monthUnrealizedEl.textContent = formatMoney(monthUnrealized);
+      applySignClass(monthUnrealizedEl, monthUnrealized);
+    }
+
+    if (rollingRealizedEl) {
+      rollingRealizedEl.textContent = formatMoney(rollingRealized);
+      applySignClass(rollingRealizedEl, rollingRealized);
+    }
+    if (rollingUnrealizedEl) {
+      rollingUnrealizedEl.textContent = formatMoney(rollingUnrealized);
+      applySignClass(rollingUnrealizedEl, rollingUnrealized);
+    }
+
+    if (yearRealizedEl) {
+      yearRealizedEl.textContent = formatMoney(yearRealized);
+      applySignClass(yearRealizedEl, yearRealized);
+    }
+    if (yearUnrealizedEl) {
+      yearUnrealizedEl.textContent = formatMoney(yearUnrealized);
+      applySignClass(yearUnrealizedEl, yearUnrealized);
+    }
+
+    weekStructure.forEach((entries, key) => {
+      const state = {
+        realized: 0,
+        investedSamples: [],
+        lastUnrealized: 0,
+        hasIncluded: false,
+      };
+
+      entries.forEach((entry) => {
+        const day = dayMap.get(entry.date);
+        if (!day || !day.inMonth || !day.included) {
+          return;
+        }
+        if (day.hasValues) {
+          state.realized += day.realized;
+          state.investedSamples.push(day.invested);
+        }
+        state.lastUnrealized = day.unrealized;
+        state.hasIncluded = true;
+      });
+
+      updateWeekSummary(key, state);
+    });
+  }
+
+  updateSummaries();
+
+  return {
+    update: updateSummaries,
+  };
+})();
+
 function openTrades(dateStr) {
   fetch('/api/trades/' + dateStr)
     .then(response => {

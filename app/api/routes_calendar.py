@@ -96,6 +96,15 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     today = date.today()
 
     start, end, days = month_bounds(year, month)
+    month_end_date = date.fromisoformat(end)
+    year_start = f"{year:04d}-01-01"
+    year_end = f"{year:04d}-12-31"
+    months_to_subtract = 11
+    total_months = year * 12 + month - 1 - months_to_subtract
+    rolling_year = total_months // 12
+    rolling_month = total_months % 12 + 1
+    rolling_start = f"{rolling_year:04d}-{rolling_month:02d}-01"
+    rolling_start_date = date.fromisoformat(rolling_start)
     # Pull daily summaries for month
     q = db.query(DailySummary).filter(DailySummary.date >= start, DailySummary.date <= end).all()
     by_day = {r.date: r for r in q}
@@ -256,6 +265,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "realized": realized_value,
                 "unrealized": day_unrealized,
                 "has_values": bool(ds),
+                "invested": invested_value,
                 "show_realized": show_realized,
                 "percent": percent_value,
                 "note": note_text,
@@ -264,6 +274,8 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "is_weekend": is_weekend,
                 "trades": day_trades,
                 "has_trades": has_trades,
+                "in_rolling": rolling_start_date <= d <= month_end_date,
+                "belongs_to_year": d.year == year,
             })
             if d.month == month and ds:
                 week_total_realized += float(ds.realized)
@@ -329,8 +341,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     )
 
     # Yearly totals
-    year_start = f"{year:04d}-01-01"
-    year_end = f"{year:04d}-12-31"
     year_rows = (
         db.query(DailySummary)
         .filter(DailySummary.date >= year_start, DailySummary.date <= year_end)
@@ -340,11 +350,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     year_unrealized = sum(float(r.unrealized) for r in year_rows)
 
     # Rolling 12 month totals ending at the current month
-    months_to_subtract = 11
-    total_months = year * 12 + month - 1 - months_to_subtract
-    rolling_year = total_months // 12
-    rolling_month = total_months % 12 + 1
-    rolling_start = f"{rolling_year:04d}-{rolling_month:02d}-01"
     rolling_rows = (
         db.query(DailySummary)
         .filter(DailySummary.date >= rolling_start, DailySummary.date <= end)
