@@ -4,7 +4,7 @@ import json
 import math
 from bisect import bisect_right
 from datetime import date, datetime, timedelta
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from fastapi import APIRouter, Request, Form, Depends, Query, HTTPException
 from fastapi.responses import (
@@ -15,6 +15,7 @@ from fastapi.responses import (
 from sqlalchemy import tuple_
 from sqlalchemy.orm import Session
 import calendar
+from app.core.config import AppConfig
 from app.core.database import get_session
 from app.core.models import DailySummary, Meta, NoteDaily, NoteMonthly, NoteWeekly, Trade
 from app.core.utils import coerce_bool, month_bounds
@@ -22,6 +23,13 @@ from app.services.trade_summaries import recompute_daily_summaries
 from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter()
+class UIPreferencesUpdate(BaseModel):
+    show_unrealized: Optional[bool] = None
+    show_percentages: Optional[bool] = None
+    show_weekends: Optional[bool] = None
+    show_exclude_controls: Optional[bool] = None
+
+
 class TradeUpdate(BaseModel):
     id: Optional[int] = None
     symbol: str
@@ -91,6 +99,9 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     show_text_default = coerce_bool(ui_cfg.get("show_text", True), True)
     show_percentages_default = coerce_bool(ui_cfg.get("show_percentages", True), True)
     show_weekends_default = coerce_bool(ui_cfg.get("show_weekends", False), False)
+    show_exclude_controls_default = coerce_bool(
+        ui_cfg.get("show_exclude_controls", True), True
+    )
     notes_cfg = cfg.get("notes", {})
     notes_enabled = coerce_bool(notes_cfg.get("enabled", True), True)
     today = date.today()
@@ -375,6 +386,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "show_text_flag": show_text_default,
         "show_percentages_flag": show_percentages_default,
         "show_weekends_flag": show_weekends_default,
+        "show_exclude_controls_flag": show_exclude_controls_default,
         "notes_enabled_flag": notes_enabled,
         "export_default_start": start,
         "export_default_end": end,
@@ -386,6 +398,32 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "calendar.html",
         ctx,
     )
+
+
+@router.post("/api/ui/preferences")
+def update_ui_preferences(payload: UIPreferencesUpdate, request: Request):
+    cfg: AppConfig = request.app.state.config
+    ui_section = cfg.raw.setdefault("ui", {})
+
+    updates: Dict[str, bool] = {}
+    for field, key in (
+        ("show_unrealized", "show_unrealized"),
+        ("show_percentages", "show_percentages"),
+        ("show_weekends", "show_weekends"),
+        ("show_exclude_controls", "show_exclude_controls"),
+    ):
+        value = getattr(payload, field)
+        if value is not None:
+            ui_section[key] = bool(value)
+            updates[key] = bool(value)
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No preferences provided.")
+
+    cfg.save()
+    request.app.state.templates.env.globals["cfg"] = cfg.raw
+
+    return {"status": "ok", "preferences": updates}
 
 
 @router.get("/api/trades/{date_str}")

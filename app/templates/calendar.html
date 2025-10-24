@@ -7,30 +7,19 @@
 {% set show_text_default = show_text_flag if show_text_flag is defined else ui_cfg.get('show_text', True) %}
 {% set show_percentages_default = show_percentages_flag if show_percentages_flag is defined else ui_cfg.get('show_percentages', True) %}
 {% set show_weekends = show_weekends_flag if show_weekends_flag is defined else ui_cfg.get('show_weekends', False) %}
+{% set show_exclude_controls = show_exclude_controls_flag if show_exclude_controls_flag is defined else ui_cfg.get('show_exclude_controls', True) %}
 {% set notes_enabled = notes_enabled_flag if notes_enabled_flag is defined else notes_cfg.get('enabled', True) %}
-<div x-data="{
+<div x-data="calendarToolbar({
         showUnrealized: {{ 'true' if show_unrealized_default else 'false' }},
-        exportOpen: false,
-        init() {
-          try {
-            const storage = window.localStorage;
-            if (!storage) {
-              return;
-            }
-
-            const stored = storage.getItem('bagholder:showUnrealized');
-            if (stored !== null) {
-              this.showUnrealized = stored === 'true';
-            }
-
-            this.$watch('showUnrealized', (value) => {
-              storage.setItem('bagholder:showUnrealized', value ? 'true' : 'false');
-            });
-          } catch (error) {
-            console.warn('Unable to persist showUnrealized preference', error);
-          }
-        }
-      }" class="space-y-4">
+        showExcludeControls: {{ 'true' if show_exclude_controls else 'false' }},
+        showPercentages: {{ 'true' if show_percentages_default else 'false' }},
+        showWeekends: {{ 'true' if show_weekends else 'false' }}
+      })"
+     data-calendar-root="true"
+     data-calendar-year="{{ year }}"
+     data-calendar-month="{{ '%02d'|format(month) }}"
+     class="space-y-4{% if not show_exclude_controls %} hide-exclude-controls{% endif %}{% if not show_percentages_default %} hide-percentages{% endif %}"
+     :class="{ 'hide-exclude-controls': !showExcludeControls, 'hide-percentages': !showPercentages }">
 <style>
   .day-excluded {
     opacity: 0.4;
@@ -65,6 +54,16 @@
   .day-include-toggle:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  .hide-exclude-controls .day-include-toggle {
+    display: none;
+  }
+
+  .hide-percentages [data-day-percent],
+  .hide-percentages [data-week-percent],
+  .hide-percentages [data-month-percent] {
+    display: none !important;
   }
 </style>
 <div class="flex items-center justify-between">
@@ -123,11 +122,41 @@
     <button type="button"
             class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
             :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showUnrealized }"
-            @click="showUnrealized = !showUnrealized"
+            @click="toggleUnrealized"
             aria-pressed="{{ 'true' if show_unrealized_default else 'false' }}"
             :aria-pressed="showUnrealized.toString()">
       <span x-text="showUnrealized ? 'Hide unrealized' : 'Show unrealized'">
         {% if show_unrealized_default %}Hide unrealized{% else %}Show unrealized{% endif %}
+      </span>
+    </button>
+    <button type="button"
+            class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
+            :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showExcludeControls }"
+            @click="toggleExcludeControls"
+            aria-pressed="{{ 'true' if show_exclude_controls else 'false' }}"
+            :aria-pressed="showExcludeControls.toString()">
+      <span x-text="showExcludeControls ? 'Hide exclude' : 'Show exclude'">
+        {% if show_exclude_controls %}Hide exclude{% else %}Show exclude{% endif %}
+      </span>
+    </button>
+    <button type="button"
+            class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
+            :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showPercentages }"
+            @click="togglePercentages"
+            aria-pressed="{{ 'true' if show_percentages_default else 'false' }}"
+            :aria-pressed="showPercentages.toString()">
+      <span x-text="showPercentages ? 'Hide percent' : 'Show percent'">
+        {% if show_percentages_default %}Hide percent{% else %}Show percent{% endif %}
+      </span>
+    </button>
+    <button type="button"
+            class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
+            :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': showWeekends }"
+            @click="toggleWeekends"
+            aria-pressed="{{ 'true' if show_weekends else 'false' }}"
+            :aria-pressed="showWeekends.toString()">
+      <span x-text="showWeekends ? 'Hide weekends' : 'Show weekends'">
+        {% if show_weekends %}Hide weekends{% else %}Show weekends{% endif %}
       </span>
     </button>
   </div>
@@ -189,11 +218,11 @@
         {% if show_text_default %}
         <div class="text-sm space-y-1">
           {% set realized_class = 'text-profit' if d.realized > 0 else ('text-loss' if d.realized < 0 else 'text-neutral-200') %}
-          {% if d.show_realized %}
+            {% if d.show_realized %}
           <div class="{{ realized_class }}">
             Realized: {{ d.realized|money }}
             {% if show_percentages_default and d.percent is not none %}
-            <span class="block text-[11px] text-neutral-300 md:inline md:ml-1">{{ '{:+.2f}%'.format(d.percent) }}</span>
+            <span class="block text-[11px] text-neutral-300 md:inline md:ml-1" data-day-percent>{{ '{:+.2f}%'.format(d.percent) }}</span>
             {% endif %}
           </div>
           {% endif %}
@@ -507,6 +536,86 @@
 </div>
 
 <script>
+async function updateUiPreferences(payload) {
+  try {
+    const response = await fetch('/api/ui/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
+    });
+    if (!response.ok) {
+      let message = 'Failed to save preference.';
+      try {
+        const data = await response.json();
+        if (data && data.detail) {
+          message = data.detail;
+        }
+      } catch (error) {
+        // Ignore JSON parse errors and use fallback message
+      }
+      throw new Error(message);
+    }
+    return true;
+  } catch (error) {
+    console.warn('Unable to save preference', error);
+    return false;
+  }
+}
+
+function calendarToolbar(initialState = {}) {
+  return {
+    showUnrealized: !!initialState.showUnrealized,
+    showExcludeControls:
+      initialState.showExcludeControls === undefined
+        ? true
+        : !!initialState.showExcludeControls,
+    showPercentages:
+      initialState.showPercentages === undefined
+        ? true
+        : !!initialState.showPercentages,
+    showWeekends: !!initialState.showWeekends,
+    exportOpen: false,
+    async toggleUnrealized() {
+      const previous = this.showUnrealized;
+      const next = !previous;
+      this.showUnrealized = next;
+      const saved = await updateUiPreferences({ show_unrealized: next });
+      if (!saved) {
+        this.showUnrealized = previous;
+      }
+    },
+    async toggleExcludeControls() {
+      const previous = this.showExcludeControls;
+      const next = !previous;
+      this.showExcludeControls = next;
+      const saved = await updateUiPreferences({ show_exclude_controls: next });
+      if (!saved) {
+        this.showExcludeControls = previous;
+      }
+    },
+    async togglePercentages() {
+      const previous = this.showPercentages;
+      const next = !previous;
+      this.showPercentages = next;
+      const saved = await updateUiPreferences({ show_percentages: next });
+      if (!saved) {
+        this.showPercentages = previous;
+      }
+    },
+    async toggleWeekends() {
+      const previous = this.showWeekends;
+      const next = !previous;
+      this.showWeekends = next;
+      const saved = await updateUiPreferences({ show_weekends: next });
+      if (!saved) {
+        this.showWeekends = previous;
+        return;
+      }
+      window.location.reload();
+    },
+  };
+}
+
 const dayImpactSimulator = (() => {
   const cells = Array.from(document.querySelectorAll('[data-day-cell]'));
   if (!cells.length) {
@@ -571,6 +680,68 @@ const dayImpactSimulator = (() => {
     return Math.round(result * 100) / 100;
   };
 
+  const calendarRoot = document.querySelector('[data-calendar-root]');
+  const calendarYear = calendarRoot ? calendarRoot.dataset.calendarYear : '';
+  const calendarMonth = calendarRoot ? calendarRoot.dataset.calendarMonth : '';
+  const excludedStorageKey =
+    calendarYear && calendarMonth
+      ? `bagholder:excludedDays:${calendarYear}-${calendarMonth}`
+      : null;
+
+  const loadStoredExcludedDays = () => {
+    if (!excludedStorageKey) {
+      return new Set();
+    }
+    try {
+      const storage = window.localStorage;
+      if (!storage) {
+        return new Set();
+      }
+      const raw = storage.getItem(excludedStorageKey);
+      if (!raw) {
+        return new Set();
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return new Set();
+      }
+      const valid = parsed.filter((value) => typeof value === 'string' && value);
+      return new Set(valid);
+    } catch (error) {
+      console.warn('Unable to restore excluded day selections', error);
+      return new Set();
+    }
+  };
+
+  const excludedDays = loadStoredExcludedDays();
+
+  const persistExcludedDays = () => {
+    if (!excludedStorageKey) {
+      return;
+    }
+    try {
+      const storage = window.localStorage;
+      if (!storage) {
+        return;
+      }
+      storage.setItem(excludedStorageKey, JSON.stringify(Array.from(excludedDays)));
+    } catch (error) {
+      console.warn('Unable to persist excluded day selections', error);
+    }
+  };
+
+  const updateExcludedStorage = (dateStr, included) => {
+    if (!excludedStorageKey || !dateStr) {
+      return;
+    }
+    if (included) {
+      excludedDays.delete(dateStr);
+    } else {
+      excludedDays.add(dateStr);
+    }
+    persistExcludedDays();
+  };
+
   const dayMap = new Map();
   const weekStructure = new Map();
 
@@ -604,6 +775,11 @@ const dayImpactSimulator = (() => {
     };
     dayMap.set(dateStr, day);
 
+    if (day.inMonth && excludedDays.has(dateStr)) {
+      day.included = false;
+    }
+    day.dateStr = dateStr;
+
     if (day.weekKey) {
       if (!weekStructure.has(day.weekKey)) {
         weekStructure.set(day.weekKey, []);
@@ -614,22 +790,37 @@ const dayImpactSimulator = (() => {
     const toggle = cell.querySelector('[data-day-toggle]');
     if (toggle) {
       const isDisabled = toggle.disabled;
-      day.included = true;
       setDayToggleState(toggle, day.included);
+      const shouldExclude = !day.included && day.inMonth;
+      cell.classList.toggle('day-excluded', shouldExclude);
       if (!isDisabled) {
-        if (!day.included && day.inMonth) {
-          cell.classList.add('day-excluded');
-        }
         toggle.addEventListener('click', () => {
           day.included = !day.included;
           setDayToggleState(toggle, day.included);
           const shouldExclude = !day.included && day.inMonth;
           cell.classList.toggle('day-excluded', shouldExclude);
+          if (day.inMonth) {
+            updateExcludedStorage(dateStr, day.included);
+          }
           updateSummaries();
         });
       }
     }
   });
+
+  if (excludedDays.size) {
+    const valid = new Set();
+    dayMap.forEach((value, key) => {
+      if (value.inMonth && excludedDays.has(key)) {
+        valid.add(key);
+      }
+    });
+    if (valid.size !== excludedDays.size) {
+      excludedDays.clear();
+      valid.forEach((key) => excludedDays.add(key));
+      persistExcludedDays();
+    }
+  }
 
   if (!dayMap.size) {
     return null;

@@ -16,6 +16,7 @@ DEFAULT_CONFIG = {
         "show_trade_count": True,
         "show_percentages": True,
         "show_weekends": False,
+        "show_exclude_controls": True,
         "highlight_weekends": True,
         "auto_dark_mode": True,
         "opacity_gain": 0.7,
