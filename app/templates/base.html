@@ -447,9 +447,52 @@
       color: var(--trade-badge-text-color);
     }
 
-    .conflict-option-new {
+    .conflict-toolbar {
+      background-color: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 1rem 1.25rem;
+    }
+
+    .conflict-toolbar__header {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: space-between;
+    }
+
+    .conflict-toolbar__row {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .conflict-card {
+      border: 1px solid var(--border-subtle);
+      background-color: var(--surface-card);
+      transition: border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .conflict-card.is-selected {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 1px var(--primary-soft-bg);
+    }
+
+    .conflict-option {
+      border: 1px solid var(--border-subtle);
+      background-color: var(--surface-subtle);
+      transition: border-color .2s ease, background-color .2s ease, box-shadow .2s ease;
+    }
+
+    .conflict-option.is-active {
       border-color: var(--primary-color);
       background-color: var(--primary-soft-bg);
+      box-shadow: 0 0 0 1px var(--primary-soft-bg);
     }
 
     .focus-ring-primary:focus,

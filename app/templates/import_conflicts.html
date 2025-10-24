@@ -5,11 +5,94 @@
   {{ inserted }} new trade{{ '' if inserted == 1 else 's' }} imported. Some days already had values in the calendar.
   Please choose which figures to keep for each conflicting date below.
 </p>
-<form action="/import/thinkorswim/conflicts" method="post" class="space-y-4">
+<form action="/import/thinkorswim/conflicts" method="post" class="space-y-4"
+      x-data="{
+        dates: {{ conflicts | map(attribute='date') | list | tojson }},
+        selected: [],
+        choices: {},
+        init() {
+          this.setChoiceForAll('new');
+        },
+        isSelected(date) {
+          return this.selected.includes(date);
+        },
+        toggleSelection(date, checked) {
+          if (checked) {
+            if (!this.selected.includes(date)) {
+              this.selected.push(date);
+            }
+          } else {
+            this.selected = this.selected.filter((value) => value !== date);
+          }
+        },
+        selectAll() {
+          this.selected = this.dates.slice();
+        },
+        clearSelection() {
+          this.selected = [];
+        },
+        setChoiceForDates(dates, choice) {
+          dates.forEach((date) => {
+            this.choices[date] = choice;
+          });
+        },
+        setChoiceForSelected(choice) {
+          if (!this.selected.length) {
+            return;
+          }
+          this.setChoiceForDates(this.selected, choice);
+        },
+        setChoiceForAll(choice) {
+          this.setChoiceForDates(this.dates, choice);
+        },
+        selectionSummary() {
+          if (!this.selected.length) {
+            return 'No rows selected – bulk actions affect all rows';
+          }
+          if (this.selected.length === this.dates.length) {
+            return 'All rows selected';
+          }
+          return `${this.selected.length} selected`;
+        }
+      }">
+  <div class="conflict-toolbar">
+    <div class="conflict-toolbar__header">
+      <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Bulk actions</span>
+      <span class="text-xs text-neutral-400" x-text="selectionSummary()"></span>
+    </div>
+    <div class="conflict-toolbar__row">
+      <button type="button" class="btn btn-outline-primary px-3 py-1 text-xs" @click="selectAll()">
+        Select all
+      </button>
+      <button type="button" class="btn btn-outline-primary px-3 py-1 text-xs" @click="clearSelection()" :disabled="!selected.length">
+        Clear selection
+      </button>
+      <button type="button" class="btn btn-primary px-3 py-1 text-xs" @click="setChoiceForSelected('new')" :disabled="!selected.length">
+        Use imported for selected
+      </button>
+      <button type="button" class="btn btn-outline-primary px-3 py-1 text-xs" @click="setChoiceForSelected('existing')" :disabled="!selected.length">
+        Keep existing for selected
+      </button>
+    </div>
+    <div class="conflict-toolbar__row">
+      <button type="button" class="btn btn-primary px-3 py-1 text-xs" @click="setChoiceForAll('new')">
+        Use imported for all
+      </button>
+      <button type="button" class="btn btn-outline-primary px-3 py-1 text-xs" @click="setChoiceForAll('existing')">
+        Keep existing for all
+      </button>
+    </div>
+    <p class="text-xs text-neutral-400">
+      Imported values are chosen by default. Adjust the radios below to keep specific existing summaries.
+    </p>
+  </div>
   {% for conflict in conflicts %}
-  <div class="rounded border border-neutral-800 bg-neutral-950 p-4">
-    <div class="mb-3 flex items-center justify-between text-sm text-neutral-300">
-      <span class="font-semibold text-neutral-100">{{ conflict.date }}</span>
+  <div class="conflict-card rounded p-4" :class="{ 'is-selected': isSelected('{{ conflict.date }}') }">
+    <div class="mb-3 flex flex-col gap-2 text-sm text-neutral-300 md:flex-row md:items-center md:justify-between">
+      <div class="flex items-center gap-3">
+        <input type="checkbox" class="h-4 w-4 focus-ring-primary" :checked="isSelected('{{ conflict.date }}')" @change="toggleSelection('{{ conflict.date }}', $event.target.checked)">
+        <span class="font-semibold text-neutral-100">{{ conflict.date }}</span>
+      </div>
       {% if conflict.existing.updated_at %}
       <span>Last updated: {{ conflict.existing.updated_at }}</span>
       {% endif %}
@@ -18,16 +101,18 @@
     <input type="hidden" name="new_realized_{{ conflict.date }}" value="{{ '%.2f'|format(conflict.new.realized) }}">
     <input type="hidden" name="new_unrealized_{{ conflict.date }}" value="{{ '%.2f'|format(conflict.new.unrealized) }}">
     <div class="grid gap-3 md:grid-cols-2">
-      <label class="flex cursor-pointer flex-col gap-1 rounded border border-neutral-800 bg-neutral-900 p-3">
-        <input type="radio" name="choice_{{ conflict.date }}" value="existing" class="h-4 w-4" checked>
+      <label class="conflict-option flex cursor-pointer flex-col gap-1 rounded p-3"
+             :class="{ 'is-active': choices['{{ conflict.date }}'] === 'existing' }">
+        <input type="radio" name="choice_{{ conflict.date }}" value="existing" class="h-4 w-4" x-model="choices['{{ conflict.date }}']">
         <span class="text-sm font-semibold">Keep existing</span>
         <div class="text-xs text-neutral-300">
           <div>Realized: {{ conflict.existing.realized|money }}</div>
           <div>Unrealized: {{ conflict.existing.unrealized|money }}</div>
         </div>
       </label>
-      <label class="flex cursor-pointer flex-col gap-1 rounded border conflict-option-new p-3">
-        <input type="radio" name="choice_{{ conflict.date }}" value="new" class="h-4 w-4">
+      <label class="conflict-option flex cursor-pointer flex-col gap-1 rounded p-3"
+             :class="{ 'is-active': choices['{{ conflict.date }}'] === 'new' }">
+        <input type="radio" name="choice_{{ conflict.date }}" value="new" class="h-4 w-4" x-model="choices['{{ conflict.date }}']" checked>
         <span class="text-sm font-semibold">Use imported values</span>
         <div class="text-xs text-neutral-200">
           <div>Realized: {{ conflict.new.realized|money }}</div>
