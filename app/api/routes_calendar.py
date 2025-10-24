@@ -313,6 +313,20 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     year_realized = sum(float(r.realized) for r in year_rows)
     year_unrealized = sum(float(r.unrealized) for r in year_rows)
 
+    # Rolling 12 month totals ending at the current month
+    months_to_subtract = 11
+    total_months = year * 12 + month - 1 - months_to_subtract
+    rolling_year = total_months // 12
+    rolling_month = total_months % 12 + 1
+    rolling_start = f"{rolling_year:04d}-{rolling_month:02d}-01"
+    rolling_rows = (
+        db.query(DailySummary)
+        .filter(DailySummary.date >= rolling_start, DailySummary.date <= end)
+        .all()
+    )
+    rolling_realized = sum(float(r.realized) for r in rolling_rows)
+    rolling_unrealized = sum(float(r.unrealized) for r in rolling_rows)
+
     ctx = {
         "request": request,
         "year": year, "month": month,
@@ -322,6 +336,8 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "month_unrealized": month_unrealized,
         "year_realized": year_realized,
         "year_unrealized": year_unrealized,
+        "rolling_year_realized": rolling_realized,
+        "rolling_year_unrealized": rolling_unrealized,
         "cfg": request.app.state.config.raw,
         "show_trade_badges": show_trade_badges,
         "show_unrealized_flag": show_unrealized_default,
