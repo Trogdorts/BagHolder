@@ -6,7 +6,7 @@
 {% set show_trade_count_badges = show_trade_badges if show_trade_badges is defined else ui_cfg.get('show_trade_count', True) %}
 {% set show_text_default = show_text_flag if show_text_flag is defined else ui_cfg.get('show_text', True) %}
 {% set show_percentages_default = show_percentages_flag if show_percentages_flag is defined else ui_cfg.get('show_percentages', True) %}
-{% set show_weekends = show_weekends_flag if show_weekends_flag is defined else ui_cfg.get('show_weekends', False) %}
+{% set show_weekends = show_weekends_flag if show_weekends_flag is defined else ui_cfg.get('show_weekends', True) %}
 {% set show_exclude_controls = show_exclude_controls_flag if show_exclude_controls_flag is defined else ui_cfg.get('show_exclude_controls', True) %}
 {% set notes_enabled = notes_enabled_flag if notes_enabled_flag is defined else notes_cfg.get('enabled', True) %}
 <div x-data="calendarToolbar({
