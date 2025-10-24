@@ -4,6 +4,7 @@
 {% set show_trade_count = cfg.ui.get('show_trade_count', True) %}
 {% set show_text = cfg.ui.get('show_text', True) %}
 {% set show_weekends = cfg.ui.get('show_weekends', False) %}
+{% set show_percentages = cfg.ui.get('show_percentages', True) %}
 {% set default_view = cfg.view.get('default', 'latest') %}
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
@@ -44,6 +45,10 @@
         <div class="settings-summary-item">
           <dt>Trade badges</dt>
           <dd>{{ 'Enabled' if show_trade_count else 'Disabled' }}</dd>
+        </div>
+        <div class="settings-summary-item">
+          <dt>Percentages</dt>
+          <dd>{{ 'Shown' if show_percentages else 'Hidden' }}</dd>
         </div>
         <div class="settings-summary-item">
           <dt>Diagnostics</dt>
@@ -175,6 +180,13 @@
             <select name="show_trade_count" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
               <option value="true" {% if show_trade_count %}selected{% endif %}>Show badges</option>
               <option value="false" {% if not show_trade_count %}selected{% endif %}>Hide badges</option>
+            </select>
+          </label>
+          <label class="space-y-2 block">
+            <span class="text-sm font-medium text-neutral-200">Show percentage change</span>
+            <select name="show_percentages" class="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="true" {% if show_percentages %}selected{% endif %}>Show percentages</option>
+              <option value="false" {% if not show_percentages %}selected{% endif %}>Hide percentages</option>
             </select>
           </label>
           <div class="space-y-2 block">

@@ -89,6 +89,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     show_trade_badges = coerce_bool(ui_cfg.get("show_trade_count", True), True)
     show_unrealized_default = coerce_bool(ui_cfg.get("show_unrealized", True), True)
     show_text_default = coerce_bool(ui_cfg.get("show_text", True), True)
+    show_percentages_default = coerce_bool(ui_cfg.get("show_percentages", True), True)
     show_weekends_default = coerce_bool(ui_cfg.get("show_weekends", False), False)
     notes_cfg = cfg.get("notes", {})
     notes_enabled = coerce_bool(notes_cfg.get("enabled", True), True)
@@ -188,10 +189,24 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     cal = calendar.Calendar(firstweekday=0)  # Monday=0 or Sunday=6; we'll keep 0
     weeks = []
     month_days = cal.monthdatescalendar(year, month)
+    def calculate_percentage(realized_value: float, invested_samples: List[float]) -> Optional[float]:
+        valid_samples = [
+            abs(sample)
+            for sample in invested_samples
+            if sample is not None and not math.isclose(sample, 0.0, abs_tol=0.005)
+        ]
+        if not valid_samples:
+            return None
+        denominator = max(valid_samples)
+        if math.isclose(denominator, 0.0, abs_tol=0.005):
+            return None
+        return round((realized_value / denominator) * 100.0, 2)
+
     for week in month_days:
         iso_year, iso_week, _ = week[0].isocalendar()
         wk = []
         week_total_realized = 0.0
+        week_invested_samples: List[float] = []
         last_unrealized_value = None
         for d in week:
             day_key = d.strftime("%Y-%m-%d")
@@ -232,6 +247,9 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             show_realized = bool(ds) and (
                 not math.isclose(realized_value, 0.0, abs_tol=0.005) or has_sell_trade
             )
+            invested_value = float(ds.total_invested) if ds else 0.0
+            percent_value = calculate_percentage(realized_value, [invested_value]) if ds else None
+
             wk.append({
                 "date": d,
                 "in_month": (d.month == month),
@@ -239,6 +257,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "unrealized": day_unrealized,
                 "has_values": bool(ds),
                 "show_realized": show_realized,
+                "percent": percent_value,
                 "note": note_text,
                 "note_updated_at": note_updated_at,
                 "has_note": bool(note_text.strip()),
@@ -248,11 +267,13 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             })
             if d.month == month and ds:
                 week_total_realized += float(ds.realized)
+                week_invested_samples.append(invested_value)
             if d.month == month:
                 if ds:
                     last_unrealized_value = float(ds.unrealized)
                 elif has_running_unrealized:
                     last_unrealized_value = day_unrealized
+        week_percent = calculate_percentage(week_total_realized, week_invested_samples)
         weeks.append({
             "days": wk,
             "week_realized": week_total_realized,
@@ -264,6 +285,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             "note": "",
             "note_updated_at": "",
             "has_note": False,
+            "week_percent": week_percent,
         })
 
     week_pairs = {(week_entry["week_year"], week_entry["week_number"]) for week_entry in weeks}
@@ -301,6 +323,10 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     # Monthly totals
     month_realized = sum(float(r.realized) for r in q)
     month_unrealized = sum(float(r.unrealized) for r in q)
+    month_percent = calculate_percentage(
+        month_realized,
+        [float(r.total_invested) for r in q],
+    )
 
     # Yearly totals
     year_start = f"{year:04d}-01-01"
@@ -320,12 +346,14 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "month_note": month_note,
         "month_realized": month_realized,
         "month_unrealized": month_unrealized,
+        "month_percent": month_percent,
         "year_realized": year_realized,
         "year_unrealized": year_unrealized,
         "cfg": request.app.state.config.raw,
         "show_trade_badges": show_trade_badges,
         "show_unrealized_flag": show_unrealized_default,
         "show_text_flag": show_text_default,
+        "show_percentages_flag": show_percentages_default,
         "show_weekends_flag": show_weekends_default,
         "notes_enabled_flag": notes_enabled,
         "export_default_start": start,

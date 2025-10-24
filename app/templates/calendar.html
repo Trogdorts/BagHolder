@@ -5,6 +5,7 @@
 {% set show_unrealized_default = show_unrealized_flag if show_unrealized_flag is defined else ui_cfg.get('show_unrealized', True) %}
 {% set show_trade_count_badges = show_trade_badges if show_trade_badges is defined else ui_cfg.get('show_trade_count', True) %}
 {% set show_text_default = show_text_flag if show_text_flag is defined else ui_cfg.get('show_text', True) %}
+{% set show_percentages_default = show_percentages_flag if show_percentages_flag is defined else ui_cfg.get('show_percentages', True) %}
 {% set show_weekends = show_weekends_flag if show_weekends_flag is defined else ui_cfg.get('show_weekends', False) %}
 {% set notes_enabled = notes_enabled_flag if notes_enabled_flag is defined else notes_cfg.get('enabled', True) %}
 <div x-data="{
@@ -141,7 +142,12 @@
         <div class="text-sm space-y-1">
           {% set realized_class = 'text-profit' if d.realized > 0 else ('text-loss' if d.realized < 0 else 'text-neutral-200') %}
           {% if d.show_realized %}
-          <div class="{{ realized_class }}">Realized: {{ d.realized|money }}</div>
+          <div class="{{ realized_class }}">
+            Realized: {{ d.realized|money }}
+            {% if show_percentages_default and d.percent is not none %}
+            <span class="block text-[11px] text-neutral-300 md:inline md:ml-1">{{ '{:+.2f}%'.format(d.percent) }}</span>
+            {% endif %}
+          </div>
           {% endif %}
           <div class="{{ 'text-profit' if d.unrealized > 0 else ('text-loss' if d.unrealized < 0 else 'text-neutral-200') }}"
                x-show="showUnrealized" x-cloak>
@@ -191,7 +197,12 @@
       <div class="text-xs text-neutral-400">Week {{ week.week_index }}</div>
       <div class="mt-2 text-sm space-y-1 text-right">
         {% if week.show_week_realized %}
-        <div class="{{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}">Realized: {{ week.week_realized|money }}</div>
+        <div class="{{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}">
+          Realized: {{ week.week_realized|money }}
+          {% if show_percentages_default and week.week_percent is not none %}
+          <span class="block text-[11px] text-neutral-300">{{ '{:+.2f}%'.format(week.week_percent) }}</span>
+          {% endif %}
+        </div>
         {% endif %}
         <div class="{{ 'text-profit' if week.week_unrealized > 0 else ('text-loss' if week.week_unrealized < 0 else 'text-neutral-200') }}"
              x-show="showUnrealized" x-cloak>
@@ -233,7 +244,12 @@
   <div class="grid gap-4 sm:grid-cols-2">
     <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative">
       <h2 class="font-semibold">Monthly summary</h2>
-      <div>Realized: <span class="{{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span></div>
+      <div>
+        Realized: <span class="{{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span>
+        {% if show_percentages_default and month_percent is not none %}
+        <span class="block text-[12px] text-neutral-300">{{ '{:+.2f}%'.format(month_percent) }}</span>
+        {% endif %}
+      </div>
       <div x-show="showUnrealized" x-cloak>
         Unrealized (invested): <span class="{{ 'text-profit' if month_unrealized > 0 else ('text-loss' if month_unrealized < 0 else 'text-neutral-200') }}">{{ month_unrealized|money }}</span>
       </div>
