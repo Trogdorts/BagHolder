@@ -106,25 +106,26 @@
               this.hasChanges = false;
             },
             isColorDefault(field) {
-              if (!this.formEl || !this.defaultColors[field]) {
+              const defaultValue = this.defaultColors[field];
+              if (!this.formEl || typeof defaultValue !== 'string') {
                 return false;
               }
               const input = this.formEl.querySelector(`[name='${field}']`);
               if (!input) {
                 return false;
               }
-              return input.value.toLowerCase() === this.defaultColors[field];
+              return input.value.toLowerCase() === defaultValue.toLowerCase();
             },
             resetColor(field) {
               const defaultValue = this.defaultColors[field];
-              if (!defaultValue || !this.formEl) {
+              if (typeof defaultValue !== 'string' || !this.formEl) {
                 return;
               }
               const input = this.formEl.querySelector(`[name='${field}']`);
               if (!input) {
                 return;
               }
-              input.value = defaultValue;
+              input.value = defaultValue.toLowerCase();
               input.dispatchEvent(new Event('input', { bubbles: true }));
               input.dispatchEvent(new Event('change', { bubbles: true }));
               this.evaluateChanges();
