@@ -98,7 +98,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     show_unrealized_default = coerce_bool(ui_cfg.get("show_unrealized", True), True)
     show_text_default = coerce_bool(ui_cfg.get("show_text", True), True)
     show_percentages_default = coerce_bool(ui_cfg.get("show_percentages", True), True)
-    show_weekends_default = coerce_bool(ui_cfg.get("show_weekends", False), False)
+    show_weekends_default = coerce_bool(ui_cfg.get("show_weekends", True), True)
     show_exclude_controls_default = coerce_bool(
         ui_cfg.get("show_exclude_controls", True), True
     )
