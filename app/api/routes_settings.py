@@ -50,6 +50,23 @@ def _sanitize_hex_color(value: str, default: str, existing: str | None = None) -
     return fallback.lower()
 
 
+def _coerce_port(value: str | int, fallback: int) -> int:
+    """Return a validated TCP port number.
+
+    Values outside the valid range (1-65535) or non-integer inputs fall back to
+    ``fallback`` so existing configuration values remain intact when invalid
+    data is submitted.
+    """
+
+    try:
+        port = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    if 1 <= port <= 65535:
+        return port
+    return fallback
+
+
 _COLOR_GROUPS = [
     {
         "title": "Interface accents",
@@ -273,6 +290,7 @@ def save_settings(
     show_percentages: str = Form("true"),
     show_weekends: str = Form("false"),
     default_view: str = Form("latest"),
+    listening_port: str = Form(str(DEFAULT_CONFIG["server"]["port"])),
     debug_logging: str = Form("false"),
     icon_color: str = Form("#6b7280"),
     primary_color: str = Form("#2563eb"),
@@ -288,10 +306,13 @@ def save_settings(
     export_empty_values: str = Form("zero"),
 ):
     cfg: AppConfig = request.app.state.config
+    server_section = cfg.raw.setdefault("server", {})
     ui_section = cfg.raw.setdefault("ui", {})
     notes_section = cfg.raw.setdefault("notes", {})
     diagnostics_section = cfg.raw.setdefault("diagnostics", {})
     view_section = cfg.raw.setdefault("view", {})
+    current_port = server_section.get("port", DEFAULT_CONFIG["server"]["port"])
+    server_section["port"] = _coerce_port(listening_port, current_port)
     ui_section["theme"] = theme
     ui_section["show_text"] = coerce_bool(show_text, True)
     ui_section["show_unrealized"] = coerce_bool(show_unrealized, True)
@@ -336,9 +357,10 @@ def save_settings(
     request.app.state.log_path = str(log_path)
     request.app.state.debug_logging_enabled = debug_logging_enabled
     log.info(
-        "Settings updated (theme=%s, debug_logging=%s)",
+        "Settings updated (theme=%s, debug_logging=%s, port=%s)",
         theme,
         debug_logging_enabled,
+        server_section["port"],
     )
     return RedirectResponse(url="/settings", status_code=303)
 
