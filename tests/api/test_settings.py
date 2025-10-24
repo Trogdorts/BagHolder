@@ -22,6 +22,7 @@ from app.api.routes_settings import (
     export_full_backup,
     import_full_backup,
     export_debug_logs,
+    save_settings,
 )  # noqa: E402
 from app.services.data_backup import create_backup_archive  # noqa: E402
 
@@ -158,6 +159,90 @@ def test_export_debug_logs_downloads_file(tmp_path, monkeypatch):
     assert response.status_code == 200
     assert response.headers["content-disposition"].startswith("attachment; filename=bagholder-debug-")
     assert b"diagnostic entry" in response.body
+
+
+def test_save_settings_updates_listening_port(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+    request = _build_request(app)
+
+    response = save_settings(
+        request,
+        theme="dark",
+        show_text="true",
+        show_unrealized="true",
+        show_trade_count="true",
+        show_percentages="true",
+        show_weekends="false",
+        default_view="latest",
+        listening_port="8123",
+        debug_logging="false",
+        icon_color="#6b7280",
+        primary_color="#2563eb",
+        primary_hover_color="#1d4ed8",
+        success_color="#22c55e",
+        warning_color="#f59e0b",
+        danger_color="#dc2626",
+        danger_hover_color="#b91c1c",
+        trade_badge_color="#34d399",
+        trade_badge_text_color="#111827",
+        note_icon_color="#80cbc4",
+        unrealized_fill_strategy="carry_forward",
+        export_empty_values="zero",
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/settings"
+    assert app.state.config.raw["server"]["port"] == 8123
+
+    cfg_path = Path(app.state.config.path)
+    with cfg_path.open("r", encoding="utf-8") as handle:
+        persisted = yaml.safe_load(handle) or {}
+
+    assert persisted["server"]["port"] == 8123
+
+
+def test_save_settings_invalid_port_preserves_existing_value(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+    request = _build_request(app)
+
+    original_port = app.state.config.raw["server"]["port"]
+    response = save_settings(
+        request,
+        theme="dark",
+        show_text="true",
+        show_unrealized="true",
+        show_trade_count="true",
+        show_percentages="true",
+        show_weekends="false",
+        default_view="latest",
+        listening_port="70000",
+        debug_logging="false",
+        icon_color="#6b7280",
+        primary_color="#2563eb",
+        primary_hover_color="#1d4ed8",
+        success_color="#22c55e",
+        warning_color="#f59e0b",
+        danger_color="#dc2626",
+        danger_hover_color="#b91c1c",
+        trade_badge_color="#34d399",
+        trade_badge_text_color="#111827",
+        note_icon_color="#80cbc4",
+        unrealized_fill_strategy="carry_forward",
+        export_empty_values="zero",
+    )
+
+    assert response.status_code == 303
+    assert app.state.config.raw["server"]["port"] == original_port
+
+    cfg_path = Path(app.state.config.path)
+    with cfg_path.open("r", encoding="utf-8") as handle:
+        persisted = yaml.safe_load(handle) or {}
+
+    assert persisted["server"]["port"] == original_port
 
 
 def test_import_full_backup_replaces_data_and_reloads_state(tmp_path, monkeypatch):

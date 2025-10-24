@@ -8,6 +8,7 @@
 {% set default_view = cfg.view.get('default', 'latest') %}
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
+{% set server_port = cfg.get('server', {}).get('port', 8012) %}
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
   <header class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
     <div class="flex flex-col gap-2">
@@ -161,6 +162,25 @@
               <option value="zero" {% if export_fill_empty %}selected{% endif %}>Fill with 0</option>
               <option value="empty" {% if not export_fill_empty %}selected{% endif %}>Leave empty</option>
             </select>
+          </div>
+        </div>
+      </section>
+
+      <section id="server-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <header class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-semibold text-neutral-50">Server access</h2>
+          <p class="text-sm text-neutral-400">Adjust how the app listens for connections.</p>
+        </header>
+        <div class="grid gap-5">
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="listening_port" class="block text-sm font-medium text-neutral-200">Listening port</label>
+              <p class="mt-1 text-xs text-neutral-500">Choose the network port BagHolder binds to. A restart may be required for changes to take effect.</p>
+            </div>
+            <div class="flex flex-col gap-2">
+              <input type="number" id="listening_port" name="listening_port" min="1" max="65535" value="{{ server_port }}" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <p class="text-[11px] uppercase tracking-wide text-neutral-600">Range: 1–65535</p>
+            </div>
           </div>
         </div>
       </section>
