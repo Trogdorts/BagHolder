@@ -36,8 +36,35 @@
     opacity: 0.4;
   }
 
-  .day-toggle-label {
-    cursor: pointer;
+  .day-include-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid #3f3f46;
+    background-color: #171717;
+    color: #a3a3a3;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+  }
+
+  .day-include-toggle.toggle-excluded {
+    background-color: #7f1d1d;
+    border-color: #b91c1c;
+    color: #fee2e2;
+  }
+
+  .day-include-toggle:focus-visible {
+    outline: 2px solid #71717a;
+    outline-offset: 2px;
+  }
+
+  .day-include-toggle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>
 <div class="flex items-center justify-between">
@@ -124,7 +151,6 @@
       {% set cls = (d.realized > 0) and 'cell-bg-pos' or (d.realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
       {% set day_identifier = d.date.strftime('%Y-%m-%d') %}
       {% set week_key = week.week_year ~ '-' ~ week.week_number %}
-      {% set toggle_id = 'day-toggle-' ~ day_identifier %}
       <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }} flex flex-col gap-2"
            data-day-cell="{{ day_identifier }}"
            data-day-realized="{{ '%.10g'|format(d.realized) }}"
@@ -186,13 +212,14 @@
             <path d="M19.14,12.94a7.43,7.43,0,0,0,.05-.94,7.43,7.43,0,0,0-.05-.94l2.11-1.65a.5.5,0,0,0,.12-.64l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.3,7.3,0,0,0-1.63-.94l-.38-2.65A.5.5,0,0,0,12.64,1H9.36a.5.5,0,0,0-.49.41L8.49,4.06a7.3,7.3,0,0,0-1.63.94l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.5.5,0,0,0,.12.64L3.94,11.06a7.43,7.43,0,0,0-.05.94,7.43,7.43,0,0,0,.05.94L1.83,14.59a.5.5,0,0,0-.12.64l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.3,7.3,0,0,0,1.63.94l.38,2.65a.5.5,0,0,0,.49.41h3.28a.5.5,0,0,0,.49-.41l.38-2.65a7.3,7.3,0,0,0,1.63-.94l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.5.5,0,0,0-.12-.64Zm-7.14,2.56A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z" fill="currentColor" />
           </svg>
         </a>
-        <div class="absolute bottom-1 left-1 flex items-center gap-1 text-[10px] text-neutral-400">
-          <input type="checkbox"
-                 id="{{ toggle_id }}"
-                 class="day-include-toggle h-3 w-3 rounded border-neutral-600 bg-neutral-900 text-neutral-100 focus:ring-neutral-500"
-                 data-day-toggle="{{ day_identifier }}"
-                 {% if d.in_month %}checked{% else %}checked disabled{% endif %}>
-          <label for="{{ toggle_id }}" class="day-toggle-label">Include</label>
+        <div class="absolute bottom-1 left-1 flex items-center">
+          <button type="button"
+                  class="day-include-toggle"
+                  data-day-toggle="{{ day_identifier }}"
+                  {% if not d.in_month %}disabled{% endif %}
+                  aria-pressed="true">
+            Include
+          </button>
         </div>
         {% if notes_enabled %}
         <!-- Note icon -->
@@ -547,6 +574,16 @@ const dayImpactSimulator = (() => {
   const dayMap = new Map();
   const weekStructure = new Map();
 
+  const setDayToggleState = (toggle, included) => {
+    if (!toggle) {
+      return;
+    }
+    toggle.classList.toggle('toggle-excluded', !included);
+    toggle.setAttribute('aria-pressed', included ? 'true' : 'false');
+    toggle.dataset.state = included ? 'included' : 'excluded';
+    toggle.textContent = included ? 'Include' : 'Excluded';
+  };
+
   cells.forEach((cell) => {
     const dateStr = cell.dataset.dayCell;
     if (!dateStr) {
@@ -577,13 +614,15 @@ const dayImpactSimulator = (() => {
     const toggle = cell.querySelector('[data-day-toggle]');
     if (toggle) {
       const isDisabled = toggle.disabled;
-      day.included = isDisabled ? true : !!toggle.checked;
+      day.included = true;
+      setDayToggleState(toggle, day.included);
       if (!isDisabled) {
         if (!day.included && day.inMonth) {
           cell.classList.add('day-excluded');
         }
-        toggle.addEventListener('change', () => {
-          day.included = !!toggle.checked;
+        toggle.addEventListener('click', () => {
+          day.included = !day.included;
+          setDayToggleState(toggle, day.included);
           const shouldExclude = !day.included && day.inMonth;
           cell.classList.toggle('day-excluded', shouldExclude);
           updateSummaries();
