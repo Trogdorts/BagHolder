@@ -18,6 +18,26 @@ def _is_close(a: float, b: float, tol: float = 0.01) -> bool:
     return abs(float(a) - float(b)) <= tol
 
 
+def _is_missing_summary(summary: DailySummary) -> bool:
+    """Return ``True`` when a summary appears to be an empty placeholder."""
+
+    if summary is None:
+        return True
+
+    updated = (summary.updated_at or "").strip()
+    if updated:
+        return False
+
+    realized = float(summary.realized or 0.0)
+    unrealized = float(summary.unrealized or 0.0)
+    invested = float(summary.total_invested or 0.0)
+    return (
+        _is_close(realized, 0.0)
+        and _is_close(unrealized, 0.0)
+        and _is_close(invested, 0.0)
+    )
+
+
 @router.get("/import", response_class=RedirectResponse)
 def import_page(request: Request):
     return RedirectResponse("/settings#stock-data-import", status_code=307)
@@ -87,7 +107,7 @@ def _finalize_trade_import(request: Request, db: Session, inserted: int):
         realized = values["realized"]
         unrealized = values["unrealized"]
         ds = db.get(DailySummary, day)
-        if ds is None:
+        if _is_missing_summary(ds):
             resolved[day] = values
             continue
 

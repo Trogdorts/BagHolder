@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
+from starlette.requests import Request
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -16,7 +17,10 @@ from app.api.routes_calendar import (  # noqa: E402
     get_trades_for_day,
     save_trades_for_day,
 )
-from app.api.routes_import import _persist_trade_rows  # noqa: E402
+from app.api.routes_import import (  # noqa: E402
+    _finalize_trade_import,
+    _persist_trade_rows,
+)
 from app.core import database as db  # noqa: E402
 from app.core.models import DailySummary, Trade  # noqa: E402
 from app.services.import_trades_csv import parse_trade_csv  # noqa: E402
@@ -25,7 +29,7 @@ from app.services.import_trades_csv import parse_trade_csv  # noqa: E402
 def _init_app(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
-    create_app()
+    return create_app()
 
 
 def test_get_trades_for_day_returns_sorted_list(tmp_path, monkeypatch):
@@ -228,5 +232,57 @@ def test_import_trades_overwrites_existing_rows(tmp_path, monkeypatch):
             )
             assert other_day.symbol == "MSFT"
             assert other_day.price == pytest.approx(100.0)
+    finally:
+        db.dispose_engine()
+
+
+def test_import_trades_auto_resolves_missing_summaries(tmp_path, monkeypatch):
+    app = _init_app(tmp_path, monkeypatch)
+    try:
+        with db.SessionLocal() as session:
+            session.add(
+                DailySummary(
+                    date="2024-01-02",
+                    realized=0.0,
+                    unrealized=0.0,
+                    total_invested=0.0,
+                    updated_at="",
+                )
+            )
+            session.commit()
+
+        rows = [
+            {
+                "date": "2024-01-02",
+                "symbol": "AAPL",
+                "action": "BUY",
+                "qty": 1.0,
+                "price": 100.0,
+                "amount": -100.0,
+            },
+            {
+                "date": "2024-01-02",
+                "symbol": "AAPL",
+                "action": "SELL",
+                "qty": 1.0,
+                "price": 130.0,
+                "amount": 130.0,
+            },
+        ]
+
+        with db.SessionLocal() as session:
+            inserted = _persist_trade_rows(session, rows)
+            request = Request({"type": "http", "method": "POST", "headers": [], "app": app})
+            response = _finalize_trade_import(request, session, inserted)
+
+            assert response.status_code == 303
+            assert response.headers.get("location") == "/"
+
+            summary = session.get(DailySummary, "2024-01-02")
+            assert summary is not None
+            assert summary.updated_at.strip() != ""
+            assert summary.realized == pytest.approx(30.0)
+            assert summary.unrealized == pytest.approx(0.0)
+            assert summary.total_invested == pytest.approx(230.0)
     finally:
         db.dispose_engine()
