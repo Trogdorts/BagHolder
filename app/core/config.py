@@ -14,6 +14,7 @@ DEFAULT_CONFIG = {
         "show_text": True,
         "show_unrealized": True,
         "show_trade_count": True,
+        "show_percentages": True,
         "show_weekends": False,
         "highlight_weekends": True,
         "auto_dark_mode": True,

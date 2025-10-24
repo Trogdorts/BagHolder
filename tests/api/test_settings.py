@@ -83,6 +83,7 @@ def test_import_settings_config_updates_state_and_persists(tmp_path, monkeypatch
     new_config = json.loads(export_response.body.decode("utf-8"))
     new_config["ui"]["theme"] = "light"
     new_config["ui"]["show_trade_count"] = False
+    new_config["ui"]["show_percentages"] = False
 
     upload = DummyUploadFile("config.json", json.dumps(new_config).encode("utf-8"))
     request = _build_request(app)
@@ -94,6 +95,8 @@ def test_import_settings_config_updates_state_and_persists(tmp_path, monkeypatch
     assert app.state.templates.env.globals["cfg"]["ui"]["theme"] == "light"
     assert app.state.config.raw["ui"]["show_trade_count"] is False
     assert app.state.templates.env.globals["cfg"]["ui"]["show_trade_count"] is False
+    assert app.state.config.raw["ui"]["show_percentages"] is False
+    assert app.state.templates.env.globals["cfg"]["ui"]["show_percentages"] is False
 
     cfg_path = Path(app.state.config.path)
     with cfg_path.open("r", encoding="utf-8") as handle:
@@ -101,6 +104,7 @@ def test_import_settings_config_updates_state_and_persists(tmp_path, monkeypatch
 
     assert contents["ui"]["theme"] == "light"
     assert contents["ui"]["show_trade_count"] is False
+    assert contents["ui"]["show_percentages"] is False
 
 
 def test_import_settings_config_with_invalid_json_sets_error(tmp_path, monkeypatch):
