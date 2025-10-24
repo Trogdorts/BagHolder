@@ -190,17 +190,14 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     weeks = []
     month_days = cal.monthdatescalendar(year, month)
     def calculate_percentage(realized_value: float, invested_samples: List[float]) -> Optional[float]:
-        valid_samples = [
+        total_invested = sum(
             abs(sample)
             for sample in invested_samples
             if sample is not None and not math.isclose(sample, 0.0, abs_tol=0.005)
-        ]
-        if not valid_samples:
+        )
+        if math.isclose(total_invested, 0.0, abs_tol=0.005):
             return None
-        denominator = max(valid_samples)
-        if math.isclose(denominator, 0.0, abs_tol=0.005):
-            return None
-        return round((realized_value / denominator) * 100.0, 2)
+        return round((realized_value / total_invested) * 100.0, 2)
 
     for week in month_days:
         iso_year, iso_week, _ = week[0].isocalendar()
@@ -248,7 +245,9 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 not math.isclose(realized_value, 0.0, abs_tol=0.005) or has_sell_trade
             )
             invested_value = float(ds.total_invested) if ds else 0.0
-            percent_value = calculate_percentage(realized_value, [invested_value]) if ds else None
+            percent_value = (
+                calculate_percentage(realized_value, [invested_value]) if ds else None
+            )
 
             wk.append({
                 "date": d,

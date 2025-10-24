@@ -110,6 +110,7 @@ def calculate_daily_trade_map(trades: Sequence[Trade]) -> Dict[str, Dict[str, fl
         result[day_key] = {
             "realized": _coerce_number(row.get("realized_pl", 0.0)),
             "unrealized": _coerce_number(row.get("unrealized_pl", 0.0)),
+            "total_invested": _coerce_number(row.get("trade_value", 0.0)),
         }
     return result
 
@@ -135,6 +136,7 @@ def upsert_daily_summaries(
     for day, values in daily_map.items():
         realized = _coerce_number(values.get("realized", 0.0))
         unrealized = _coerce_number(values.get("unrealized", 0.0))
+        total_invested = _coerce_number(values.get("total_invested", 0.0))
         row = by_date.get(day)
         if row is None:
             db.add(
@@ -142,7 +144,7 @@ def upsert_daily_summaries(
                     date=day,
                     realized=realized,
                     unrealized=unrealized,
-                    total_invested=unrealized,
+                    total_invested=total_invested,
                     updated_at=timestamp,
                 )
             )
@@ -150,7 +152,7 @@ def upsert_daily_summaries(
 
         row.realized = realized
         row.unrealized = unrealized
-        row.total_invested = unrealized
+        row.total_invested = total_invested
         row.updated_at = timestamp
 
 

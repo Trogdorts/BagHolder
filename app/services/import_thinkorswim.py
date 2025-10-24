@@ -855,6 +855,7 @@ def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
             "date",
             "realized_pl",
             "unrealized_pl",
+            "trade_value",
             "total_pl",
             "cumulative_pl",
         ]
@@ -887,6 +888,7 @@ def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
 
     for date_value, day_trades in df.groupby("date", sort=True):
         realized_total = 0.0
+        trade_value_total = 0.0
 
         for trade in day_trades.itertuples(index=False):
             side = trade.side
@@ -903,6 +905,7 @@ def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
                 symbol, {"shares": 0.0, "avg_cost": 0.0, "last_price": None}
             )
             realized_total += _apply_trade_to_position(position, side, qty, price)
+            trade_value_total += qty * price
 
         invested_total = _current_invested_total(positions)
         total_value = realized_total + invested_total
@@ -912,6 +915,7 @@ def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
                 "date": date_value,
                 "realized_pl": round(realized_total, 2),
                 "unrealized_pl": round(invested_total, 2),
+                "trade_value": round(trade_value_total, 2),
                 "total_pl": round(total_value, 2),
             }
         )
