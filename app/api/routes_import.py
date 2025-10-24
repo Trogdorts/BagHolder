@@ -1,17 +1,20 @@
 from datetime import datetime
-from typing import Dict
+from pathlib import Path
+from typing import Dict, Iterable, Set, Tuple
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_session
+from app.core.logger import get_logger
 from app.core.models import DailySummary, Trade
 from app.services.import_thinkorswim import parse_thinkorswim_csv
 from app.services.import_trades_csv import parse_trade_csv
 from app.services.trade_summaries import calculate_daily_trade_map, upsert_daily_summaries
 
 router = APIRouter()
+log = get_logger(__name__)
 
 
 def _is_close(a: float, b: float, tol: float = 0.01) -> bool:
@@ -36,6 +39,73 @@ def _is_missing_summary(summary: DailySummary) -> bool:
         and _is_close(unrealized, 0.0)
         and _is_close(invested, 0.0)
     )
+
+
+def _import_config(request: Request) -> Tuple[int, Set[str]]:
+    cfg = getattr(request.app.state, "config", None)
+    default_max_bytes = 5_000_000
+    default_formats = {".csv"}
+
+    if not cfg:
+        return default_max_bytes, default_formats
+
+    try:
+        raw_cfg = cfg.raw  # type: ignore[attr-defined]
+    except AttributeError:  # pragma: no cover - defensive fallback
+        return default_max_bytes, default_formats
+
+    import_cfg = raw_cfg.get("import", {}) if isinstance(raw_cfg, dict) else {}
+    max_bytes = import_cfg.get("max_upload_bytes", default_max_bytes)
+    try:
+        max_bytes = int(max_bytes)
+    except (TypeError, ValueError):
+        max_bytes = default_max_bytes
+
+    accepted = import_cfg.get("accepted_formats", default_formats)
+    if isinstance(accepted, (list, tuple, set)):
+        extensions = {str(ext).lower() for ext in accepted if isinstance(ext, str)}
+        accepted_formats: Set[str] = extensions or default_formats
+    else:
+        accepted_formats = default_formats
+
+    return max(1, max_bytes), accepted_formats
+
+
+async def _read_upload(
+    upload: UploadFile,
+    allowed_formats: Iterable[str],
+    max_bytes: int,
+) -> bytes:
+    filename = upload.filename or ""
+    suffix = Path(filename).suffix.lower()
+    allowed_set = {ext.lower() for ext in allowed_formats}
+    if allowed_set and suffix not in allowed_set:
+        log.warning(
+            "Rejected import due to unsupported extension (filename=%s, allowed=%s)",
+            filename,
+            sorted(allowed_formats),
+        )
+        raise HTTPException(status_code=400, detail="Unsupported file format")
+
+    try:
+        await upload.seek(0)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        log.error("Failed to seek upload %s: %s", filename, exc)
+        raise HTTPException(status_code=400, detail="Invalid upload state") from exc
+
+    # ``UploadFile`` streams content to a SpooledTemporaryFile so reading more than
+    # ``max_bytes + 1`` ensures we can detect oversized uploads without loading an
+    # unbounded payload into memory.
+    content = await upload.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        log.warning(
+            "Rejected import due to oversized payload (filename=%s, size=%s, limit=%s)",
+            filename,
+            len(content),
+            max_bytes,
+        )
+        raise HTTPException(status_code=413, detail="Uploaded file is too large")
+    return content
 
 
 @router.get("/import", response_class=RedirectResponse)
@@ -93,6 +163,7 @@ def _persist_trade_rows(db: Session, rows):
         inserted += 1
 
     db.commit()
+    log.info("Persisted %s trades to database", inserted)
     return inserted
 
 
@@ -134,6 +205,9 @@ def _finalize_trade_import(request: Request, db: Session, inserted: int):
     db.commit()
 
     if conflicts:
+        log.warning(
+            "Import conflicts detected for %s day(s): %s", len(conflicts), [c["date"] for c in conflicts]
+        )
         return request.app.state.templates.TemplateResponse(
             request,
             "import_conflicts.html",
@@ -144,6 +218,11 @@ def _finalize_trade_import(request: Request, db: Session, inserted: int):
             },
         )
 
+    log.info(
+        "Trade import finalized (inserted=%s, summaries_updated=%s)",
+        inserted,
+        len(resolved),
+    )
     return RedirectResponse(url="/", status_code=303)
 
 
@@ -153,16 +232,37 @@ async def import_trades(
     file: UploadFile = File(...),
     db: Session = Depends(get_session),
 ):
-    content = await file.read()
+    max_bytes, allowed_formats = _import_config(request)
+    try:
+        content = await _read_upload(file, allowed_formats, max_bytes)
+    except HTTPException as exc:
+        await file.close()
+        query = "file_too_large" if exc.status_code == 413 else "invalid_format"
+        return RedirectResponse(
+            f"/settings?trade_csv_error={query}#stock-data-import",
+            status_code=303,
+        )
+
     rows = parse_trade_csv(content)
+    await file.close()
 
     if not rows:
+        log.warning(
+            "Trade CSV upload produced no rows (filename=%s)",
+            file.filename,
+        )
         return RedirectResponse(
             "/settings?trade_csv_error=no_trades#stock-data-import",
             status_code=303,
         )
 
     inserted = _persist_trade_rows(db, rows)
+    log.info(
+        "Imported generic trade CSV (filename=%s, rows=%s, inserted=%s)",
+        file.filename,
+        len(rows),
+        inserted,
+    )
     return _finalize_trade_import(request, db, inserted)
 
 
@@ -172,16 +272,37 @@ async def import_thinkorswim(
     file: UploadFile = File(...),
     db: Session = Depends(get_session),
 ):
-    content = await file.read()
+    max_bytes, allowed_formats = _import_config(request)
+    try:
+        content = await _read_upload(file, allowed_formats, max_bytes)
+    except HTTPException as exc:
+        await file.close()
+        query = "file_too_large" if exc.status_code == 413 else "invalid_format"
+        return RedirectResponse(
+            f"/settings?thinkorswim_error={query}#stock-data-import",
+            status_code=303,
+        )
+
     rows = parse_thinkorswim_csv(content)
+    await file.close()
 
     if not rows:
+        log.warning(
+            "thinkorswim CSV upload produced no rows (filename=%s)",
+            file.filename,
+        )
         return RedirectResponse(
             "/settings?thinkorswim_error=no_trades#stock-data-import",
             status_code=303,
         )
 
     inserted = _persist_trade_rows(db, rows)
+    log.info(
+        "Imported thinkorswim trade CSV (filename=%s, rows=%s, inserted=%s)",
+        file.filename,
+        len(rows),
+        inserted,
+    )
     return _finalize_trade_import(request, db, inserted)
 
 
@@ -193,6 +314,7 @@ async def resolve_conflicts(
     form = await request.form()
     dates = form.getlist("date")
     now = datetime.utcnow().isoformat()
+    updated_days = 0
 
     for day in dates:
         choice = form.get(f"choice_{day}")
@@ -217,6 +339,8 @@ async def resolve_conflicts(
                     updated_at=now,
                 )
             )
+        updated_days += 1
 
     db.commit()
+    log.info("Resolved trade import conflicts for %s day(s)", updated_days)
     return RedirectResponse(url="/", status_code=303)

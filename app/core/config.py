@@ -46,6 +46,7 @@ DEFAULT_CONFIG = {
         "auto_recalculate": True,
         "backup_before_import": True,
         "accepted_formats": [".csv"],
+        "max_upload_bytes": 5_000_000,
     },
     "view": {"default": "latest", "remember_last_view": True, "month_start_day": "monday"},
     "backup": {"enable_auto_backup": True, "retention_days": 7},
