@@ -34,6 +34,7 @@ class UIPreferencesUpdate(BaseModel):
     show_percentages: Optional[bool] = None
     show_weekends: Optional[bool] = None
     show_exclude_controls: Optional[bool] = None
+    show_trade_count: Optional[bool] = None
 
 
 class TradeUpdate(BaseModel):
@@ -100,7 +101,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     cfg = request.app.state.config.raw
     ui_cfg = cfg.get("ui", {})
     fill_strategy = ui_cfg.get("unrealized_fill_strategy", "carry_forward")
-    show_trade_badges = coerce_bool(ui_cfg.get("show_trade_count", True), True)
+    show_trade_badges = coerce_bool(ui_cfg.get("show_trade_count", False), False)
     show_unrealized_default = coerce_bool(ui_cfg.get("show_unrealized", True), True)
     show_text_default = coerce_bool(ui_cfg.get("show_text", True), True)
     show_percentages_default = coerce_bool(ui_cfg.get("show_percentages", True), True)
@@ -398,8 +399,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "show_weekends_flag": show_weekends_default,
         "show_exclude_controls_flag": show_exclude_controls_default,
         "notes_enabled_flag": notes_enabled,
-        "export_default_start": start,
-        "export_default_end": end,
         "current_year": today.year,
         "current_month": today.month,
     }
@@ -421,6 +420,7 @@ def update_ui_preferences(payload: UIPreferencesUpdate, request: Request):
         ("show_percentages", "show_percentages"),
         ("show_weekends", "show_weekends"),
         ("show_exclude_controls", "show_exclude_controls"),
+        ("show_trade_count", "show_trade_count"),
     ):
         value = getattr(payload, field)
         if value is not None:
