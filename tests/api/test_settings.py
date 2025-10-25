@@ -16,19 +16,22 @@ if str(ROOT_DIR) not in sys.path:
 
 from app.main import create_app  # noqa: E402
 from app.api.routes_settings import (
+    create_new_account,
     shutdown_application,
     export_settings_config,
     import_settings_config,
     export_full_backup,
     import_full_backup,
     export_debug_logs,
+    rename_existing_account,
     save_settings,
+    switch_active_account,
 )  # noqa: E402
 from app.services.data_backup import create_backup_archive  # noqa: E402
 
 
 def _build_request(app, method: str = "POST"):
-    return Request({"type": "http", "app": app, "method": method, "headers": []})
+    return Request({"type": "http", "app": app, "method": method, "path": "/", "headers": []})
 
 
 class DummyUploadFile:
@@ -120,6 +123,74 @@ def test_import_settings_config_with_invalid_json_sets_error(tmp_path, monkeypat
     assert response.status_code == 303
     assert response.headers["location"].startswith("/settings?config_error=")
     assert app.state.config.raw["ui"]["theme"] == "dark"
+
+
+def test_create_new_account_switches_active_and_creates_directory(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    request = _build_request(app)
+    response = create_new_account(request, account_name="Swing", redirect_to="/settings")
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/settings?account_status=created"
+    assert app.state.active_account.name == "Swing"
+    account_path = Path(app.state.account_data_dir)
+    assert account_path.exists()
+    assert account_path.parent.name == "accounts"
+
+
+def test_rename_existing_account_updates_name(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+    request = _build_request(app)
+    create_new_account(request, account_name="Growth", redirect_to="/settings")
+    account_id = app.state.active_account.id
+
+    response = rename_existing_account(
+        request,
+        account_id=account_id,
+        account_name="Growth Fund",
+        redirect_to="/settings",
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/settings?account_status=renamed"
+    assert app.state.active_account.name == "Growth Fund"
+
+    error_response = rename_existing_account(
+        request,
+        account_id=account_id,
+        account_name="   ",
+        redirect_to="/settings",
+    )
+
+    assert error_response.status_code == 303
+    assert error_response.headers["location"] == "/settings?account_error=empty_name"
+
+
+def test_switch_active_account_uses_redirect_target(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+    request = _build_request(app)
+    create_new_account(request, account_name="Short", redirect_to="/settings")
+    secondary_id = app.state.active_account.id
+
+    response = switch_active_account(request, account_id="primary", redirect_to="/calendar")
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/calendar"
+    assert app.state.active_account.id == "primary"
+
+    # Switching back to the secondary account should return to settings and flag the success message.
+    response_back = switch_active_account(request, account_id=secondary_id, redirect_to="/settings")
+
+    assert response_back.status_code == 303
+    assert response_back.headers["location"] == "/settings?account_status=switched"
+    assert app.state.active_account.id == secondary_id
 
 
 def test_export_full_backup_includes_database_and_config(tmp_path, monkeypatch):

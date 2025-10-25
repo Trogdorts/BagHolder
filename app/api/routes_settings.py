@@ -3,6 +3,7 @@ import logging
 import os
 import re
 import signal
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 from urllib.parse import quote_plus
@@ -21,6 +22,13 @@ from app.core.config import AppConfig, DEFAULT_CONFIG
 from app.core.lifecycle import reload_application_state
 from app.core.logger import configure_logging
 from app.core.utils import coerce_bool
+from app.services.accounts import (
+    create_account,
+    prepare_accounts,
+    rename_account,
+    serialize_accounts,
+    set_active_account,
+)
 from app.services.data_backup import create_backup_archive, restore_backup_archive
 from app.services.data_reset import clear_all_data
 
@@ -34,6 +42,23 @@ def _resolve_data_directory(cfg: AppConfig) -> str:
     if cfg.path:
         return os.path.dirname(cfg.path)
     return os.environ.get("BAGHOLDER_DATA", "/app/data")
+
+
+def _resolve_account_directory(request: Request, cfg: AppConfig) -> str:
+    existing = getattr(request.app.state, "account_data_dir", None)
+    if isinstance(existing, str) and existing:
+        return existing
+    base_dir = _resolve_data_directory(cfg)
+    _, active = prepare_accounts(cfg, base_dir)
+    return active.path
+
+
+def _normalize_redirect_target(value: str | None) -> str:
+    if isinstance(value, str):
+        candidate = value.strip()
+        if candidate.startswith("/"):
+            return candidate
+    return "/settings"
 
 
 _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -191,10 +216,37 @@ _LOG_EXPORT_ERRORS = {
 }
 
 
+_ACCOUNT_STATUS_MESSAGES = {
+    "created": "Account created successfully.",
+    "renamed": "Account name updated.",
+    "switched": "Active account changed.",
+}
+
+_ACCOUNT_ERROR_MESSAGES = {
+    "missing": "The selected account could not be found.",
+    "empty_name": "Account name cannot be empty.",
+    "unknown": "Unable to update account due to an unexpected error.",
+}
+
+
 def _resolve_message(code: str | None, mapping: dict[str, str]) -> str | None:
     if not code:
         return None
     return mapping.get(code, code)
+
+
+def _account_success_redirect(status: str, redirect_to: str | None) -> RedirectResponse:
+    target = _normalize_redirect_target(redirect_to)
+    if target == "/settings":
+        return RedirectResponse(url=f"/settings?account_status={quote_plus(status, safe='')}", status_code=303)
+    return RedirectResponse(url=target, status_code=303)
+
+
+def _account_error_redirect(code: str, redirect_to: str | None) -> RedirectResponse:
+    target = _normalize_redirect_target(redirect_to)
+    if target == "/settings":
+        return RedirectResponse(url=f"/settings?account_error={quote_plus(code, safe='')}", status_code=303)
+    return RedirectResponse(url=target, status_code=303)
 
 
 def _build_color_context(cfg: AppConfig) -> tuple[list[dict[str, Any]], dict[str, str]]:
@@ -251,11 +303,22 @@ def settings_page(request: Request):
         params.get("thinkorswim_error"), _THINKORSWIM_IMPORT_ERRORS
     )
     log_error_message = _resolve_message(params.get("log_error"), _LOG_EXPORT_ERRORS)
+    account_status_message = _resolve_message(params.get("account_status"), _ACCOUNT_STATUS_MESSAGES)
+    account_error_message = _resolve_message(params.get("account_error"), _ACCOUNT_ERROR_MESSAGES)
     color_groups, color_defaults = _build_color_context(cfg)
     diagnostics_cfg = cfg.raw.get("diagnostics", {}) if isinstance(cfg.raw, dict) else {}
     debug_logging_enabled = coerce_bool(diagnostics_cfg.get("debug_logging"), False)
     log_path = getattr(request.app.state, "log_path", None)
     log_export_available = bool(log_path and os.path.exists(log_path))
+
+    accounts_records = getattr(request.app.state, "accounts", None)
+    active_record = getattr(request.app.state, "active_account", None)
+    if not accounts_records or active_record is None:
+        base_dir = _resolve_data_directory(cfg)
+        accounts_records, active_record = prepare_accounts(cfg, base_dir)
+
+    serialized_accounts = serialize_accounts(accounts_records, active_record)
+    active_account_payload = asdict(active_record)
 
     context = {
         "request": request,
@@ -273,6 +336,10 @@ def settings_page(request: Request):
         "debug_logging_enabled": debug_logging_enabled,
         "log_export_available": log_export_available,
         "log_error_message": log_error_message,
+        "accounts": serialized_accounts,
+        "active_account": active_account_payload,
+        "account_status_message": account_status_message,
+        "account_error_message": account_error_message,
     }
     return request.app.state.templates.TemplateResponse(
         request,
@@ -365,6 +432,72 @@ def save_settings(
     return RedirectResponse(url="/settings", status_code=303)
 
 
+@router.post("/settings/accounts/create", response_class=HTMLResponse)
+def create_new_account(
+    request: Request,
+    account_name: str = Form(""),
+    redirect_to: str = Form("/settings"),
+):
+    cfg: AppConfig = request.app.state.config
+    base_dir = _resolve_data_directory(cfg)
+    try:
+        record = create_account(cfg, base_dir, account_name)
+    except Exception:  # pragma: no cover - defensive
+        log.exception("Failed to create trading account")
+        return _account_error_redirect("unknown", redirect_to)
+
+    reload_application_state(request.app, data_dir=base_dir)
+    log.info("Created account %s (%s)", record.id, record.name)
+    return _account_success_redirect("created", redirect_to)
+
+
+@router.post("/settings/accounts/rename", response_class=HTMLResponse)
+def rename_existing_account(
+    request: Request,
+    account_id: str = Form(...),
+    account_name: str = Form(...),
+    redirect_to: str = Form("/settings"),
+):
+    cfg: AppConfig = request.app.state.config
+    base_dir = _resolve_data_directory(cfg)
+    try:
+        rename_account(cfg, base_dir, account_id, account_name)
+    except ValueError as exc:
+        detail = (str(exc) or "").lower()
+        if "empty" in detail:
+            code = "empty_name"
+        else:
+            code = "missing"
+        log.warning("Failed to rename account %s: %s", account_id, exc)
+        return _account_error_redirect(code, redirect_to)
+    except Exception:  # pragma: no cover - defensive
+        log.exception("Unexpected error renaming account %s", account_id)
+        return _account_error_redirect("unknown", redirect_to)
+
+    reload_application_state(request.app, data_dir=base_dir)
+    log.info("Renamed account %s", account_id)
+    return _account_success_redirect("renamed", redirect_to)
+
+
+@router.post("/settings/accounts/switch", response_class=HTMLResponse)
+def switch_active_account(
+    request: Request,
+    account_id: str = Form(...),
+    redirect_to: str = Form("/settings"),
+):
+    cfg: AppConfig = request.app.state.config
+    base_dir = _resolve_data_directory(cfg)
+    try:
+        set_active_account(cfg, base_dir, account_id)
+    except ValueError:
+        log.warning("Attempted to switch to unknown account %s", account_id)
+        return _account_error_redirect("missing", redirect_to)
+
+    reload_application_state(request.app, data_dir=base_dir)
+    log.info("Active account set to %s", account_id)
+    return _account_success_redirect("switched", redirect_to)
+
+
 @router.get("/settings/config/export")
 def export_settings_config(request: Request):
     cfg: AppConfig = request.app.state.config
@@ -436,9 +569,8 @@ async def import_settings_config(request: Request, config_file: UploadFile = Fil
             f"Unable to import configuration: {detail}."
         )
 
-    templates = getattr(request.app.state, "templates", None)
-    if templates is not None:
-        templates.env.globals["cfg"] = cfg.raw
+    base_dir = _resolve_data_directory(cfg)
+    reload_application_state(request.app, data_dir=base_dir)
 
     log.info("Configuration imported successfully from %s", config_file.filename)
     return RedirectResponse(url="/settings?config_imported=1", status_code=303)
@@ -447,8 +579,8 @@ async def import_settings_config(request: Request, config_file: UploadFile = Fil
 @router.post("/settings/clear-data", response_class=HTMLResponse)
 def clear_settings_data(request: Request):
     cfg: AppConfig = request.app.state.config
-    data_dir = _resolve_data_directory(cfg)
-    clear_all_data(data_dir)
+    account_dir = _resolve_account_directory(request, cfg)
+    clear_all_data(account_dir)
     log.warning("All application data cleared via settings page")
     return RedirectResponse(url="/settings?cleared=1", status_code=303)
 
