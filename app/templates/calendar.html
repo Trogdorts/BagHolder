@@ -344,7 +344,7 @@
             {% endif %}
           {% endif %}
           <div class="{{ realized_class }} space-y-1">
-            <span data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">Realized: {{ d.realized|money }}</span>
+            <span class="{{ realized_class }}" data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">Realized: {{ d.realized|money }}</span>
             <span data-day-percent class="text-[11px] text-neutral-200{% if d.percent is none %} hidden{% endif %} mt-0.5">Realized: <span data-day-percent-value class="{{ day_percent_class }}">{{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span></span>
           </div>
           {% endif %}
