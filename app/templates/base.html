@@ -387,31 +387,35 @@
         </a>
         <a href="/" class="font-semibold">BagHolder</a>
       </div>
-      {% block nav_title_extra %}{% endblock %}
+      <div class="pointer-events-none absolute inset-0 flex items-center justify-center px-16">
+        {% block nav_title_extra %}{% endblock %}
+      </div>
       {% if current_user %}
-        <form method="post" action="/settings/accounts/switch" class="ml-auto flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
-          <input type="hidden" name="redirect_to" value="{{ request.url.path }}">
-          <label for="nav-account" class="uppercase tracking-wide">Portfolio</label>
-          <select id="nav-account" name="account_id" class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" onchange="this.form.submit()" {% if (accounts | default([]) | length) <= 1 %}disabled{% endif %}>
-            {% for account in accounts | default([]) %}
-              <option value="{{ account.id }}" {% if account.is_active %}selected{% endif %}>{{ account.name }}</option>
-            {% endfor %}
-          </select>
-        </form>
-        <div class="flex items-center gap-4 text-sm">
-          <div class="hidden text-xs text-neutral-400 sm:inline">
-            Signed in as <span class="text-neutral-200">{{ current_user.username }}</span>
-            {% if current_user.is_admin %}<span class="ml-1 rounded bg-neutral-800 px-2 py-0.5 text-[10px] uppercase tracking-widest text-neutral-300">Admin</span>{% endif %}
-          </div>
-          <a href="/settings" class="hover:underline">Settings</a>
-          {% if current_user.is_admin %}
-            <button type="button" id="dev-reload" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition">
-              Reload app
-            </button>
-          {% endif %}
-          <form method="post" action="/logout">
-            <button type="submit" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition">Sign out</button>
+        <div class="ml-auto flex flex-col items-start gap-3 text-sm sm:flex-row sm:items-center sm:gap-6">
+          <form method="post" action="/settings/accounts/switch" class="flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
+            <input type="hidden" name="redirect_to" value="{{ request.url.path }}">
+            <label for="nav-account" class="uppercase tracking-wide">Portfolio</label>
+            <select id="nav-account" name="account_id" class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" onchange="this.form.submit()" {% if (accounts | default([]) | length) <= 1 %}disabled{% endif %}>
+              {% for account in accounts | default([]) %}
+                <option value="{{ account.id }}" {% if account.is_active %}selected{% endif %}>{{ account.name }}</option>
+              {% endfor %}
+            </select>
           </form>
+          <div class="flex items-center gap-4 text-sm">
+            <div class="hidden text-xs text-neutral-400 sm:inline">
+              Signed in as <span class="text-neutral-200">{{ current_user.username }}</span>
+              {% if current_user.is_admin %}<span class="ml-1 rounded bg-neutral-800 px-2 py-0.5 text-[10px] uppercase tracking-widest text-neutral-300">Admin</span>{% endif %}
+            </div>
+            <a href="/settings" class="hover:underline">Settings</a>
+            {% if current_user.is_admin %}
+              <button type="button" id="dev-reload" class="rounded border border-neutral-700 px-3 py-1 transition hover:bg-neutral-800">
+                Reload app
+              </button>
+            {% endif %}
+            <form method="post" action="/logout">
+              <button type="submit" class="rounded border border-neutral-700 px-3 py-1 transition hover:bg-neutral-800">Sign out</button>
+            </form>
+          </div>
         </div>
       {% else %}
         <div class="ml-auto text-sm">
