@@ -4,8 +4,13 @@ import os
 import re
 import shutil
 from dataclasses import dataclass
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
+from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.core.models import User
 from app.core.seed import ensure_seed
 from app.services.data_reset import clear_all_data
 
@@ -50,6 +55,68 @@ def _generate_unique_id(base: str, existing: Iterable[str]) -> str:
         candidate = f"{slug}-{index}"
         index += 1
     return candidate
+
+
+def _capture_users_from_database(db_path: str) -> list[dict[str, Any]]:
+    """Return serialized user records from ``db_path`` if available."""
+
+    if not os.path.exists(db_path):
+        return []
+
+    engine = create_engine(
+        f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
+    )
+    try:
+        with Session(engine) as session:
+            users = session.query(User).order_by(User.id.asc()).all()
+            return [
+                {
+                    "username": user.username,
+                    "password_hash": user.password_hash,
+                    "password_salt": user.password_salt,
+                    "is_admin": bool(user.is_admin),
+                    "created_at": user.created_at,
+                }
+                for user in users
+            ]
+    except SQLAlchemyError:
+        return []
+    finally:
+        engine.dispose()
+
+
+def _restore_users_to_database(db_path: str, payload: Sequence[dict[str, Any]]) -> None:
+    """Populate ``db_path`` with provided user records if empty."""
+
+    if not payload or not os.path.exists(db_path):
+        return
+
+    engine = create_engine(
+        f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
+    )
+    try:
+        with Session(engine) as session:
+            existing = {
+                username
+                for (username,) in session.query(User.username).all()
+            }
+            for item in payload:
+                username = item.get("username")
+                if not username or username in existing:
+                    continue
+                user = User(
+                    username=username,
+                    password_hash=item.get("password_hash", ""),
+                    password_salt=item.get("password_salt", ""),
+                    is_admin=bool(item.get("is_admin")),
+                    created_at=item.get("created_at"),
+                )
+                session.add(user)
+            session.commit()
+    except SQLAlchemyError:
+        return
+    finally:
+        engine.dispose()
 
 
 def _ensure_account_sections(cfg) -> tuple[dict, dict]:
@@ -163,7 +230,10 @@ def prepare_accounts(cfg, base_dir: str) -> tuple[list[AccountRecord], AccountRe
 def create_account(cfg, base_dir: str, requested_name: str | None = None) -> AccountRecord:
     """Create a new trading account and make it active."""
 
-    prepare_accounts(cfg, base_dir)
+    records, active_record = prepare_accounts(cfg, base_dir)
+    source_db_path = None
+    if active_record is not None:
+        source_db_path = os.path.join(active_record.path, "profitloss.db")
     accounts_section, entries = _ensure_account_sections(cfg)
     existing_ids = entries.keys()
 
@@ -183,7 +253,14 @@ def create_account(cfg, base_dir: str, requested_name: str | None = None) -> Acc
 
     account_path = os.path.abspath(os.path.join(base_dir, storage))
     os.makedirs(account_path, exist_ok=True)
-    ensure_seed(os.path.join(account_path, "profitloss.db"))
+    target_db_path = os.path.join(account_path, "profitloss.db")
+    ensure_seed(target_db_path)
+    if (
+        source_db_path
+        and os.path.abspath(source_db_path) != os.path.abspath(target_db_path)
+    ):
+        payload = _capture_users_from_database(source_db_path)
+        _restore_users_to_database(target_db_path, payload)
 
     return AccountRecord(id=account_id, name=sanitized_name, storage=storage, path=account_path)
 
