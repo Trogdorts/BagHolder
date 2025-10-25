@@ -22,6 +22,182 @@
      class="space-y-4{% if not show_exclude_controls %} hide-exclude-controls{% endif %}{% if not show_percentages_default %} hide-percentages{% endif %}"
      :class="{ 'hide-exclude-controls': !showExcludeControls, 'hide-percentages': !showPercentages }">
 <style>
+  .toolbar-card {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1.5rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(63, 63, 70, 0.65);
+    background: linear-gradient(135deg, rgba(39, 39, 42, 0.9), rgba(24, 24, 27, 0.92));
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  }
+
+  .toolbar-top {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .toolbar-top {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+    }
+  }
+
+  .toolbar-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .toolbar-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #f4f4f5;
+    letter-spacing: -0.01em;
+  }
+
+  .toolbar-subtitle {
+    margin: 0;
+    font-size: 0.875rem;
+    color: #a1a1aa;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .toolbar-top-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: flex-start;
+  }
+
+  @media (min-width: 768px) {
+    .toolbar-top-actions {
+      justify-content: flex-end;
+    }
+  }
+
+  .toolbar-nav {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 9999px;
+    border: 1px solid rgba(63, 63, 70, 0.8);
+    overflow: hidden;
+    background: rgba(24, 24, 27, 0.75);
+  }
+
+  .toolbar-nav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #e4e4e7;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .toolbar-nav-link + .toolbar-nav-link {
+    border-left: 1px solid rgba(63, 63, 70, 0.8);
+  }
+
+  .toolbar-nav-link:hover,
+  .toolbar-nav-link:focus-visible {
+    background-color: rgba(63, 63, 70, 0.7);
+    color: #fafafa;
+  }
+
+  .toolbar-support-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(217, 119, 6, 0.45);
+    background: rgba(146, 64, 14, 0.25);
+    color: #fbbf24;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    transition: background-color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  }
+
+  .toolbar-support-link:hover,
+  .toolbar-support-link:focus-visible {
+    background: rgba(217, 119, 6, 0.35);
+    border-color: rgba(217, 119, 6, 0.75);
+    transform: translateY(-1px);
+    color: #fde68a;
+  }
+
+  .toolbar-support-icon {
+    width: 1.1rem;
+    height: 1.1rem;
+  }
+
+  .toolbar-support-label {
+    white-space: nowrap;
+  }
+
+  @media (max-width: 480px) {
+    .toolbar-support-label {
+      display: none;
+    }
+  }
+
+  .toolbar-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .toolbar-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 0.95rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(63, 63, 70, 0.75);
+    background: rgba(17, 17, 17, 0.85);
+    color: #d4d4d8;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  }
+
+  .toolbar-toggle:hover,
+  .toolbar-toggle:focus-visible {
+    background: rgba(63, 63, 70, 0.6);
+    border-color: rgba(82, 82, 91, 0.85);
+    color: #fafafa;
+  }
+
+  .toolbar-toggle.is-active {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(129, 140, 248, 0.7);
+    color: #e0e7ff;
+    box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.3);
+  }
+
+  .toolbar-toggle:focus-visible {
+    outline: 2px solid rgba(129, 140, 248, 0.5);
+    outline-offset: 2px;
+  }
+
+  .toolbar-card .toolbar-toggle span {
+    pointer-events: none;
+  }
+
   .day-excluded {
     opacity: 0.4;
   }
@@ -67,19 +243,38 @@
     display: none !important;
   }
 </style>
-<div class="flex items-center justify-between">
-  <div class="text-lg font-semibold">{{ year }}-{{ "%02d"|format(month) }}</div>
-  <div class="flex items-center gap-2 flex-wrap justify-end">
-    {% set prev_year = (month == 1) and year-1 or year %}
-    {% set prev_month = (month == 1) and 12 or month-1 %}
-    {% set next_year = (month == 12) and year+1 or year %}
-    {% set next_month = (month == 12) and 1 or month+1 %}
-    <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Prev</a>
-    <a href="/calendar/{{ current_year }}/{{ current_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Home</a>
-    <a href="/calendar/{{ next_year }}/{{ next_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Next</a>
+<div class="toolbar-card">
+  <div class="toolbar-top">
+    <div class="toolbar-title-group">
+      <div class="toolbar-title">{{ year }}-{{ "%02d"|format(month) }}</div>
+      <p class="toolbar-subtitle">Monthly performance overview</p>
+    </div>
+    <div class="toolbar-top-actions">
+      {% set prev_year = (month == 1) and year-1 or year %}
+      {% set prev_month = (month == 1) and 12 or month-1 %}
+      {% set next_year = (month == 12) and year+1 or year %}
+      {% set next_month = (month == 12) and 1 or month+1 %}
+      <nav class="toolbar-nav" aria-label="Calendar navigation">
+        <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="toolbar-nav-link">Prev</a>
+        <a href="/calendar/{{ current_year }}/{{ current_month }}" class="toolbar-nav-link">Today</a>
+        <a href="/calendar/{{ next_year }}/{{ next_month }}" class="toolbar-nav-link">Next</a>
+      </nav>
+      <a href="https://buymeacoffee.com/crissejdav6"
+         class="toolbar-support-link"
+         target="_blank"
+         rel="noopener noreferrer"
+         aria-label="Buy me a coffee">
+        <svg class="toolbar-support-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M19 4h-2.18L16.6 2.8A1 1 0 0 0 15.64 2H8.36a1 1 0 0 0-.96.8L7.18 4H5a1 1 0 0 0 0 2h1.13l1.54 9.64A3.5 3.5 0 0 0 11.13 18h1.74a3.5 3.5 0 0 0 3.46-2.36L17.87 6H19a2 2 0 1 1 0 4h-1a1 1 0 0 0 0 2h1a4 4 0 0 0 0-8ZM9.13 4h5.74l.25 1.5H8.88Zm5.29 10.93a1.5 1.5 0 0 1-1.45 1.07h-1.74a1.5 1.5 0 0 1-1.45-1.07L8.45 8h7.1Z" />
+        </svg>
+        <span class="toolbar-support-label">Buy me a coffee</span>
+      </a>
+    </div>
+  </div>
+  <div class="toolbar-controls">
     <button type="button"
-            class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
-            :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showUnrealized }"
+            class="toolbar-toggle"
+            :class="{ 'is-active': !showUnrealized }"
             @click="toggleUnrealized"
             aria-pressed="{{ 'true' if show_unrealized_default else 'false' }}"
             :aria-pressed="showUnrealized.toString()">
@@ -88,8 +283,8 @@
       </span>
     </button>
     <button type="button"
-            class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
-            :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showExcludeControls }"
+            class="toolbar-toggle"
+            :class="{ 'is-active': !showExcludeControls }"
             @click="toggleExcludeControls"
             aria-pressed="{{ 'true' if show_exclude_controls else 'false' }}"
             :aria-pressed="showExcludeControls.toString()">
@@ -98,8 +293,8 @@
       </span>
     </button>
     <button type="button"
-            class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
-            :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showPercentages }"
+            class="toolbar-toggle"
+            :class="{ 'is-active': !showPercentages }"
             @click="togglePercentages"
             aria-pressed="{{ 'true' if show_percentages_default else 'false' }}"
             :aria-pressed="showPercentages.toString()">
@@ -108,8 +303,8 @@
       </span>
     </button>
     <button type="button"
-            class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
-            :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': showWeekends }"
+            class="toolbar-toggle"
+            :class="{ 'is-active': showWeekends }"
             @click="toggleWeekends"
             aria-pressed="{{ 'true' if show_weekends else 'false' }}"
             :aria-pressed="showWeekends.toString()">
@@ -118,8 +313,8 @@
       </span>
     </button>
     <button type="button"
-            class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
-            :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': showTradeCounts }"
+            class="toolbar-toggle"
+            :class="{ 'is-active': showTradeCounts }"
             @click="toggleTradeCounts"
             aria-pressed="{{ 'true' if show_trade_count_badges else 'false' }}"
             :aria-pressed="showTradeCounts.toString()">
