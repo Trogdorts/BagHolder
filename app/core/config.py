@@ -17,7 +17,7 @@ DEFAULT_CONFIG = {
             }
         },
     },
-    "server": {"host": "0.0.0.0", "port": 8012, "data_folder": "/app/data"},
+    "server": {"host": "0.0.0.0", "port": 8012, "data_folder": "data"},
     "ui": {
         "theme": "dark",
         "show_text": True,

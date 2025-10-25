@@ -29,11 +29,28 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8012
 
   Omitting `--password` launches an interactive prompt with confirmation.
 
-## Data
+## Data and diagnostics
 
-A volume is mounted at `/app/data` (or `./app/data` in local dev) containing:
+By default the application stores its configuration, logs, and database under
+`app/data` inside the repository. Override the location by setting the
+`BAGHOLDER_DATA` environment variable before starting the server.
+
 - `profitloss.db` (SQLite)
 - `config.yaml`
+- `logs/bagholder.log`
+
+Set `BAGHOLDER_DEBUG_LOGGING=true` to force verbose debug logging regardless of
+the value stored in `config.yaml`.
+
+To wipe the data directory for a fresh test environment run:
+
+```bash
+python -m app.scripts.reset_data --force
+```
+
+Add `--data-dir <path>` to target a custom location. The script recreates the
+directory and writes a pristine `config.yaml` so the next server start behaves
+like a first-time launch.
 
 ## Import
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from pathlib import Path
 from dataclasses import asdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
@@ -23,6 +24,19 @@ _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 log = logging.getLogger(__name__)
+
+
+def get_default_data_dir() -> str:
+    """Return the location used when no data directory is configured.
+
+    The path resolves to ``<package_root>/data`` so that local development runs
+    do not require elevated permissions to create the default storage
+    directory. Keeping the data directory inside the repository also makes it
+    easy for contributors to inspect log output during tests.
+    """
+
+    package_root = Path(__file__).resolve().parents[1]
+    return str(package_root / "data")
 
 
 def _parse_hex_color(color: str) -> tuple[int, int, int] | None:
@@ -109,13 +123,16 @@ def reload_application_state(app: FastAPI, data_dir: str | None = None) -> AppCo
     changes on disk are immediately reflected without restarting the server.
     """
 
-    data_dir = data_dir or os.environ.get("BAGHOLDER_DATA", "/app/data")
+    data_dir = data_dir or os.environ.get("BAGHOLDER_DATA") or get_default_data_dir()
     os.makedirs(data_dir, exist_ok=True)
 
     cfg = AppConfig.load(data_dir)
     accounts, active_account = prepare_accounts(cfg, data_dir)
     diagnostics_cfg = cfg.raw.get("diagnostics", {}) if isinstance(cfg.raw, dict) else {}
     debug_logging = coerce_bool(diagnostics_cfg.get("debug_logging"), False)
+    debug_logging_env = os.environ.get("BAGHOLDER_DEBUG_LOGGING")
+    if debug_logging_env is not None:
+        debug_logging = coerce_bool(debug_logging_env, debug_logging)
     log_path = configure_logging(
         data_dir,
         debug_enabled=debug_logging,
