@@ -35,8 +35,8 @@
   .toolbar-top {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    align-items: center;
+    gap: 1rem;
+    align-items: stretch;
   }
 
   .toolbar-heading {
@@ -46,6 +46,7 @@
     font-weight: 600;
     letter-spacing: -0.015em;
     color: #f4f4f5;
+    text-align: center;
   }
 
   @media (min-width: 640px) {
@@ -55,26 +56,25 @@
     }
   }
 
+  .toolbar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: center;
+    width: 100%;
+  }
+
   .toolbar-nav {
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
 
-  .toolbar-heading {
-    text-align: center;
-  }
-
   @media (min-width: 768px) {
-    .toolbar-top {
+    .toolbar-actions {
       flex-direction: row;
-      flex-wrap: nowrap;
       align-items: center;
-    }
-
-    .toolbar-heading {
-      flex: 1 1 auto;
-      margin: 0 1rem;
+      justify-content: space-between;
     }
   }
 
@@ -212,65 +212,68 @@
       {% set prev_month = (month == 1) and 12 or month-1 %}
       {% set next_year = (month == 12) and year+1 or year %}
       {% set next_month = (month == 12) and 1 or month+1 %}
-      <nav class="toolbar-nav" aria-label="Calendar navigation">
-        <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="toolbar-nav-link">Prev</a>
-        <a href="/calendar/{{ current_year }}/{{ current_month }}" class="toolbar-nav-link">Today</a>
-        <a href="/calendar/{{ next_year }}/{{ next_month }}" class="toolbar-nav-link">Next</a>
-      </nav>
       <div class="toolbar-heading">
         {{ year }}-{{ "%02d"|format(month) }}
       </div>
-      <div class="toolbar-controls">
-      <button type="button"
-              class="toolbar-toggle"
-              :class="{ 'is-active': !showUnrealized }"
-              @click="toggleUnrealized"
-              aria-pressed="{{ 'true' if show_unrealized_default else 'false' }}"
-              :aria-pressed="showUnrealized.toString()">
-        <span x-text="showUnrealized ? 'Hide unrealized' : 'Show unrealized'">
-          {% if show_unrealized_default %}Hide unrealized{% else %}Show unrealized{% endif %}
-        </span>
-      </button>
-      <button type="button"
-              class="toolbar-toggle"
-              :class="{ 'is-active': !showExcludeControls }"
-              @click="toggleExcludeControls"
-              aria-pressed="{{ 'true' if show_exclude_controls else 'false' }}"
-              :aria-pressed="showExcludeControls.toString()">
-        <span x-text="showExcludeControls ? 'Hide exclude' : 'Show exclude'">
-          {% if show_exclude_controls %}Hide exclude{% else %}Show exclude{% endif %}
-        </span>
-      </button>
-      <button type="button"
-              class="toolbar-toggle"
-              :class="{ 'is-active': !showPercentages }"
-              @click="togglePercentages"
-              aria-pressed="{{ 'true' if show_percentages_default else 'false' }}"
-              :aria-pressed="showPercentages.toString()">
-        <span x-text="showPercentages ? 'Hide percent' : 'Show percent'">
-          {% if show_percentages_default %}Hide percent{% else %}Show percent{% endif %}
-        </span>
-      </button>
-      <button type="button"
-              class="toolbar-toggle"
-              :class="{ 'is-active': showWeekends }"
-              @click="toggleWeekends"
-              aria-pressed="{{ 'true' if show_weekends else 'false' }}"
-              :aria-pressed="showWeekends.toString()">
-        <span x-text="showWeekends ? 'Hide weekends' : 'Show weekends'">
-          {% if show_weekends %}Hide weekends{% else %}Show weekends{% endif %}
-        </span>
-      </button>
-      <button type="button"
-              class="toolbar-toggle"
-              :class="{ 'is-active': showTradeCounts }"
-              @click="toggleTradeCounts"
-              aria-pressed="{{ 'true' if show_trade_count_badges else 'false' }}"
-              :aria-pressed="showTradeCounts.toString()">
-        <span x-text="showTradeCounts ? 'Hide trade count' : 'Show trade count'">
-          {% if show_trade_count_badges %}Hide trade count{% else %}Show trade count{% endif %}
-        </span>
-      </button>
+      <div class="toolbar-actions">
+        <nav class="toolbar-nav" aria-label="Calendar navigation">
+          <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="toolbar-nav-link">Prev</a>
+          <a href="/calendar/{{ current_year }}/{{ current_month }}" class="toolbar-nav-link">Today</a>
+          <a href="/calendar/{{ next_year }}/{{ next_month }}" class="toolbar-nav-link">Next</a>
+        </nav>
+        <div class="toolbar-controls">
+          <button type="button"
+                  class="toolbar-toggle"
+                  :class="{ 'is-active': !showUnrealized }"
+                  @click="toggleUnrealized"
+                  aria-pressed="{{ 'true' if show_unrealized_default else 'false' }}"
+                  :aria-pressed="showUnrealized.toString()">
+            <span x-text="showUnrealized ? 'Hide unrealized' : 'Show unrealized'">
+              {% if show_unrealized_default %}Hide unrealized{% else %}Show unrealized{% endif %}
+            </span>
+          </button>
+          <button type="button"
+                  class="toolbar-toggle"
+                  :class="{ 'is-active': !showExcludeControls }"
+                  @click="toggleExcludeControls"
+                  aria-pressed="{{ 'true' if show_exclude_controls else 'false' }}"
+                  :aria-pressed="showExcludeControls.toString()">
+            <span x-text="showExcludeControls ? 'Hide exclude' : 'Show exclude'">
+              {% if show_exclude_controls %}Hide exclude{% else %}Show exclude{% endif %}
+            </span>
+          </button>
+          <button type="button"
+                  class="toolbar-toggle"
+                  :class="{ 'is-active': !showPercentages }"
+                  @click="togglePercentages"
+                  aria-pressed="{{ 'true' if show_percentages_default else 'false' }}"
+                  :aria-pressed="showPercentages.toString()">
+            <span x-text="showPercentages ? 'Hide percent' : 'Show percent'">
+              {% if show_percentages_default %}Hide percent{% else %}Show percent{% endif %}
+            </span>
+          </button>
+          <button type="button"
+                  class="toolbar-toggle"
+                  :class="{ 'is-active': showWeekends }"
+                  @click="toggleWeekends"
+                  aria-pressed="{{ 'true' if show_weekends else 'false' }}"
+                  :aria-pressed="showWeekends.toString()">
+            <span x-text="showWeekends ? 'Hide weekends' : 'Show weekends'">
+              {% if show_weekends %}Hide weekends{% else %}Show weekends{% endif %}
+            </span>
+          </button>
+          <button type="button"
+                  class="toolbar-toggle"
+                  :class="{ 'is-active': showTradeCounts }"
+                  @click="toggleTradeCounts"
+                  aria-pressed="{{ 'true' if show_trade_count_badges else 'false' }}"
+                  :aria-pressed="showTradeCounts.toString()">
+            <span x-text="showTradeCounts ? 'Hide trade count' : 'Show trade count'">
+              {% if show_trade_count_badges %}Hide trade count{% else %}Show trade count{% endif %}
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
