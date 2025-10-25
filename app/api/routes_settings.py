@@ -9,7 +9,7 @@ from typing import Any
 from urllib.parse import quote_plus
 from zipfile import BadZipFile
 
-from fastapi import APIRouter, Request, Form, UploadFile, File
+from fastapi import APIRouter, Request, Form, UploadFile, File, Depends
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -17,15 +17,13 @@ from fastapi.responses import (
     Response,
 )
 from starlette.background import BackgroundTask
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 from app.core.config import AppConfig, DEFAULT_CONFIG
-from app.core.auth import hash_password, verify_password
-from app.core import database
 from app.core.lifecycle import reload_application_state
 from app.core.logger import configure_logging
 from app.core.utils import coerce_bool
-from app.core.models import User
+from app.core.database import get_session
 from app.services.accounts import (
     create_account,
     prepare_accounts,
@@ -35,6 +33,7 @@ from app.services.accounts import (
 )
 from app.services.data_backup import create_backup_archive, restore_backup_archive
 from app.services.data_reset import clear_all_data
+from app.services.identity import IdentityService
 
 router = APIRouter()
 
@@ -478,57 +477,40 @@ def update_account_password(
     new_password: str = Form(""),
     confirm_password: str = Form(""),
     redirect_to: str = Form("/settings"),
+    db: Session = Depends(get_session),
 ):
-    """Update the authenticated user's password."""
+    """Update the authenticated user's password using the identity service."""
 
-    if not all([current_password, new_password, confirm_password]):
-        return _password_error_redirect("missing_fields", redirect_to)
-
-    if len(new_password) < 8:
-        return _password_error_redirect("too_short", redirect_to)
-
-    if new_password != confirm_password:
-        return _password_error_redirect("mismatch", redirect_to)
-
-    if database.SessionLocal is None:
-        log.error("Password update attempted before database initialization")
-        return _password_error_redirect("unknown", redirect_to)
-
+    redirect_target = _normalize_redirect_target(redirect_to)
     user = getattr(request.state, "user", None)
     if user is None:
         return RedirectResponse(url="/login", status_code=303)
 
-    salt: str | None = None
-    password_hash: str | None = None
+    identity = IdentityService(db)
+    result = identity.change_password(
+        user_id=user.id,
+        current_password=current_password,
+        new_password=new_password,
+        confirm_password=confirm_password,
+    )
+
+    if not result.success or result.user is None:
+        code = result.error_code or "unknown"
+        log.warning(
+            "Password update failed for user %s (code=%s)",
+            getattr(user, "username", user.id),
+            code,
+        )
+        return _password_error_redirect(code, redirect_target)
 
     try:
-        with database.SessionLocal() as session:
-            db_user = session.get(User, user.id)
-            if db_user is None:
-                log.warning("Authenticated user %s not found during password update", user.id)
-                return _password_error_redirect("missing_user", redirect_to)
-
-            if not verify_password(current_password, db_user.password_salt, db_user.password_hash):
-                return _password_error_redirect("invalid_current", redirect_to)
-
-            salt, password_hash = hash_password(new_password)
-            db_user.password_salt = salt
-            db_user.password_hash = password_hash
-            session.add(db_user)
-            session.commit()
-    except SQLAlchemyError:
-        log.exception("Failed to update password for user %s", getattr(user, "username", user.id))
-        return _password_error_redirect("unknown", redirect_to)
-
-    if salt and password_hash:
-        try:
-            request.state.user.password_salt = salt
-            request.state.user.password_hash = password_hash
-        except AttributeError:
-            pass
+        request.state.user.password_salt = result.user.password_salt
+        request.state.user.password_hash = result.user.password_hash
+    except AttributeError:
+        pass
 
     log.info("Password updated for user %s", getattr(user, "username", user.id))
-    return _password_success_redirect("updated", redirect_to)
+    return _password_success_redirect("updated", redirect_target)
 
 
 @router.post("/settings/accounts/create", response_class=HTMLResponse)
