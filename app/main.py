@@ -14,10 +14,12 @@ from starlette.types import ASGIApp
 if __package__ in {None, ""}:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
+from app.core.bootstrap import maybe_bootstrap_admin_from_env
 from app.core.lifecycle import reload_application_state
 from app.core import database
 from app.core.session import SignedCookieSessionMiddleware
 from app.services.identity import IdentityService
+from app.version import __version__
 
 
 class LoginRequiredMiddleware(BaseHTTPMiddleware):
@@ -104,7 +106,14 @@ def create_app():
     app.add_middleware(LoginRequiredMiddleware)
     app.add_middleware(SignedCookieSessionMiddleware, secret_key=secret_key)
 
-    reload_application_state(app)
+    cfg = reload_application_state(app)
+    if cfg.path:
+        data_dir = os.path.dirname(cfg.path)
+    else:
+        data_dir = None
+    maybe_bootstrap_admin_from_env(data_dir=data_dir)
+    app.state.version = __version__
+    app.version = __version__
 
     from app.api.routes_import import router as import_router
     from app.api.routes_calendar import router as calendar_router

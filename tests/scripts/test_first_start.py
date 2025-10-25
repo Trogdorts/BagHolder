@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
+from app.core.bootstrap import BootstrapError, bootstrap_admin
 from app.core.config import AppConfig
 from app.core.database import dispose_engine, init_db
 from app.core.models import User
-from app.scripts.first_start import bootstrap_admin
 from app.services.accounts import prepare_accounts
 
 
@@ -40,5 +40,5 @@ def test_bootstrap_admin_requires_empty_database(tmp_path):
 
     bootstrap_admin("first", "password123", data_dir=str(data_dir))
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(BootstrapError):
         bootstrap_admin("second", "password123", data_dir=str(data_dir))
