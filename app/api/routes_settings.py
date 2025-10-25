@@ -25,7 +25,10 @@ from app.core.logger import configure_logging
 from app.core.utils import coerce_bool
 from app.core.database import get_session
 from app.services.accounts import (
+    AccountOperationError,
+    clear_account,
     create_account,
+    delete_account,
     prepare_accounts,
     rename_account,
     serialize_accounts,
@@ -223,11 +226,15 @@ _ACCOUNT_STATUS_MESSAGES = {
     "created": "Account created successfully.",
     "renamed": "Account name updated.",
     "switched": "Active account changed.",
+    "cleared": "Account data cleared successfully.",
+    "deleted": "Account deleted successfully.",
 }
 
 _ACCOUNT_ERROR_MESSAGES = {
     "missing": "The selected account could not be found.",
     "empty_name": "Account name cannot be empty.",
+    "protected": "The primary account cannot be deleted.",
+    "last_account": "At least one account must remain configured.",
     "unknown": "Unable to update account due to an unexpected error.",
 }
 
@@ -558,6 +565,50 @@ def rename_existing_account(
     reload_application_state(request.app, data_dir=base_dir)
     log.info("Renamed account %s", account_id)
     return _account_success_redirect("renamed", redirect_to)
+
+
+@router.post("/settings/accounts/clear", response_class=HTMLResponse)
+def clear_existing_account(
+    request: Request,
+    account_id: str = Form(...),
+    redirect_to: str = Form("/settings"),
+):
+    cfg: AppConfig = request.app.state.config
+    base_dir = _resolve_data_directory(cfg)
+    try:
+        record = clear_account(cfg, base_dir, account_id)
+    except AccountOperationError as exc:
+        log.warning("Failed to clear account %s: %s", account_id, exc)
+        return _account_error_redirect(exc.code, redirect_to)
+    except Exception:  # pragma: no cover - defensive
+        log.exception("Unexpected error clearing account %s", account_id)
+        return _account_error_redirect("unknown", redirect_to)
+
+    reload_application_state(request.app, data_dir=base_dir)
+    log.info("Cleared data for account %s (%s)", record.id, record.name)
+    return _account_success_redirect("cleared", redirect_to)
+
+
+@router.post("/settings/accounts/delete", response_class=HTMLResponse)
+def delete_existing_account(
+    request: Request,
+    account_id: str = Form(...),
+    redirect_to: str = Form("/settings"),
+):
+    cfg: AppConfig = request.app.state.config
+    base_dir = _resolve_data_directory(cfg)
+    try:
+        record = delete_account(cfg, base_dir, account_id)
+    except AccountOperationError as exc:
+        log.warning("Failed to delete account %s: %s", account_id, exc)
+        return _account_error_redirect(exc.code, redirect_to)
+    except Exception:  # pragma: no cover - defensive
+        log.exception("Unexpected error deleting account %s", account_id)
+        return _account_error_redirect("unknown", redirect_to)
+
+    reload_application_state(request.app, data_dir=base_dir)
+    log.info("Deleted account %s (%s)", record.id, record.name)
+    return _account_success_redirect("deleted", redirect_to)
 
 
 @router.post("/settings/accounts/switch", response_class=HTMLResponse)
