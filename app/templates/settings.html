@@ -23,7 +23,7 @@
   </header>
 
   <nav aria-label="Settings sections" class="-mx-1 mt-2 flex flex-wrap gap-2 overflow-x-auto pb-1 text-sm text-neutral-400 sm:mt-0">
-    <a href="#account-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Accounts</a>
+    <a href="#account-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Portfolios</a>
     <a href="#display-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Appearance</a>
     <a href="#calculation-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Data handling</a>
     <a href="#server-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Server</a>
@@ -51,6 +51,14 @@
     {% elif password_error_message %}
       <div class="alert alert-error px-4 py-3 text-sm">{{ password_error_message }}</div>
     {% endif %}
+    {% if user_status_message %}
+      <div class="alert alert-success px-4 py-3 text-sm">{{ user_status_message }}</div>
+    {% elif user_error_message %}
+      <div class="alert alert-error px-4 py-3 text-sm">{{ user_error_message }}</div>
+    {% endif %}
+    {% if self_error_message %}
+      <div class="alert alert-error px-4 py-3 text-sm">{{ self_error_message }}</div>
+    {% endif %}
     {% if backup_restored %}
       <div class="alert alert-success px-4 py-3 text-sm">Backup imported successfully.</div>
     {% elif backup_error_message %}
@@ -60,7 +68,7 @@
       <div class="alert alert-error px-4 py-3 text-sm">{{ log_error_message }}</div>
     {% endif %}
     {% if cleared %}
-      <div class="alert alert-success px-4 py-3 text-sm">All application data has been cleared.</div>
+      <div class="alert alert-success px-4 py-3 text-sm">All portfolio data has been cleared while keeping user accounts intact.</div>
     {% endif %}
     {% if shutting_down %}
       <div class="alert alert-warning px-4 py-3 text-sm">The server is shutting down. You may now close this window.</div>
@@ -70,7 +78,7 @@
   <div class="lg:grid lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)] lg:items-start lg:gap-8">
     <aside class="sticky top-24 hidden h-fit flex-col gap-2 rounded-2xl border border-neutral-800/60 bg-neutral-950/70 px-4 py-5 text-sm text-neutral-400 shadow-lg shadow-black/30 lg:flex">
       <p class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Quick navigation</p>
-      <a href="#account-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Accounts</a>
+      <a href="#account-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Portfolios</a>
       <a href="#display-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Appearance &amp; calendar</a>
       <a href="#calculation-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Data handling</a>
       <a href="#server-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Server access</a>
@@ -85,15 +93,15 @@
     <div class="flex flex-col gap-6">
     <section id="account-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4 flex flex-col gap-1">
-          <h2 class="text-lg font-semibold text-neutral-50">Accounts</h2>
+          <h2 class="text-lg font-semibold text-neutral-50">Portfolios</h2>
           <p class="text-sm text-neutral-400">Create dedicated data sets, rename them, and switch between portfolios with a click.</p>
         </header>
         <div class="flex flex-col gap-4">
           <form method="post" action="/settings/accounts/create" class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
             <input type="hidden" name="redirect_to" value="/settings">
-            <label for="new-account-name" class="sr-only">Account name</label>
-            <input id="new-account-name" name="account_name" placeholder="Name this account" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" autocomplete="off">
-            <button class="btn btn-primary w-full px-4 py-2 text-sm sm:w-auto">Add account</button>
+            <label for="new-account-name" class="sr-only">Portfolio name</label>
+            <input id="new-account-name" name="account_name" placeholder="Name this portfolio" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" autocomplete="off">
+            <button class="btn btn-primary w-full px-4 py-2 text-sm sm:w-auto">Add portfolio</button>
           </form>
           <div class="space-y-3">
             {% for account in accounts %}
@@ -108,33 +116,33 @@
                     <input type="hidden" name="account_id" value="{{ account.id }}">
                     <input type="hidden" name="redirect_to" value="/settings">
                     <button class="btn btn-outline-primary px-3 py-1.5 text-xs font-semibold uppercase tracking-wide sm:text-sm" {% if account.is_active %}disabled{% endif %}>
-                      {% if account.is_active %}Active account{% else %}Set active{% endif %}
+                      {% if account.is_active %}Active portfolio{% else %}Set active{% endif %}
                     </button>
                   </form>
                 </div>
                 <form method="post" action="/settings/accounts/rename" class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
                   <input type="hidden" name="account_id" value="{{ account.id }}">
                   <input type="hidden" name="redirect_to" value="/settings">
-                  <label for="account-name-{{ account.id }}" class="sr-only">Account name</label>
+                  <label for="account-name-{{ account.id }}" class="sr-only">Portfolio name</label>
                   <input id="account-name-{{ account.id }}" name="account_name" value="{{ account.name }}" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" autocomplete="off">
                   <button class="btn btn-outline-primary px-3 py-2 text-sm sm:w-auto">Rename</button>
                 </form>
                 <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <form method="post" action="/settings/accounts/clear" class="flex w-full sm:w-auto"
-                        onsubmit="return confirm('This will delete all trades, summaries, and notes for this account. Continue?');">
+                        onsubmit="return confirm('This will delete all trades, summaries, and notes for this portfolio. Continue?');">
                     <input type="hidden" name="account_id" value="{{ account.id }}">
                     <input type="hidden" name="redirect_to" value="/settings">
                     <button class="btn btn-outline-danger w-full px-3 py-2 text-sm sm:w-auto">
-                      Clear data
+                      Clear portfolio data
                     </button>
                   </form>
                   <form method="post" action="/settings/accounts/delete" class="flex w-full sm:w-auto"
-                        onsubmit="return confirm('This will permanently delete the account and its data. Continue?');">
+                        onsubmit="return confirm('This will permanently delete the portfolio and its data. Continue?');">
                     <input type="hidden" name="account_id" value="{{ account.id }}">
                     <input type="hidden" name="redirect_to" value="/settings">
                     <button class="btn btn-danger w-full px-3 py-2 text-sm sm:w-auto {% if is_primary %}opacity-60 cursor-not-allowed pointer-events-none{% endif %}"
                             {% if is_primary %}aria-disabled="true" tabindex="-1" disabled{% endif %}>
-                      Delete account
+                      Delete portfolio
                     </button>
                   </form>
                 </div>
@@ -475,14 +483,141 @@
     <section id="danger-zone" class="rounded-2xl border border-red-900/70 bg-gradient-to-br from-red-950/40 via-red-950/60 to-black/50 p-6 shadow-2xl shadow-red-900/20">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-red-200">Danger zone</h2>
-          <p class="mt-1 text-sm text-red-200/80">Clearing data removes every account, imported trade, calculated summary, saved note, and configuration. This action cannot be undone.</p>
+          <p class="mt-1 text-sm text-red-200/80">Use these tools carefully—most actions cannot be undone.</p>
         </header>
-        <form method="post" action="/settings/clear-data" onsubmit="return confirm('This will delete every account, trade, summary, note, and saved setting. Continue?');" class="flex flex-col gap-3">
-          <button class="btn btn-danger w-full px-4 py-2">Clear all data</button>
-        </form>
-        <form method="post" action="/settings/shutdown" onsubmit="return confirm('This will stop the server. Continue?');" class="mt-2 flex flex-col gap-3">
-          <button class="btn btn-outline-danger w-full px-4 py-2">Shut down server</button>
-        </form>
+        {% if current_user and current_user.is_admin %}
+          <div class="space-y-6">
+            <div class="rounded-xl border border-red-900/40 bg-red-950/30 p-5">
+              <div class="mb-4">
+                <h3 class="text-sm font-semibold text-red-100">Team access</h3>
+                <p class="text-xs text-red-200/80">Invite new administrators or remove existing users from BagHolder.</p>
+              </div>
+              <div class="space-y-4">
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-red-300/80">Current users</p>
+                  <div class="mt-2 space-y-2">
+                    {% if managed_users %}
+                      {% for user in managed_users %}
+                        <div class="flex items-center justify-between rounded-lg border border-red-900/40 bg-red-950/20 px-3 py-2">
+                          <div>
+                            <p class="text-sm font-medium text-red-100">
+                              {{ user.username }}
+                              {% if current_user and user.id|int == current_user.id %}<span class="text-xs text-red-300/80">(you)</span>{% endif %}
+                            </p>
+                            <p class="text-[11px] text-red-300/70">Added {{ user.created_at }}</p>
+                          </div>
+                          <span class="rounded-full border border-red-500/40 px-2 py-0.5 text-[10px] uppercase tracking-widest text-red-200/90">{% if user.is_admin %}Admin{% else %}User{% endif %}</span>
+                        </div>
+                      {% endfor %}
+                    {% else %}
+                      <p class="text-xs text-red-200/80">No users have been configured yet.</p>
+                    {% endif %}
+                  </div>
+                </div>
+                <form method="post" action="/settings/users/create" class="grid gap-3 sm:grid-cols-2">
+                  <input type="hidden" name="redirect_to" value="/settings">
+                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                    Username
+                    <input name="username" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" autocomplete="off" required>
+                  </label>
+                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                    Password
+                    <input type="password" name="password" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" minlength="8" required>
+                  </label>
+                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                    Confirm password
+                    <input type="password" name="confirm_password" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" minlength="8" required>
+                  </label>
+                  <label class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                    <input type="checkbox" name="is_admin" value="true" class="h-4 w-4 rounded border-red-800 bg-red-950 text-red-500 focus:ring-red-500">
+                    Grant administrator access
+                  </label>
+                  <div class="sm:col-span-2">
+                    <button class="btn btn-danger w-full px-4 py-2 text-sm">Add user</button>
+                  </div>
+                </form>
+                <form method="post" action="/settings/users/reset-password" class="grid gap-3 sm:grid-cols-2">
+                  <input type="hidden" name="redirect_to" value="/settings">
+                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                    Select user
+                    <select name="user_id" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" required>
+                      <option value="" disabled selected>Choose a user</option>
+                      {% for user in managed_users %}
+                        <option value="{{ user.id }}">{{ user.username }}{% if user.is_admin %} (admin){% endif %}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <div class="grid gap-3 sm:grid-cols-2 sm:col-span-2">
+                    <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                      New password
+                      <input type="password" name="new_password" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" minlength="8" required>
+                    </label>
+                    <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                      Confirm password
+                      <input type="password" name="confirm_password" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" minlength="8" required>
+                    </label>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <button class="btn btn-outline-danger w-full px-4 py-2 text-sm">Reset user password</button>
+                  </div>
+                </form>
+                <form method="post" action="/settings/users/delete" class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                  <input type="hidden" name="redirect_to" value="/settings">
+                  <label class="flex w-full flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                    Remove user
+                    <select name="user_id" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" required>
+                      <option value="" disabled selected>Select a user</option>
+                      {% for user in managed_users %}
+                        <option value="{{ user.id }}">{{ user.username }}{% if user.is_admin %} (admin){% endif %}</option>
+                      {% endfor %}
+                    </select>
+                  </label>
+                  <button class="btn btn-outline-danger w-full px-4 py-2 text-sm sm:w-auto">Delete user</button>
+                </form>
+                <p class="text-[11px] text-red-300/70">Administrators cannot delete their own account from this list. Use the personal controls below to remove yourself.</p>
+              </div>
+            </div>
+            <div class="rounded-xl border border-red-900/40 bg-red-950/30 p-5">
+              <div class="mb-4">
+                <h3 class="text-sm font-semibold text-red-100">Application maintenance</h3>
+                <p class="text-xs text-red-200/80">Reset trading data or safely restart the server when maintenance is required.</p>
+              </div>
+              <form method="post" action="/settings/clear-data" class="flex flex-col gap-3"
+                    onsubmit="return confirm('This will remove all trades, summaries, notes, and configuration data for every portfolio. User accounts will remain. Continue?');">
+                <input type="hidden" name="redirect_to" value="/settings">
+                <button class="btn btn-danger w-full px-4 py-2">Reset application data</button>
+              </form>
+              <form method="post" action="/settings/shutdown" class="mt-3 flex flex-col gap-3"
+                    onsubmit="return confirm('This will stop the server. Continue?');">
+                <button class="btn btn-outline-danger w-full px-4 py-2">Shut down server</button>
+              </form>
+            </div>
+            <div class="rounded-xl border border-red-900/40 bg-red-950/30 p-5">
+              <div class="mb-3">
+                <h3 class="text-sm font-semibold text-red-100">Personal account</h3>
+                <p class="text-xs text-red-200/80">Remove your own login once another administrator is available to manage the system.</p>
+              </div>
+              <form method="post" action="/settings/account/delete" class="flex flex-col gap-3"
+                    onsubmit="return confirm('This will permanently delete your user account and sign you out. Continue?');">
+                <input type="hidden" name="redirect_to" value="/settings">
+                <button class="btn btn-outline-danger w-full px-4 py-2">Delete my account</button>
+              </form>
+            </div>
+          </div>
+        {% else %}
+          <div class="rounded-xl border border-red-900/40 bg-red-950/30 p-5">
+            <div class="mb-3">
+              <h3 class="text-sm font-semibold text-red-100">Delete my account</h3>
+              <p class="text-xs text-red-200/80">Remove your access to BagHolder. This action is permanent and cannot be undone.</p>
+            </div>
+            <form method="post" action="/settings/account/delete" class="flex flex-col gap-3"
+                  onsubmit="return confirm('This will permanently delete your user account and sign you out. Continue?');">
+              <input type="hidden" name="redirect_to" value="/settings">
+              <button class="btn btn-danger w-full px-4 py-2">Delete my account</button>
+            </form>
+            <p class="mt-3 text-xs text-red-200/80">Need other help? Contact an administrator to reset data or invite you again.</p>
+          </div>
+        {% endif %}
     </section>
     <a href="https://buymeacoffee.com/crissejdav6" target="_blank" rel="noopener noreferrer"
        class="btn btn-outline-danger inline-flex w-full justify-center rounded-full px-4 py-2 text-xs uppercase tracking-wide">
