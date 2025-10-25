@@ -1,0 +1,61 @@
+accounts:
+  active: primary
+  entries:
+    primary:
+      name: Primary account
+      storage: .
+server:
+  host: 0.0.0.0
+  port: 8012
+  data_folder: data
+ui:
+  theme: dark
+  show_text: true
+  show_unrealized: true
+  show_trade_count: true
+  show_percentages: true
+  show_weekends: false
+  show_exclude_controls: true
+  highlight_weekends: true
+  auto_dark_mode: true
+  opacity_gain: 0.7
+  opacity_loss: 0.7
+  grid_transparency: 0.8
+  icon_color: '#6b7280'
+  primary_color: '#2563eb'
+  primary_hover_color: '#1d4ed8'
+  success_color: '#22c55e'
+  warning_color: '#f59e0b'
+  danger_color: '#dc2626'
+  danger_hover_color: '#b91c1c'
+  trade_badge_color: '#34d399'
+  trade_badge_text_color: '#111827'
+  unrealized_fill_strategy: carry_forward
+notes:
+  enabled: true
+  icon_opacity: 0.25
+  icon_hover_opacity: 0.9
+  icon_has_note_color: '#80cbc4'
+  autosave: true
+  max_length: 4000
+import:
+  sources:
+  - thinkorswim
+  auto_recalculate: true
+  backup_before_import: true
+  accepted_formats:
+  - .csv
+  max_upload_bytes: 5000000
+view:
+  default: latest
+  remember_last_view: true
+  month_start_day: monday
+backup:
+  enable_auto_backup: true
+  retention_days: 7
+export:
+  fill_empty_with_zero: true
+diagnostics:
+  debug_logging: false
+  log_max_bytes: 1048576
+  log_retention: 5
