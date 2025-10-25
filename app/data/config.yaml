@@ -45,7 +45,7 @@ import:
   backup_before_import: true
   accepted_formats:
   - .csv
-  max_upload_bytes: 5000000
+  max_upload_bytes: 25000000
 view:
   default: latest
   remember_last_view: true
