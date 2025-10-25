@@ -8,6 +8,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
 from app.main import create_app  # noqa: E402
+from app.main import _is_api_like_request  # noqa: E402
 from app.api.routes_auth import (  # noqa: E402
     login_action,
     login_form,
@@ -18,7 +19,13 @@ from app.core import database as db  # noqa: E402
 from app.core.models import User  # noqa: E402
 
 
-def _build_request(app, method: str = "GET", path: str = "/login") -> Request:
+def _build_request(
+    app,
+    method: str = "GET",
+    path: str = "/login",
+    *,
+    headers: list[tuple[bytes, bytes]] | None = None,
+) -> Request:
     scope = {
         "type": "http",
         "http_version": "1.1",
@@ -27,7 +34,7 @@ def _build_request(app, method: str = "GET", path: str = "/login") -> Request:
         "path": path,
         "raw_path": path.encode("utf-8"),
         "query_string": b"",
-        "headers": [],
+        "headers": headers or [],
         "client": ("test", 1234),
         "server": ("testserver", 80),
         "app": app,
@@ -60,6 +67,7 @@ def test_register_creates_initial_user_and_logs_in(tmp_path, monkeypatch):
         users = session.query(User).all()
         assert len(users) == 1
         assert users[0].username == "admin"
+        assert users[0].is_admin is True
 
     db.dispose_engine()
 
@@ -91,6 +99,57 @@ def test_login_with_existing_user_sets_session(tmp_path, monkeypatch):
         response = login_action(request, username="trader", password="wrong", db=session)
         assert response.status_code == 401
         assert response.context["login_error"] == "Invalid username or password."
+
+    db.dispose_engine()
+
+
+def test_api_request_detection(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    api_request = _build_request(
+        app,
+        method="POST",
+        path="/api/ui/preferences",
+        headers=[(b"content-type", b"application/json"), (b"accept", b"*/*")],
+    )
+    assert _is_api_like_request(api_request, "/api/ui/preferences") is True
+
+    fetch_request = _build_request(
+        app,
+        method="POST",
+        path="/dev/reload",
+        headers=[(b"accept", b"*/*")],
+    )
+    assert _is_api_like_request(fetch_request, "/dev/reload") is True
+
+    form_request = _build_request(
+        app,
+        method="POST",
+        path="/settings",
+        headers=[
+            (
+                b"accept",
+                b"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,*/*;q=0.8",
+            ),
+            (b"content-type", b"application/x-www-form-urlencoded"),
+        ],
+    )
+    assert _is_api_like_request(form_request, "/settings") is False
+
+    get_request = _build_request(
+        app,
+        method="GET",
+        path="/calendar/2024/1",
+        headers=[
+            (
+                b"accept",
+                b"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,*/*;q=0.8",
+            )
+        ],
+    )
+    assert _is_api_like_request(get_request, "/calendar/2024/1") is False
 
     db.dispose_engine()
 

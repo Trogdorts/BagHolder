@@ -7,7 +7,7 @@ if __package__ in (None, ""):
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import RedirectResponse
+from starlette.responses import JSONResponse, RedirectResponse
 
 if __package__ in {None, ""}:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -16,6 +16,21 @@ from app.core.lifecycle import reload_application_state
 from app.core.models import User
 from app.core import database
 from app.core.session import SignedCookieSessionMiddleware
+
+
+def _is_api_like_request(request: Request, path: str) -> bool:
+    accept_header = (request.headers.get("accept") or "").lower()
+    content_type = (request.headers.get("content-type") or "").lower()
+    return any(
+        [
+            path.startswith("/api"),
+            "application/json" in accept_header,
+            "application/json" in content_type,
+            request.headers.get("hx-request", "").lower() == "true",
+            request.headers.get("x-requested-with", "").lower() == "xmlhttprequest",
+            request.method.upper() != "GET" and "text/html" not in accept_header,
+        ]
+    )
 
 
 def create_app():
@@ -58,6 +73,9 @@ def create_app():
         )
 
         if request.state.user is None and not is_public:
+            if _is_api_like_request(request, path):
+                return JSONResponse({"detail": "Authentication required."}, status_code=401)
+
             status_code = 303 if request.method.upper() != "GET" else 302
             return RedirectResponse(url="/login", status_code=status_code)
 

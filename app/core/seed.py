@@ -1,10 +1,12 @@
 from sqlalchemy import text
 
 from app.core.database import init_db
+from sqlalchemy.orm import Session
+
 from app.core.models import Base, Meta
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def _ensure_daily_notes_markdown_column(engine) -> None:
@@ -21,11 +23,34 @@ def _ensure_daily_notes_markdown_column(engine) -> None:
             )
 
 
+def _ensure_users_admin_column(engine) -> None:
+    """Add the ``is_admin`` column to ``users`` and promote the first user."""
+
+    with engine.begin() as conn:
+        columns = conn.execute(text("PRAGMA table_info(users)")).fetchall()
+        has_column = any(row[1] == "is_admin" for row in columns)
+        if not has_column:
+            conn.execute(
+                text("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+            )
+
+        has_admin = conn.execute(
+            text("SELECT 1 FROM users WHERE is_admin = 1 LIMIT 1")
+        ).fetchone()
+        if has_admin is None:
+            first_user = conn.execute(
+                text("SELECT id FROM users ORDER BY id ASC LIMIT 1")
+            ).fetchone()
+            if first_user is not None:
+                conn.execute(
+                    text("UPDATE users SET is_admin = 1 WHERE id = :user_id"),
+                    {"user_id": first_user[0]},
+                )
+
+
 def ensure_seed(db_path: str):
     engine, _ = init_db(db_path)
     Base.metadata.create_all(engine)
-
-    from sqlalchemy.orm import Session
 
     with Session(engine) as session:
         schema_meta = session.get(Meta, "schema_version")
@@ -42,6 +67,10 @@ def ensure_seed(db_path: str):
         if current_version < 2:
             _ensure_daily_notes_markdown_column(engine)
             current_version = 2
+
+        if current_version < 3:
+            _ensure_users_admin_column(engine)
+            current_version = 3
 
         if current_version < SCHEMA_VERSION:
             schema_meta.value = str(SCHEMA_VERSION)
