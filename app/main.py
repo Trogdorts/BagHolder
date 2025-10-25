@@ -38,17 +38,23 @@ class LoginRequiredMiddleware(BaseHTTPMiddleware):
             request.scope["session"] = session_data
 
         session_user_id = session_data.get("user_id")
+        needs_setup = database.SessionLocal is None
 
-        if session_user_id is not None and database.SessionLocal is not None:
+        if database.SessionLocal is not None:
             with database.SessionLocal() as db_session:
                 identity = IdentityService(db_session)
-                user = identity.get_user_by_id(session_user_id)
-                if user is not None:
-                    request.state.user = user
-                else:
-                    session_data.pop("user_id", None)
 
-        public_paths = {"/login", "/login/register"}
+                if session_user_id is not None:
+                    user = identity.get_user_by_id(session_user_id)
+                    if user is not None:
+                        request.state.user = user
+                    else:
+                        session_data.pop("user_id", None)
+
+                if request.state.user is None:
+                    needs_setup = identity.allow_self_registration()
+
+        public_paths = {"/login", "/login/register", "/setup"}
         is_public = (
             path in public_paths
             or path.startswith("/docs")
@@ -57,6 +63,10 @@ class LoginRequiredMiddleware(BaseHTTPMiddleware):
         )
 
         if request.state.user is None and not is_public:
+            if needs_setup and path != "/setup":
+                status_code = 303 if request.method.upper() != "GET" else 302
+                return RedirectResponse(url="/setup", status_code=status_code)
+
             if _is_api_like_request(request, path):
                 return JSONResponse({"detail": "Authentication required."}, status_code=401)
 
@@ -91,8 +101,8 @@ def create_app():
     )
 
     secret_key = os.environ.get("BAGHOLDER_SECRET_KEY", "bagholder-dev-secret")
-    app.add_middleware(SignedCookieSessionMiddleware, secret_key=secret_key)
     app.add_middleware(LoginRequiredMiddleware)
+    app.add_middleware(SignedCookieSessionMiddleware, secret_key=secret_key)
 
     reload_application_state(app)
 
@@ -103,7 +113,9 @@ def create_app():
     from app.api.routes_stats import router as stats_router
     from app.api.routes_dev import router as dev_router
     from app.api.routes_auth import router as auth_router
+    from app.api.routes_setup import router as setup_router
 
+    app.include_router(setup_router)
     app.include_router(calendar_router)
     app.include_router(import_router)
     app.include_router(settings_router)
