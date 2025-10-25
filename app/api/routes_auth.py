@@ -14,10 +14,14 @@ def login_form(request: Request, db: Session = Depends(get_session)):
         return RedirectResponse(url="/", status_code=303)
 
     identity = IdentityService(db)
+    allow_registration = identity.allow_self_registration()
+    if allow_registration:
+        return RedirectResponse(url="/setup", status_code=303)
+
     context = {
         "request": request,
         "cfg": request.app.state.config.raw,
-        "allow_registration": identity.allow_self_registration(),
+        "allow_registration": allow_registration,
         "login_error": None,
         "registration_error": None,
         "submitted_username": "",

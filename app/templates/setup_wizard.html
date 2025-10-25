@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-xl mx-auto mt-12 bg-neutral-900/80 border border-neutral-800 rounded-xl shadow-lg p-8">
+  <div class="flex items-center gap-3 mb-6">
+    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary-color">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="h-6 w-6">
+        <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zm0 2.25a7.5 7.5 0 100 15 7.5 7.5 0 000-15zm.75 3a.75.75 0 00-1.5 0v4.19l-2.22 2.22a.75.75 0 101.06 1.06l2.41-2.41c.18-.18.28-.43.28-.69V7.5z" clip-rule="evenodd" />
+      </svg>
+    </div>
+    <div>
+      <h1 class="text-2xl font-semibold text-neutral-100">Welcome to BagHolder</h1>
+      <p class="text-sm text-neutral-400">Let&rsquo;s create the first administrator account to finish setting things up.</p>
+    </div>
+  </div>
+
+  <form method="post" class="space-y-5">
+    <div>
+      <label for="username" class="block text-sm font-medium text-neutral-300">Administrator username</label>
+      <input
+        id="username"
+        name="username"
+        type="text"
+        required
+        value="{{ submitted_username }}"
+        class="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+        autofocus
+      />
+    </div>
+
+    <div class="grid gap-5 sm:grid-cols-2">
+      <div>
+        <label for="password" class="block text-sm font-medium text-neutral-300">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          class="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+        />
+      </div>
+      <div>
+        <label for="confirm_password" class="block text-sm font-medium text-neutral-300">Confirm password</label>
+        <input
+          id="confirm_password"
+          name="confirm_password"
+          type="password"
+          required
+          class="mt-2 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-3 py-2 text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+        />
+      </div>
+    </div>
+
+    {% if error_message %}
+      <div class="alert alert-error text-sm">
+        {{ error_message }}
+      </div>
+    {% endif %}
+
+    <div class="rounded-lg border border-neutral-800 bg-neutral-900/60 p-4 text-sm text-neutral-400">
+      <p class="font-medium text-neutral-300">What happens next?</p>
+      <ul class="mt-2 list-disc space-y-1 pl-5">
+        <li>Your account will be marked as an administrator so you can manage settings.</li>
+        <li>You&rsquo;ll stay signed in on this browser after setup finishes.</li>
+        <li>Additional users can sign in once you create them from the settings area.</li>
+      </ul>
+    </div>
+
+    <button type="submit" class="btn btn-primary w-full py-2 text-base">Create administrator account</button>
+  </form>
+</div>
+{% endblock %}
