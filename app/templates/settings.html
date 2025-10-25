@@ -26,6 +26,11 @@
     {% elif config_error_message %}
       <div class="alert alert-error px-4 py-3 text-sm">{{ config_error_message }}</div>
     {% endif %}
+    {% if account_status_message %}
+      <div class="alert alert-success px-4 py-3 text-sm">{{ account_status_message }}</div>
+    {% elif account_error_message %}
+      <div class="alert alert-error px-4 py-3 text-sm">{{ account_error_message }}</div>
+    {% endif %}
     {% if backup_restored %}
       <div class="alert alert-success px-4 py-3 text-sm">Backup imported successfully.</div>
     {% elif backup_error_message %}
@@ -43,12 +48,54 @@
   </div>
 
   <div class="grid gap-6 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] xl:gap-8">
-    <form method="post" action="/settings" class="flex flex-col gap-6" x-data="settingsForm()" @submit="resetChanges()">
-      <div x-show="hasChanges" x-cloak x-transition.opacity.duration.200ms class="rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-        You have unsaved changes. Don't forget to save before leaving this page.
-      </div>
+    <div class="flex flex-col gap-6">
+      <section id="account-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <header class="mb-4 flex flex-col gap-1">
+          <h2 class="text-lg font-semibold text-neutral-50">Accounts</h2>
+          <p class="text-sm text-neutral-400">Create dedicated data sets, rename them, and switch between portfolios with a click.</p>
+        </header>
+        <div class="flex flex-col gap-4">
+          <form method="post" action="/settings/accounts/create" class="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <input type="hidden" name="redirect_to" value="/settings">
+            <label for="new-account-name" class="sr-only">Account name</label>
+            <input id="new-account-name" name="account_name" placeholder="Name this account" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" autocomplete="off">
+            <button class="btn btn-primary w-full px-4 py-2 text-sm sm:w-auto">Add account</button>
+          </form>
+          <div class="space-y-3">
+            {% for account in accounts %}
+              <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-semibold text-neutral-100">{{ account.name }}</p>
+                    <p class="text-xs text-neutral-500">Data folder: {{ account.storage }}</p>
+                  </div>
+                  <form method="post" action="/settings/accounts/switch" class="flex items-center">
+                    <input type="hidden" name="account_id" value="{{ account.id }}">
+                    <input type="hidden" name="redirect_to" value="/settings">
+                    <button class="btn btn-outline-primary px-3 py-1.5 text-xs font-semibold uppercase tracking-wide sm:text-sm" {% if account.is_active %}disabled{% endif %}>
+                      {% if account.is_active %}Active account{% else %}Set active{% endif %}
+                    </button>
+                  </form>
+                </div>
+                <form method="post" action="/settings/accounts/rename" class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+                  <input type="hidden" name="account_id" value="{{ account.id }}">
+                  <input type="hidden" name="redirect_to" value="/settings">
+                  <label for="account-name-{{ account.id }}" class="sr-only">Account name</label>
+                  <input id="account-name-{{ account.id }}" name="account_name" value="{{ account.name }}" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" autocomplete="off">
+                  <button class="btn btn-outline-primary px-3 py-2 text-sm sm:w-auto">Rename</button>
+                </form>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
 
-      <section id="display-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+      <form method="post" action="/settings" class="flex flex-col gap-6" x-data="settingsForm()" @submit="resetChanges()">
+        <div x-show="hasChanges" x-cloak x-transition.opacity.duration.200ms class="rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          You have unsaved changes. Don't forget to save before leaving this page.
+        </div>
+
+        <section id="display-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
         <header class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-neutral-50">Appearance &amp; calendar</h2>
           <p class="text-sm text-neutral-400">Configure the default look and feel of the calendar.</p>
@@ -275,6 +322,7 @@
         </button>
       </div>
     </form>
+    </div>
 
     <aside class="flex flex-col gap-6">
       <section id="stock-data-import" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">

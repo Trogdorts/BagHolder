@@ -16,6 +16,11 @@ def test_reload_application_state_updates_config_and_templates(tmp_path):
     assert Path(app.state.log_path).name == "bagholder.log"
     assert Path(app.state.log_path).exists()
     assert app.state.debug_logging_enabled is False
+    assert app.state.account_data_dir == str(data_dir)
+    assert app.state.active_account.id == "primary"
+    assert len(app.state.accounts) == 1
+    accounts_global = app.state.templates.env.globals["accounts"]
+    assert accounts_global and accounts_global[0]["is_active"] is True
 
     cfg_path = data_dir / "config.yaml"
     assert cfg_path.exists()

@@ -8,6 +8,15 @@ from dataclasses import dataclass, field
 from typing import Any, Dict
 
 DEFAULT_CONFIG = {
+    "accounts": {
+        "active": "primary",
+        "entries": {
+            "primary": {
+                "name": "Primary account",
+                "storage": ".",
+            }
+        },
+    },
     "server": {"host": "0.0.0.0", "port": 8012, "data_folder": "/app/data"},
     "ui": {
         "theme": "dark",
