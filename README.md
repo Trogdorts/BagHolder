@@ -1,7 +1,10 @@
-# BagHolder
+# BagHolder (Alpha 1)
 
 FastAPI + Jinja2 + HTMX + Alpine.js app to visualize realized and unrealized P&L on a calendar.
 Imports ThinkOrSwim (TOS) Account Statement CSVs. No personally identifying account fields are stored.
+
+The **Alpha 1** milestone focuses on containerized deployment and smoother
+first-run experiences when provisioning the administrator account.
 
 ## Quick start
 
@@ -9,6 +12,29 @@ Imports ThinkOrSwim (TOS) Account Statement CSVs. No personally identifying acco
 docker compose up --build
 # open http://localhost:8012
 ```
+
+### Docker deployment notes
+
+The project ships with a Dockerfile optimized for production usage. Build
+arguments allow matching the container UID/GID to the host so that bind-mounted
+volumes remain writable:
+
+```bash
+APP_VERSION=0.1.0-alpha.1 BAGHOLDER_UID=$(id -u) BAGHOLDER_GID=$(id -g) \
+  docker compose up --build -d
+```
+
+Environment variables can be stored in a local `.env` file that sits alongside
+`docker-compose.yml`. Useful keys include:
+
+```dotenv
+BAGHOLDER_SECRET_KEY=change-me
+BAGHOLDER_BOOTSTRAP_USERNAME=admin
+BAGHOLDER_BOOTSTRAP_PASSWORD=super-secret-password
+```
+
+When both bootstrap variables are provided the container automatically creates
+the initial administrator account on startup.
 
 ## Manual dev
 
@@ -35,6 +61,10 @@ By default the application stores its configuration, logs, and database under
 `app/data` inside the repository. Override the location by setting the
 `BAGHOLDER_DATA` environment variable before starting the server.
 
+- `BAGHOLDER_SECRET_KEY` customizes the session signing key. Always set a strong
+  value in production deployments.
+- `BAGHOLDER_BOOTSTRAP_USERNAME` and `BAGHOLDER_BOOTSTRAP_PASSWORD` enable
+  unattended administrator provisioning (e.g., Docker deployments).
 - `profitloss.db` (SQLite)
 - `config.yaml`
 - `logs/bagholder.log`
