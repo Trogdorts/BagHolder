@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import DEFAULT_CONFIG
 from app.core.database import get_session
 from app.core.logger import get_logger
 from app.core.models import DailySummary, NoteDaily, Trade
@@ -43,8 +44,29 @@ def _is_missing_summary(summary: DailySummary) -> bool:
 
 def _import_config(request: Request) -> Tuple[int, Set[str]]:
     cfg = getattr(request.app.state, "config", None)
-    default_max_bytes = 5_000_000
-    default_formats = {".csv"}
+    default_import_cfg = DEFAULT_CONFIG.get("import", {}) if isinstance(DEFAULT_CONFIG, dict) else {}
+
+    raw_default_max = default_import_cfg.get("max_upload_bytes", 5_000_000)
+    try:
+        default_max_bytes = int(raw_default_max)
+    except (TypeError, ValueError):
+        default_max_bytes = 5_000_000
+    default_max_bytes = max(1, default_max_bytes)
+
+    default_formats_raw = default_import_cfg.get("accepted_formats", [".csv"])
+    default_formats: Set[str] = set()
+    if isinstance(default_formats_raw, (list, tuple, set)):
+        for ext in default_formats_raw:
+            if not isinstance(ext, str):
+                continue
+            normalized = ext.strip().lower()
+            if not normalized:
+                continue
+            if not normalized.startswith("."):
+                normalized = f".{normalized}"
+            default_formats.add(normalized)
+    if not default_formats:
+        default_formats = {".csv"}
 
     if not cfg:
         return default_max_bytes, default_formats
@@ -63,8 +85,18 @@ def _import_config(request: Request) -> Tuple[int, Set[str]]:
 
     accepted = import_cfg.get("accepted_formats", default_formats)
     if isinstance(accepted, (list, tuple, set)):
-        extensions = {str(ext).lower() for ext in accepted if isinstance(ext, str)}
-        accepted_formats: Set[str] = extensions or default_formats
+        accepted_formats: Set[str] = set()
+        for ext in accepted:
+            if not isinstance(ext, str):
+                continue
+            normalized = ext.strip().lower()
+            if not normalized:
+                continue
+            if not normalized.startswith("."):
+                normalized = f".{normalized}"
+            accepted_formats.add(normalized)
+        if not accepted_formats:
+            accepted_formats = default_formats
     else:
         accepted_formats = default_formats
 
