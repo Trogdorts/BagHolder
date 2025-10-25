@@ -168,20 +168,18 @@
 
   .hide-percentages [data-day-percent],
   .hide-percentages [data-week-percent],
-  .hide-percentages [data-month-percent] {
+  .hide-percentages [data-month-percent],
+  .hide-percentages [data-rolling-percent],
+  .hide-percentages [data-year-percent] {
     display: none !important;
   }
 
   [data-day-realized-amount],
-  [data-day-percent] {
-    display: block;
-  }
-
-  [data-calendar-root]:not(.hide-percentages) [data-day-realized-amount][data-has-percent="true"] {
-    display: none;
-  }
-
-  [data-calendar-root]:not(.hide-percentages) [data-day-percent]:not(.hidden) {
+  [data-day-percent],
+  [data-week-percent],
+  [data-month-percent],
+  [data-rolling-percent],
+  [data-year-percent] {
     display: block;
   }
 </style>
@@ -313,7 +311,7 @@
             {% if d.show_realized %}
           <div class="{{ realized_class }} space-y-1">
             <span data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">Realized: {{ d.realized|money }}</span>
-            <span data-day-percent class="{% if d.percent is none %}hidden{% endif %}">Realized: {{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span>
+            <span data-day-percent class="text-[11px] text-neutral-300{% if d.percent is none %} hidden{% endif %} mt-0.5">Realized: {{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span>
           </div>
           {% endif %}
           <div class="{{ 'text-profit' if d.unrealized > 0 else ('text-loss' if d.unrealized < 0 else 'text-neutral-200') }}"
@@ -376,10 +374,10 @@
       <div class="mt-2 text-sm space-y-1 text-right">
         <div data-week-realized
              class="{{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}{% if not week.show_week_realized %} hidden{% endif %}">
-          Realized: <span data-week-realized-value>{{ week.week_realized|money }}</span>
-          <span data-week-percent class="block text-[11px] text-neutral-300 md:inline md:ml-1{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %}">
-            {% if show_percentages_default and week.week_percent is not none %}{{ '{:+.2f}%'.format(week.week_percent) }}{% endif %}
-          </span>
+          <div>Realized: <span data-week-realized-value>{{ week.week_realized|money }}</span></div>
+          <div data-week-percent class="text-[11px] text-neutral-300{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %} mt-0.5">
+            {% if show_percentages_default and week.week_percent is not none %}Realized: {{ '{:+.2f}%'.format(week.week_percent) }}{% endif %}
+          </div>
         </div>
         <div data-week-unrealized
              class="{{ 'text-profit' if week.week_unrealized > 0 else ('text-loss' if week.week_unrealized < 0 else 'text-neutral-200') }}"
@@ -425,11 +423,11 @@
          data-base-realized="{{ '%.10g'|format(month_realized) }}"
          data-base-unrealized="{{ '%.10g'|format(month_unrealized) }}">
       <h2 class="font-semibold">Monthly summary</h2>
-      <div>
-        Realized: <span data-month-realized-value class="{{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span>
-        <span data-month-percent class="block text-[12px] text-neutral-300{% if not (show_percentages_default and month_percent is not none) %} hidden{% endif %}">
-          {% if show_percentages_default and month_percent is not none %}{{ '{:+.2f}%'.format(month_percent) }}{% endif %}
-        </span>
+      <div class="space-y-1">
+        <div>Realized: <span data-month-realized-value class="{{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span></div>
+        <div data-month-percent class="text-[12px] text-neutral-300{% if not (show_percentages_default and month_percent is not none) %} hidden{% endif %}">
+          {% if show_percentages_default and month_percent is not none %}Realized: {{ '{:+.2f}%'.format(month_percent) }}{% endif %}
+        </div>
       </div>
       <div class="mt-2 text-sm hidden" data-month-average>
         <span class="text-neutral-300">Avg realized per day (<span data-month-average-count>0</span> days):</span>
@@ -471,9 +469,13 @@
              data-rolling-summary
              data-base-realized="{{ '%.10g'|format(rolling_year_realized) }}"
              data-base-unrealized="{{ '%.10g'|format(rolling_year_unrealized) }}"
-             data-base-trading-days="{{ rolling_year_trading_days }}">
+             data-base-trading-days="{{ rolling_year_trading_days }}"
+             data-other-invested-max="{{ '%.10g'|format(rolling_year_other_invested_max) }}">
           <p class="text-[11px] uppercase tracking-wide text-neutral-400">Last 12 months</p>
           <div>Realized: <span data-rolling-realized-value class="{{ 'text-profit' if rolling_year_realized > 0 else ('text-loss' if rolling_year_realized < 0 else 'text-neutral-200') }}">{{ rolling_year_realized|money }}</span></div>
+          <div data-rolling-percent class="text-[12px] text-neutral-300{% if not (show_percentages_default and rolling_year_percent is not none) %} hidden{% endif %}">
+            {% if show_percentages_default and rolling_year_percent is not none %}Realized: {{ '{:+.2f}%'.format(rolling_year_percent) }}{% endif %}
+          </div>
           <div class="text-sm hidden" data-rolling-average>
             <span class="text-neutral-300">Avg realized per day (<span data-rolling-average-count>0</span> days):</span>
             <span data-rolling-average-value class="text-neutral-200"></span>
@@ -486,9 +488,13 @@
              data-year-summary
              data-base-realized="{{ '%.10g'|format(year_realized) }}"
              data-base-unrealized="{{ '%.10g'|format(year_unrealized) }}"
-             data-base-trading-days="{{ year_trading_days }}">
+             data-base-trading-days="{{ year_trading_days }}"
+             data-other-invested-max="{{ '%.10g'|format(year_other_invested_max) }}">
           <p class="text-[11px] uppercase tracking-wide text-neutral-400">Since Jan 1</p>
           <div>Realized: <span data-year-realized-value class="{{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
+          <div data-year-percent class="text-[12px] text-neutral-300{% if not (show_percentages_default and year_percent is not none) %} hidden{% endif %}">
+            {% if show_percentages_default and year_percent is not none %}Realized: {{ '{:+.2f}%'.format(year_percent) }}{% endif %}
+          </div>
           <div class="text-sm hidden" data-year-average>
             <span class="text-neutral-300">Avg realized per day (<span data-year-average-count>0</span> days):</span>
             <span data-year-average-value class="text-neutral-200"></span>
@@ -796,6 +802,14 @@ const dayImpactSimulator = (() => {
     return Math.round(result * 100) / 100;
   };
 
+  const collectInvestedSample = (collection, value) => {
+    const magnitude = Math.abs(Number(value));
+    if (!Number.isFinite(magnitude) || isApproximatelyZero(magnitude)) {
+      return;
+    }
+    collection.push(magnitude);
+  };
+
   const calendarRoot = document.querySelector('[data-calendar-root]');
   const calendarYear = calendarRoot ? calendarRoot.dataset.calendarYear : '';
   const calendarMonth = calendarRoot ? calendarRoot.dataset.calendarMonth : '';
@@ -956,6 +970,7 @@ const dayImpactSimulator = (() => {
 
   const rollingSummaryEl = document.querySelector('[data-rolling-summary]');
   const rollingRealizedEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-realized-value]') : null;
+  const rollingPercentEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-percent]') : null;
   const rollingUnrealizedEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-unrealized-value]') : null;
   const rollingAverageContainer = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-average]') : null;
   const rollingAverageCountEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-average-count]') : null;
@@ -963,6 +978,7 @@ const dayImpactSimulator = (() => {
 
   const yearSummaryEl = document.querySelector('[data-year-summary]');
   const yearRealizedEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-realized-value]') : null;
+  const yearPercentEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-percent]') : null;
   const yearUnrealizedEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-unrealized-value]') : null;
   const yearAverageContainer = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-average]') : null;
   const yearAverageCountEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-average-count]') : null;
@@ -987,9 +1003,11 @@ const dayImpactSimulator = (() => {
   const yearBaseRealized = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseRealized);
   const yearBaseUnrealized = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseUnrealized);
   const yearBaseTradingDays = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseTradingDays);
+  const yearOtherInvestedMax = parseNumber(yearSummaryEl && yearSummaryEl.dataset.otherInvestedMax);
   const rollingBaseRealized = parseNumber(rollingSummaryEl && rollingSummaryEl.dataset.baseRealized);
   const rollingBaseUnrealized = parseNumber(rollingSummaryEl && rollingSummaryEl.dataset.baseUnrealized);
   const rollingBaseTradingDays = parseNumber(rollingSummaryEl && rollingSummaryEl.dataset.baseTradingDays);
+  const rollingOtherInvestedMax = parseNumber(rollingSummaryEl && rollingSummaryEl.dataset.otherInvestedMax);
 
   let monthInitialRealized = 0;
   let monthInitialUnrealized = 0;
@@ -1068,7 +1086,7 @@ const dayImpactSimulator = (() => {
           dom.percent.textContent = '';
           dom.percent.classList.add('hidden');
         } else {
-          dom.percent.textContent = formatPercentage(percentValue);
+          dom.percent.textContent = `Realized: ${formatPercentage(percentValue)}`;
           dom.percent.classList.remove('hidden');
         }
       }
@@ -1087,7 +1105,9 @@ const dayImpactSimulator = (() => {
   function updateSummaries() {
     let monthRealized = 0;
     let monthUnrealized = 0;
-    const monthInvested = [];
+    const monthInvestedSamples = [];
+    const rollingInvestedSamples = [];
+    const yearInvestedSamples = [];
     let monthTradingDays = 0;
     let yearRealized = yearOtherRealized;
     let yearUnrealized = yearOtherUnrealized;
@@ -1096,6 +1116,9 @@ const dayImpactSimulator = (() => {
     let rollingUnrealized = rollingOtherUnrealized;
     let rollingTradingDays = rollingOtherTradingDays;
 
+    collectInvestedSample(rollingInvestedSamples, rollingOtherInvestedMax);
+    collectInvestedSample(yearInvestedSamples, yearOtherInvestedMax);
+
     dayMap.forEach((day) => {
       if (!day.included) {
         return;
@@ -1103,17 +1126,19 @@ const dayImpactSimulator = (() => {
       if (day.inMonth && day.hasValues) {
         monthRealized += day.realized;
         monthUnrealized += day.unrealized;
-        monthInvested.push(day.invested);
+        collectInvestedSample(monthInvestedSamples, day.invested);
         monthTradingDays += 1;
       }
       if (day.inMonth && day.hasValues && day.belongsToYear) {
         yearRealized += day.realized;
         yearUnrealized += day.unrealized;
         yearTradingDays += 1;
+        collectInvestedSample(yearInvestedSamples, day.invested);
       }
       if (day.inRolling && day.hasValues) {
         rollingRealized += day.realized;
         rollingUnrealized += day.unrealized;
+        collectInvestedSample(rollingInvestedSamples, day.invested);
         if (day.inMonth) {
           rollingTradingDays += 1;
         }
@@ -1125,12 +1150,12 @@ const dayImpactSimulator = (() => {
       applySignClass(monthRealizedEl, monthRealized);
     }
     if (monthPercentEl) {
-      const percentValue = calculatePercentageValue(monthRealized, monthInvested);
+      const percentValue = calculatePercentageValue(monthRealized, monthInvestedSamples);
       if (percentValue === null) {
         monthPercentEl.textContent = '';
         monthPercentEl.classList.add('hidden');
       } else {
-        monthPercentEl.textContent = formatPercentage(percentValue);
+        monthPercentEl.textContent = `Realized: ${formatPercentage(percentValue)}`;
         monthPercentEl.classList.remove('hidden');
       }
     }
@@ -1155,6 +1180,16 @@ const dayImpactSimulator = (() => {
       rollingRealizedEl.textContent = formatMoney(rollingRealized);
       applySignClass(rollingRealizedEl, rollingRealized);
     }
+    if (rollingPercentEl) {
+      const percentValue = calculatePercentageValue(rollingRealized, rollingInvestedSamples);
+      if (percentValue === null) {
+        rollingPercentEl.textContent = '';
+        rollingPercentEl.classList.add('hidden');
+      } else {
+        rollingPercentEl.textContent = `Realized: ${formatPercentage(percentValue)}`;
+        rollingPercentEl.classList.remove('hidden');
+      }
+    }
     if (rollingUnrealizedEl) {
       rollingUnrealizedEl.textContent = formatMoney(rollingUnrealized);
       applySignClass(rollingUnrealizedEl, rollingUnrealized);
@@ -1175,6 +1210,16 @@ const dayImpactSimulator = (() => {
     if (yearRealizedEl) {
       yearRealizedEl.textContent = formatMoney(yearRealized);
       applySignClass(yearRealizedEl, yearRealized);
+    }
+    if (yearPercentEl) {
+      const percentValue = calculatePercentageValue(yearRealized, yearInvestedSamples);
+      if (percentValue === null) {
+        yearPercentEl.textContent = '';
+        yearPercentEl.classList.add('hidden');
+      } else {
+        yearPercentEl.textContent = `Realized: ${formatPercentage(percentValue)}`;
+        yearPercentEl.classList.remove('hidden');
+      }
     }
     if (yearUnrealizedEl) {
       yearUnrealizedEl.textContent = formatMoney(yearUnrealized);
@@ -1208,7 +1253,7 @@ const dayImpactSimulator = (() => {
         }
         if (day.hasValues) {
           state.realized += day.realized;
-          state.investedSamples.push(day.invested);
+          collectInvestedSample(state.investedSamples, day.invested);
         }
         state.lastUnrealized = day.unrealized;
         state.hasIncluded = true;
