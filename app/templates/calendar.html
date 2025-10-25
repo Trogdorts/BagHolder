@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block nav_title_extra %}
-  <div class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-2xl font-semibold tracking-tight text-neutral-100 sm:text-3xl">
+  <div class="whitespace-nowrap text-2xl font-semibold tracking-tight text-neutral-100 sm:text-3xl">
     {{ year }}-{{ "%02d"|format(month) }}
   </div>
 {% endblock %}
@@ -321,7 +321,7 @@
           {% endif %}
           <div class="{{ realized_class }} space-y-1">
             <span data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">Realized: {{ d.realized|money }}</span>
-            <span data-day-percent class="text-[11px] {{ day_percent_class }}{% if d.percent is none %} hidden{% endif %} mt-0.5">Realized: {{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span>
+            <span data-day-percent class="text-[11px] text-neutral-200{% if d.percent is none %} hidden{% endif %} mt-0.5">Realized: <span data-day-percent-value class="{{ day_percent_class }}">{{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span></span>
           </div>
           {% endif %}
           <div class="{{ 'text-profit' if d.unrealized > 0 else ('text-loss' if d.unrealized < 0 else 'text-neutral-200') }}"
@@ -393,8 +393,8 @@
               {% set week_percent_class = 'text-loss' %}
             {% endif %}
           {% endif %}
-          <div data-week-percent class="text-[11px] {{ week_percent_class }}{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %} mt-0.5">
-            {% if show_percentages_default and week.week_percent is not none %}Realized: {{ '{:+.2f}%'.format(week.week_percent) }}{% endif %}
+          <div data-week-percent class="text-[11px] text-neutral-200{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %} mt-0.5">
+            {% if show_percentages_default and week.week_percent is not none %}Realized: <span data-week-percent-value class="{{ week_percent_class }}">{{ '{:+.2f}%'.format(week.week_percent) }}</span>{% endif %}
           </div>
         </div>
         <div data-week-unrealized
@@ -451,8 +451,8 @@
             {% set month_percent_class = 'text-loss' %}
           {% endif %}
         {% endif %}
-        <div data-month-percent class="text-[12px] {{ month_percent_class }}{% if not (show_percentages_default and month_percent is not none) %} hidden{% endif %}">
-          {% if show_percentages_default and month_percent is not none %}Realized: {{ '{:+.2f}%'.format(month_percent) }}{% endif %}
+        <div data-month-percent class="text-[12px]{% if not (show_percentages_default and month_percent is not none) %} hidden{% endif %}">
+          {% if show_percentages_default and month_percent is not none %}Realized: <span data-month-percent-value class="{{ month_percent_class }}">{{ '{:+.2f}%'.format(month_percent) }}</span>{% endif %}
         </div>
       </div>
       <div class="mt-2 text-sm hidden" data-month-average>
@@ -507,8 +507,8 @@
               {% set rolling_percent_class = 'text-loss' %}
             {% endif %}
           {% endif %}
-          <div data-rolling-percent class="text-[12px] {{ rolling_percent_class }}{% if not (show_percentages_default and rolling_year_percent is not none) %} hidden{% endif %}">
-            {% if show_percentages_default and rolling_year_percent is not none %}Realized: {{ '{:+.2f}%'.format(rolling_year_percent) }}{% endif %}
+          <div data-rolling-percent class="text-[12px]{% if not (show_percentages_default and rolling_year_percent is not none) %} hidden{% endif %}">
+            {% if show_percentages_default and rolling_year_percent is not none %}Realized: <span data-rolling-percent-value class="{{ rolling_percent_class }}">{{ '{:+.2f}%'.format(rolling_year_percent) }}</span>{% endif %}
           </div>
           <div class="text-sm hidden" data-rolling-average>
             <span class="text-neutral-300">Avg realized per day (<span data-rolling-average-count>0</span> days):</span>
@@ -534,8 +534,8 @@
               {% set year_percent_class = 'text-loss' %}
             {% endif %}
           {% endif %}
-          <div data-year-percent class="text-[12px] {{ year_percent_class }}{% if not (show_percentages_default and year_percent is not none) %} hidden{% endif %}">
-            {% if show_percentages_default and year_percent is not none %}Realized: {{ '{:+.2f}%'.format(year_percent) }}{% endif %}
+          <div data-year-percent class="text-[12px]{% if not (show_percentages_default and year_percent is not none) %} hidden{% endif %}">
+            {% if show_percentages_default and year_percent is not none %}Realized: <span data-year-percent-value class="{{ year_percent_class }}">{{ '{:+.2f}%'.format(year_percent) }}</span>{% endif %}
           </div>
           <div class="text-sm hidden" data-year-average>
             <span class="text-neutral-300">Avg realized per day (<span data-year-average-count>0</span> days):</span>
@@ -1004,7 +1004,8 @@ const dayImpactSimulator = (() => {
 
   const monthSummaryEl = document.querySelector('[data-month-summary]');
   const monthRealizedEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-realized-value]') : null;
-  const monthPercentEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-percent]') : null;
+  const monthPercentContainer = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-percent]') : null;
+  const monthPercentValueEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-percent-value]') : null;
   const monthUnrealizedEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-unrealized-value]') : null;
   const monthAverageContainer = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-average]') : null;
   const monthAverageCountEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-average-count]') : null;
@@ -1012,7 +1013,8 @@ const dayImpactSimulator = (() => {
 
   const rollingSummaryEl = document.querySelector('[data-rolling-summary]');
   const rollingRealizedEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-realized-value]') : null;
-  const rollingPercentEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-percent]') : null;
+  const rollingPercentContainer = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-percent]') : null;
+  const rollingPercentValueEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-percent-value]') : null;
   const rollingUnrealizedEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-unrealized-value]') : null;
   const rollingAverageContainer = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-average]') : null;
   const rollingAverageCountEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-average-count]') : null;
@@ -1020,7 +1022,8 @@ const dayImpactSimulator = (() => {
 
   const yearSummaryEl = document.querySelector('[data-year-summary]');
   const yearRealizedEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-realized-value]') : null;
-  const yearPercentEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-percent]') : null;
+  const yearPercentContainer = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-percent]') : null;
+  const yearPercentValueEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-percent-value]') : null;
   const yearUnrealizedEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-unrealized-value]') : null;
   const yearAverageContainer = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-average]') : null;
   const yearAverageCountEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-average-count]') : null;
@@ -1037,6 +1040,7 @@ const dayImpactSimulator = (() => {
       realizedContainer: weekEl.querySelector('[data-week-realized]'),
       realizedValue: weekEl.querySelector('[data-week-realized-value]'),
       percent: weekEl.querySelector('[data-week-percent]'),
+      percentValue: weekEl.querySelector('[data-week-percent-value]'),
       unrealizedContainer: weekEl.querySelector('[data-week-unrealized]'),
       unrealizedValue: weekEl.querySelector('[data-week-unrealized-value]'),
     });
@@ -1122,16 +1126,16 @@ const dayImpactSimulator = (() => {
         dom.realizedValue.textContent = formatMoney(realizedValue);
       }
       applySignClass(dom.realizedContainer, realizedValue);
-      if (dom.percent) {
+      if (dom.percent && dom.percentValue) {
         const percentValue = shouldShow ? calculatePercentageValue(realizedValue, state.investedSamples) : null;
         if (percentValue === null) {
-          dom.percent.textContent = '';
           dom.percent.classList.add('hidden');
-          applySignClass(dom.percent, 0);
+          dom.percentValue.textContent = '';
+          applySignClass(dom.percentValue, 0);
         } else {
-          dom.percent.textContent = `Realized: ${formatPercentage(percentValue)}`;
           dom.percent.classList.remove('hidden');
-          applySignClass(dom.percent, percentValue);
+          dom.percentValue.textContent = formatPercentage(percentValue);
+          applySignClass(dom.percentValue, percentValue);
         }
       }
     }
@@ -1193,16 +1197,16 @@ const dayImpactSimulator = (() => {
       monthRealizedEl.textContent = formatMoney(monthRealized);
       applySignClass(monthRealizedEl, monthRealized);
     }
-    if (monthPercentEl) {
+    if (monthPercentContainer && monthPercentValueEl) {
       const percentValue = calculatePercentageValue(monthRealized, monthInvestedSamples);
       if (percentValue === null) {
-        monthPercentEl.textContent = '';
-        monthPercentEl.classList.add('hidden');
-        applySignClass(monthPercentEl, 0);
+        monthPercentContainer.classList.add('hidden');
+        monthPercentValueEl.textContent = '';
+        applySignClass(monthPercentValueEl, 0);
       } else {
-        monthPercentEl.textContent = `Realized: ${formatPercentage(percentValue)}`;
-        monthPercentEl.classList.remove('hidden');
-        applySignClass(monthPercentEl, percentValue);
+        monthPercentContainer.classList.remove('hidden');
+        monthPercentValueEl.textContent = formatPercentage(percentValue);
+        applySignClass(monthPercentValueEl, percentValue);
       }
     }
     if (monthUnrealizedEl) {
@@ -1226,16 +1230,16 @@ const dayImpactSimulator = (() => {
       rollingRealizedEl.textContent = formatMoney(rollingRealized);
       applySignClass(rollingRealizedEl, rollingRealized);
     }
-    if (rollingPercentEl) {
+    if (rollingPercentContainer && rollingPercentValueEl) {
       const percentValue = calculatePercentageValue(rollingRealized, rollingInvestedSamples);
       if (percentValue === null) {
-        rollingPercentEl.textContent = '';
-        rollingPercentEl.classList.add('hidden');
-        applySignClass(rollingPercentEl, 0);
+        rollingPercentContainer.classList.add('hidden');
+        rollingPercentValueEl.textContent = '';
+        applySignClass(rollingPercentValueEl, 0);
       } else {
-        rollingPercentEl.textContent = `Realized: ${formatPercentage(percentValue)}`;
-        rollingPercentEl.classList.remove('hidden');
-        applySignClass(rollingPercentEl, percentValue);
+        rollingPercentContainer.classList.remove('hidden');
+        rollingPercentValueEl.textContent = formatPercentage(percentValue);
+        applySignClass(rollingPercentValueEl, percentValue);
       }
     }
     if (rollingUnrealizedEl) {
@@ -1259,16 +1263,16 @@ const dayImpactSimulator = (() => {
       yearRealizedEl.textContent = formatMoney(yearRealized);
       applySignClass(yearRealizedEl, yearRealized);
     }
-    if (yearPercentEl) {
+    if (yearPercentContainer && yearPercentValueEl) {
       const percentValue = calculatePercentageValue(yearRealized, yearInvestedSamples);
       if (percentValue === null) {
-        yearPercentEl.textContent = '';
-        yearPercentEl.classList.add('hidden');
-        applySignClass(yearPercentEl, 0);
+        yearPercentContainer.classList.add('hidden');
+        yearPercentValueEl.textContent = '';
+        applySignClass(yearPercentValueEl, 0);
       } else {
-        yearPercentEl.textContent = `Realized: ${formatPercentage(percentValue)}`;
-        yearPercentEl.classList.remove('hidden');
-        applySignClass(yearPercentEl, percentValue);
+        yearPercentContainer.classList.remove('hidden');
+        yearPercentValueEl.textContent = formatPercentage(percentValue);
+        applySignClass(yearPercentValueEl, percentValue);
       }
     }
     if (yearUnrealizedEl) {
