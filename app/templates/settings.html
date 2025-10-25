@@ -445,9 +445,9 @@
     <section id="danger-zone" class="rounded-xl border border-red-900/60 bg-red-950/40 p-6 shadow-sm">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-red-200">Danger zone</h2>
-          <p class="mt-1 text-sm text-red-200/80">Clearing data removes every imported trade, calculated summary, and saved note. This action cannot be undone.</p>
+          <p class="mt-1 text-sm text-red-200/80">Clearing data removes every account, imported trade, calculated summary, saved note, and configuration. This action cannot be undone.</p>
         </header>
-        <form method="post" action="/settings/clear-data" onsubmit="return confirm('This will delete all trades, summaries, and notes. Continue?');" class="flex flex-col gap-3">
+        <form method="post" action="/settings/clear-data" onsubmit="return confirm('This will delete every account, trade, summary, note, and saved setting. Continue?');" class="flex flex-col gap-3">
           <button class="btn btn-danger w-full px-4 py-2">Clear all data</button>
         </form>
         <form method="post" action="/settings/shutdown" onsubmit="return confirm('This will stop the server. Continue?');" class="mt-2 flex flex-col gap-3">
