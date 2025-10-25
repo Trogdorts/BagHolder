@@ -213,3 +213,5 @@ app/data/profitloss.db
 testings/
 
 app/data/accounts/primary-2/profitloss.db
+
+app/data/accounts/ddd/profitloss.db
