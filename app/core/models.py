@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import String, Integer, Float, Text, UniqueConstraint, Boolean
+from sqlalchemy import String, Integer, Float, Text, UniqueConstraint, Boolean, DateTime
 from sqlalchemy.sql import func
 from sqlalchemy.types import Date
 from sqlalchemy.orm import DeclarativeBase
-from datetime import date
+from datetime import date, datetime
 
 class Base(DeclarativeBase):
     pass
@@ -57,3 +57,13 @@ class NoteMonthly(Base):
     note: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[str] = mapped_column(String, default="")
     __table_args__ = (UniqueConstraint("year", "month", name="uix_month"),)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(150), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(256), nullable=False)
+    password_salt: Mapped[str] = mapped_column(String(256), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

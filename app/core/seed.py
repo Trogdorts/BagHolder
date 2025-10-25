@@ -4,7 +4,7 @@ from app.core.database import init_db
 from app.core.models import Base, Meta
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def _ensure_daily_notes_markdown_column(engine) -> None:
@@ -41,6 +41,9 @@ def ensure_seed(db_path: str):
 
         if current_version < 2:
             _ensure_daily_notes_markdown_column(engine)
+            current_version = 2
+
+        if current_version < SCHEMA_VERSION:
             schema_meta.value = str(SCHEMA_VERSION)
 
         if not session.get(Meta, "last_viewed_month"):
