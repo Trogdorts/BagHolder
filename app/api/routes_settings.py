@@ -67,6 +67,54 @@ def _normalize_redirect_target(value: str | None) -> str:
     return "/settings"
 
 
+def _import_limits_from_config(cfg: AppConfig) -> tuple[int, list[str]]:
+    defaults = DEFAULT_CONFIG.get("import", {}) if isinstance(DEFAULT_CONFIG, dict) else {}
+    import_cfg = cfg.raw.get("import", {}) if isinstance(cfg.raw, dict) else {}
+
+    raw_max = import_cfg.get("max_upload_bytes", defaults.get("max_upload_bytes", 5_000_000))
+    try:
+        max_bytes = int(raw_max)
+    except (TypeError, ValueError):
+        fallback = defaults.get("max_upload_bytes", 5_000_000)
+        try:
+            max_bytes = int(fallback)
+        except (TypeError, ValueError):
+            max_bytes = 5_000_000
+    max_bytes = max(1, max_bytes)
+
+    raw_formats = import_cfg.get("accepted_formats", defaults.get("accepted_formats", [".csv"]))
+    normalized_formats: list[str] = []
+    seen: set[str] = set()
+    if isinstance(raw_formats, (list, tuple, set)):
+        for ext in raw_formats:
+            if not isinstance(ext, str):
+                continue
+            normalized = ext.strip().lower()
+            if not normalized:
+                continue
+            if not normalized.startswith("."):
+                normalized = f".{normalized}"
+            if normalized not in seen:
+                seen.add(normalized)
+                normalized_formats.append(normalized)
+    if not normalized_formats:
+        normalized_formats = [".csv"]
+
+    return max_bytes, normalized_formats
+
+
+def _format_size(num_bytes: int) -> str:
+    if num_bytes >= 1024 * 1024:
+        size = num_bytes / (1024 * 1024)
+        formatted = f"{size:.1f}".rstrip("0").rstrip(".")
+        return f"{formatted} MB"
+    if num_bytes >= 1024:
+        size = num_bytes / 1024
+        formatted = f"{size:.1f}".rstrip("0").rstrip(".")
+        return f"{formatted} KB"
+    return f"{num_bytes} bytes"
+
+
 _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
@@ -211,10 +259,14 @@ _BACKUP_IMPORT_ERRORS = {
 
 _TRADE_IMPORT_ERRORS = {
     "no_trades": "No trades were detected in the uploaded file.",
+    "invalid_format": "Unsupported file format.",
+    "file_too_large": "The uploaded file exceeds the allowed size.",
 }
 
 _THINKORSWIM_IMPORT_ERRORS = {
     "no_trades": "No trades were detected in the uploaded statement.",
+    "invalid_format": "Unsupported file format.",
+    "file_too_large": "The uploaded file exceeds the allowed size.",
 }
 
 _LOG_EXPORT_ERRORS = {
@@ -281,6 +333,24 @@ _PASSWORD_ERROR_MESSAGES = {
 def _resolve_message(code: str | None, mapping: dict[str, str]) -> str | None:
     if not code:
         return None
+    return mapping.get(code, code)
+
+
+def _resolve_import_error(
+    code: str | None, mapping: dict[str, str], cfg: AppConfig
+) -> str | None:
+    if not code:
+        return None
+    if code == "file_too_large":
+        max_bytes, _ = _import_limits_from_config(cfg)
+        limit = _format_size(max_bytes)
+        return f"Uploaded file is too large. Maximum allowed size is {limit}."
+    if code == "invalid_format":
+        _, formats = _import_limits_from_config(cfg)
+        if formats:
+            allowed = ", ".join(formats)
+            return f"Unsupported file format. Allowed extensions: {allowed}."
+        return "Unsupported file format."
     return mapping.get(code, code)
 
 
@@ -359,11 +429,11 @@ def settings_page(request: Request, db: Session = Depends(get_session)):
     backup_restored = params.get("backup_restored") is not None
     error_message = _resolve_message(params.get("config_error"), _CONFIG_IMPORT_ERRORS)
     backup_error_message = _resolve_message(params.get("backup_error"), _BACKUP_IMPORT_ERRORS)
-    trade_csv_error_message = _resolve_message(
-        params.get("trade_csv_error"), _TRADE_IMPORT_ERRORS
+    trade_csv_error_message = _resolve_import_error(
+        params.get("trade_csv_error"), _TRADE_IMPORT_ERRORS, cfg
     )
-    thinkorswim_error_message = _resolve_message(
-        params.get("thinkorswim_error"), _THINKORSWIM_IMPORT_ERRORS
+    thinkorswim_error_message = _resolve_import_error(
+        params.get("thinkorswim_error"), _THINKORSWIM_IMPORT_ERRORS, cfg
     )
     log_error_message = _resolve_message(params.get("log_error"), _LOG_EXPORT_ERRORS)
     account_status_message = _resolve_message(params.get("account_status"), _ACCOUNT_STATUS_MESSAGES)
