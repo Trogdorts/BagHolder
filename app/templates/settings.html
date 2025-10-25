@@ -9,16 +9,31 @@
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
 {% set server_port = cfg.get('server', {}).get('port', 8012) %}
-<div class="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-  <header class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+<div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+  <header class="rounded-3xl border border-neutral-800/70 bg-gradient-to-br from-neutral-900/80 via-neutral-950/80 to-black/80 p-8 shadow-lg shadow-black/30">
     <div class="flex flex-col gap-2">
       <div>
         <p class="text-xs font-semibold uppercase tracking-wide text-blue-300">BagHolder</p>
-        <h1 class="text-2xl font-semibold text-neutral-50 sm:text-3xl">Settings</h1>
+        <h1 class="text-3xl font-semibold text-neutral-50 sm:text-4xl">Settings</h1>
       </div>
-      <p class="max-w-2xl text-sm text-neutral-400">Fine-tune how BagHolder looks, calculates totals, and manages data without scrolling through empty space.</p>
+      <p class="max-w-2xl text-sm text-neutral-400">
+        Fine-tune how BagHolder looks, calculates totals, and manages data without scrolling through empty space.
+      </p>
     </div>
   </header>
+
+  <nav aria-label="Settings sections" class="-mx-1 mt-2 flex flex-wrap gap-2 overflow-x-auto pb-1 text-sm text-neutral-400 sm:mt-0">
+    <a href="#account-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Accounts</a>
+    <a href="#display-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Appearance</a>
+    <a href="#calculation-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Data handling</a>
+    <a href="#server-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Server</a>
+    <a href="#palette-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Palette</a>
+    <a href="#diagnostic-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Diagnostics</a>
+    <a href="#stock-data-import" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Imports</a>
+    <a href="#configuration-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Configuration</a>
+    <a href="#backup-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Backups</a>
+    <a href="#danger-zone" class="rounded-full border border-red-900/40 bg-red-950/30 px-4 py-2 font-medium text-red-200 transition hover:border-red-500/70 hover:text-red-100">Danger zone</a>
+  </nav>
 
   <div class="space-y-3">
     {% if config_imported %}
@@ -52,8 +67,23 @@
     {% endif %}
   </div>
 
-  <div class="flex flex-col gap-6">
-    <section id="account-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+  <div class="lg:grid lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)] lg:items-start lg:gap-8">
+    <aside class="sticky top-24 hidden h-fit flex-col gap-2 rounded-2xl border border-neutral-800/60 bg-neutral-950/70 px-4 py-5 text-sm text-neutral-400 shadow-lg shadow-black/30 lg:flex">
+      <p class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Quick navigation</p>
+      <a href="#account-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Accounts</a>
+      <a href="#display-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Appearance &amp; calendar</a>
+      <a href="#calculation-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Data handling</a>
+      <a href="#server-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Server access</a>
+      <a href="#palette-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Color palette</a>
+      <a href="#diagnostic-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Diagnostics</a>
+      <a href="#stock-data-import" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Import history</a>
+      <a href="#configuration-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Configuration</a>
+      <a href="#backup-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Full backup</a>
+      <a href="#danger-zone" class="rounded-lg px-3 py-2 font-medium text-red-200 transition hover:bg-red-950/40 hover:text-red-100">Danger zone</a>
+    </aside>
+
+    <div class="flex flex-col gap-6">
+    <section id="account-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-neutral-50">Accounts</h2>
           <p class="text-sm text-neutral-400">Create dedicated data sets, rename them, and switch between portfolios with a click.</p>
@@ -68,7 +98,7 @@
           <div class="space-y-3">
             {% for account in accounts %}
               {% set is_primary = account.id == 'primary' %}
-              <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+              <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/50 p-4 shadow-inner shadow-black/30">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p class="text-sm font-semibold text-neutral-100">{{ account.name }}</p>
@@ -111,7 +141,7 @@
               </div>
             {% endfor %}
           </div>
-          <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+          <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/50 p-4 shadow-inner shadow-black/30">
             <div class="mb-3 flex flex-col gap-1">
               <h3 class="text-sm font-semibold text-neutral-100">Update password</h3>
               <p class="text-xs text-neutral-500">Change the credentials used to access BagHolder.</p>
@@ -143,7 +173,7 @@
           You have unsaved changes. Don't forget to save before leaving this page.
         </div>
 
-        <section id="display-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+        <section id="display-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-neutral-50">Appearance &amp; calendar</h2>
           <p class="text-sm text-neutral-400">Configure the default look and feel of the calendar.</p>
@@ -232,7 +262,7 @@
         </div>
       </section>
 
-      <section id="calculation-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+      <section id="calculation-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-neutral-50">Data handling</h2>
           <p class="text-sm text-neutral-400">Decide how missing values are calculated and exported.</p>
@@ -261,7 +291,7 @@
         </div>
       </section>
 
-      <section id="server-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+      <section id="server-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-neutral-50">Server access</h2>
           <p class="text-sm text-neutral-400">Adjust how the app listens for connections.</p>
@@ -280,7 +310,7 @@
         </div>
       </section>
 
-      <section id="palette-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+      <section id="palette-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 class="text-lg font-semibold text-neutral-50">Color palette</h2>
@@ -296,7 +326,7 @@
         </div>
         <div class="grid gap-4">
           {% for group in color_groups | default([], true) %}
-          <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+          <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/50 p-4 shadow-inner shadow-black/30">
             <div class="mb-4 space-y-1">
               <h3 class="text-sm font-semibold text-neutral-100">{{ group.title }}</h3>
               <p class="text-xs text-neutral-500 leading-relaxed">{{ group.description }}</p>
@@ -326,7 +356,7 @@
         </div>
       </section>
 
-      <section id="diagnostic-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+      <section id="diagnostic-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-neutral-50">Diagnostics</h2>
           <p class="text-sm text-neutral-400">Persist detailed logs for troubleshooting and share them with support.</p>
@@ -361,7 +391,7 @@
         </div>
       </section>
 
-      <div class="flex flex-col items-stretch justify-between gap-3 rounded-xl border border-neutral-800 bg-neutral-900/80 p-5 shadow-sm sm:flex-row sm:items-center">
+      <div class="flex flex-col items-stretch justify-between gap-3 rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-5 shadow-xl shadow-black/20 backdrop-blur sm:flex-row sm:items-center">
         <p class="text-xs text-neutral-500" x-show="!hasChanges" x-cloak>All changes are synced with the current configuration.</p>
         <button type="submit" class="btn btn-primary w-full px-5 py-2.5 sm:w-auto"
                 :class="{ 'opacity-60 cursor-not-allowed': !hasChanges }"
@@ -371,13 +401,13 @@
       </div>
     </form>
 
-    <section id="stock-data-import" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+    <section id="stock-data-import" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-neutral-50">Import trade history</h2>
           <p class="mt-1 text-sm text-neutral-400">Upload CSV trade summaries or ThinkOrSwim statements.</p>
         </header>
         <div class="space-y-5">
-          <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+          <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/50 p-4 shadow-inner shadow-black/30">
             <h3 class="text-sm font-semibold text-neutral-100">Stock buy &amp; sell CSV data</h3>
             <p class="mt-1 text-xs text-neutral-500">Import executed trades from a CSV with the columns date, symbol, action, qty, price, amount.</p>
             {% if trade_csv_error_message %}
@@ -388,7 +418,7 @@
               <button class="btn btn-primary px-4 py-2">Upload</button>
             </form>
           </div>
-          <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+          <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/50 p-4 shadow-inner shadow-black/30">
             <h3 class="text-sm font-semibold text-neutral-100">ThinkOrSwim account statement</h3>
             <p class="mt-1 text-xs text-neutral-500">Only trade fields are persisted (date, symbol, action, qty, price, amount). Account identifiers are discarded after parsing.</p>
             {% if thinkorswim_error_message %}
@@ -402,7 +432,7 @@
         </div>
     </section>
 
-    <section id="configuration-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+    <section id="configuration-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-neutral-50">Configuration</h2>
           <p class="mt-1 text-sm text-neutral-400">Export the current configuration or apply a previously exported JSON file.</p>
@@ -422,7 +452,7 @@
         </div>
     </section>
 
-    <section id="backup-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+    <section id="backup-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-neutral-50">Full backup</h2>
           <p class="mt-1 text-sm text-neutral-400">Create or restore a ZIP archive containing all application data.</p>
@@ -442,7 +472,7 @@
         </div>
     </section>
 
-    <section id="danger-zone" class="rounded-xl border border-red-900/60 bg-red-950/40 p-6 shadow-sm">
+    <section id="danger-zone" class="rounded-2xl border border-red-900/70 bg-gradient-to-br from-red-950/40 via-red-950/60 to-black/50 p-6 shadow-2xl shadow-red-900/20">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-red-200">Danger zone</h2>
           <p class="mt-1 text-sm text-red-200/80">Clearing data removes every imported trade, calculated summary, and saved note. This action cannot be undone.</p>
@@ -455,9 +485,10 @@
         </form>
     </section>
     <a href="https://buymeacoffee.com/crissejdav6" target="_blank" rel="noopener noreferrer"
-       class="btn btn-outline-danger inline-flex w-full justify-center px-3 py-1 text-xs uppercase tracking-wide">
+       class="btn btn-outline-danger inline-flex w-full justify-center rounded-full px-4 py-2 text-xs uppercase tracking-wide">
       Buy me a coffee
     </a>
+    </div>
   </div>
 </div>
 <script>
