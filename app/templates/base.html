@@ -13,6 +13,7 @@
 {% set notes_cfg = (cfg.get('notes', {}) if cfg is defined else {}) %}
 {% set note_icon_active_color = notes_cfg.get('icon_has_note_color', '#80CBC4') %}
 {% set note_icon_active_opacity = notes_cfg.get('icon_hover_opacity', 0.9) %}
+{% set current_user = request.state.user if request is defined else None %}
 <html lang="en" data-theme="{{ theme }}">
 <head>
   <meta charset="utf-8">
@@ -375,21 +376,36 @@
   <nav class="w-full border-b border-neutral-800 bg-neutral-950">
     <div class="max-w-6xl mx-auto flex items-center gap-4 px-4 py-3">
       <a href="/" class="font-semibold">BagHolder</a>
-      <form method="post" action="/settings/accounts/switch" class="ml-auto flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
-        <input type="hidden" name="redirect_to" value="{{ request.url.path }}">
-        <label for="nav-account" class="uppercase tracking-wide">Account</label>
-        <select id="nav-account" name="account_id" class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" onchange="this.form.submit()" {% if (accounts | default([]) | length) <= 1 %}disabled{% endif %}>
-          {% for account in accounts | default([]) %}
-            <option value="{{ account.id }}" {% if account.is_active %}selected{% endif %}>{{ account.name }}</option>
-          {% endfor %}
-        </select>
-      </form>
-      <div class="flex items-center gap-4 text-sm">
-        <a href="/settings" class="hover:underline">Settings</a>
-        <button type="button" id="dev-reload" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition">
-          Reload app
-        </button>
-      </div>
+      {% if current_user %}
+        <form method="post" action="/settings/accounts/switch" class="ml-auto flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
+          <input type="hidden" name="redirect_to" value="{{ request.url.path }}">
+          <label for="nav-account" class="uppercase tracking-wide">Account</label>
+          <select id="nav-account" name="account_id" class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" onchange="this.form.submit()" {% if (accounts | default([]) | length) <= 1 %}disabled{% endif %}>
+            {% for account in accounts | default([]) %}
+              <option value="{{ account.id }}" {% if account.is_active %}selected{% endif %}>{{ account.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
+        <div class="flex items-center gap-4 text-sm">
+          <div class="hidden text-xs text-neutral-400 sm:inline">
+            Signed in as <span class="text-neutral-200">{{ current_user.username }}</span>
+            {% if current_user.is_admin %}<span class="ml-1 rounded bg-neutral-800 px-2 py-0.5 text-[10px] uppercase tracking-widest text-neutral-300">Admin</span>{% endif %}
+          </div>
+          <a href="/settings" class="hover:underline">Settings</a>
+          {% if current_user.is_admin %}
+            <button type="button" id="dev-reload" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition">
+              Reload app
+            </button>
+          {% endif %}
+          <form method="post" action="/logout">
+            <button type="submit" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition">Sign out</button>
+          </form>
+        </div>
+      {% else %}
+        <div class="ml-auto text-sm">
+          <a href="/login" class="text-neutral-300 hover:text-neutral-100">Sign in</a>
+        </div>
+      {% endif %}
     </div>
   </nav>
   <main class="max-w-6xl mx-auto p-4">

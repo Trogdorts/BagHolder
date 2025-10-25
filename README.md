@@ -17,6 +17,18 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8012
 ```
 
+## User accounts
+
+- Visit `/login` to sign in. The application requires authentication for all pages and API endpoints.
+- When no users exist you may create the first account directly on the login screen. That account is promoted to administrator.
+- To provision the administrator ahead of time, run the bootstrap helper:
+
+  ```bash
+  python -m app.scripts.first_start --username admin --password "your-strong-password"
+  ```
+
+  Omitting `--password` launches an interactive prompt with confirmation.
+
 ## Data
 
 A volume is mounted at `/app/data` (or `./app/data` in local dev) containing:

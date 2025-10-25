@@ -22,6 +22,7 @@ def login_form(request: Request, db: Session = Depends(get_session)):
         "allow_registration": user_count == 0,
         "login_error": None,
         "registration_error": None,
+        "submitted_username": "",
     }
     return request.app.state.templates.TemplateResponse(request, "login.html", context)
 
@@ -96,7 +97,12 @@ def register_action(
         )
 
     salt, password_hash = hash_password(password)
-    user = User(username=normalized, password_hash=password_hash, password_salt=salt)
+    user = User(
+        username=normalized,
+        password_hash=password_hash,
+        password_salt=salt,
+        is_admin=allow_registration,
+    )
     db.add(user)
     db.commit()
 
