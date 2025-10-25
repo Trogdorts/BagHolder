@@ -372,13 +372,15 @@ def test_update_account_password_changes_credentials(tmp_path, monkeypatch):
     request = _build_request(app)
     request.state.user = user
 
-    response = update_account_password(
-        request,
-        current_password="password123",
-        new_password="newpassword456",
-        confirm_password="newpassword456",
-        redirect_to="/settings",
-    )
+    with db.SessionLocal() as session:
+        response = update_account_password(
+            request,
+            current_password="password123",
+            new_password="newpassword456",
+            confirm_password="newpassword456",
+            redirect_to="/settings",
+            db=session,
+        )
 
     assert response.status_code == 303
     assert response.headers["location"] == "/settings?password_status=updated"
@@ -406,13 +408,15 @@ def test_update_account_password_rejects_invalid_current(tmp_path, monkeypatch):
     request = _build_request(app)
     request.state.user = user
 
-    response = update_account_password(
-        request,
-        current_password="wrongpass",
-        new_password="newpassword456",
-        confirm_password="newpassword456",
-        redirect_to="/settings",
-    )
+    with db.SessionLocal() as session:
+        response = update_account_password(
+            request,
+            current_password="wrongpass",
+            new_password="newpassword456",
+            confirm_password="newpassword456",
+            redirect_to="/settings",
+            db=session,
+        )
 
     assert response.status_code == 303
     assert response.headers["location"] == "/settings?password_error=invalid_current"

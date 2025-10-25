@@ -15,9 +15,9 @@ if __package__ in {None, ""}:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.lifecycle import reload_application_state
-from app.core.models import User
 from app.core import database
 from app.core.session import SignedCookieSessionMiddleware
+from app.services.identity import IdentityService
 
 
 class LoginRequiredMiddleware(BaseHTTPMiddleware):
@@ -41,7 +41,8 @@ class LoginRequiredMiddleware(BaseHTTPMiddleware):
 
         if session_user_id is not None and database.SessionLocal is not None:
             with database.SessionLocal() as db_session:
-                user = db_session.get(User, session_user_id)
+                identity = IdentityService(db_session)
+                user = identity.get_user_by_id(session_user_id)
                 if user is not None:
                     request.state.user = user
                 else:

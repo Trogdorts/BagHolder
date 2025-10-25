@@ -10,12 +10,12 @@ from typing import Iterable, cast
 
 from sqlalchemy.orm import Session
 
-from app.core.auth import hash_password
 from app.core.config import AppConfig
 from app.core.database import dispose_engine, init_db
 from app.core.models import User
 from app.core.seed import ensure_seed
 from app.services.accounts import prepare_accounts
+from app.services.identity import IdentityService
 
 
 def bootstrap_admin(username: str, password: str, *, data_dir: str | None = None) -> User:
@@ -40,21 +40,18 @@ def bootstrap_admin(username: str, password: str, *, data_dir: str | None = None
     try:
         with session_factory() as session:
             session = cast(Session, session)
-            existing_users = session.query(User).count()
-            if existing_users > 0:
+            identity = IdentityService(session)
+            if not identity.allow_self_registration():
                 raise RuntimeError("An account already exists. Use the web UI to manage users.")
 
-            salt, password_hash = hash_password(password)
-            user = User(
+            result = identity.register(
                 username=normalized_username,
-                password_hash=password_hash,
-                password_salt=salt,
-                is_admin=True,
+                password=password,
+                confirm_password=password,
             )
-            session.add(user)
-            session.commit()
-            session.refresh(user)
-            return user
+            if not result.success or result.user is None:
+                raise RuntimeError(result.error_message or "Failed to create administrator account.")
+            return result.user
     finally:
         dispose_engine()
 
