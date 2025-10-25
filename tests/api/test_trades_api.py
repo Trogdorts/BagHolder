@@ -22,7 +22,7 @@ from app.api.routes_import import (  # noqa: E402
     _persist_trade_rows,
 )
 from app.core import database as db  # noqa: E402
-from app.core.models import DailySummary, Trade  # noqa: E402
+from app.core.models import DailySummary, NoteDaily, Trade  # noqa: E402
 from app.services.import_trades_csv import parse_trade_csv  # noqa: E402
 
 
@@ -201,7 +201,11 @@ def test_import_trades_overwrites_existing_rows(tmp_path, monkeypatch):
             )
             session.commit()
 
-        csv_content = """date,symbol,action,qty,price,amount\n2025-10-16,ORCL,SELL,100,320.17,32017\n2025-10-16,MLTX,BUY,100,10,-1000\n"""
+        csv_content = (
+            "date,symbol,action,qty,price,amount,notes\n"
+            "2025-10-16,ORCL,SELL,100,320.17,32017,Trimmed position\n"
+            "2025-10-16,MLTX,BUY,100,10,-1000,Added to watchlist\n"
+        )
         rows = parse_trade_csv(csv_content.encode("utf-8"))
         assert len(rows) == 2
 
@@ -232,6 +236,10 @@ def test_import_trades_overwrites_existing_rows(tmp_path, monkeypatch):
             )
             assert other_day.symbol == "MSFT"
             assert other_day.price == pytest.approx(100.0)
+
+            note = session.get(NoteDaily, "2025-10-16")
+            assert note is not None
+            assert note.note == "Trimmed position"
     finally:
         db.dispose_engine()
 

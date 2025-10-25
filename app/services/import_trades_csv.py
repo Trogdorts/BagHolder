@@ -43,6 +43,10 @@ _HEADER_ALIASES = {
     "total": "amount",
     "net_amount": "amount",
     "proceeds": "amount",
+    "note": "notes",
+    "notes": "notes",
+    "day_note": "notes",
+    "day_notes": "notes",
 }
 
 _DATE_FORMATS = (
@@ -168,6 +172,7 @@ def parse_trade_csv(content: bytes) -> List[Dict[str, Any]]:
         canonical_headers.append(_canonical_header(header))
 
     rows: List[Dict[str, Any]] = []
+    include_notes = "notes" in canonical_headers
     for raw_row in reader:
         if not any((cell or "").strip() for cell in raw_row):
             continue
@@ -207,16 +212,18 @@ def parse_trade_csv(content: bytes) -> List[Dict[str, Any]]:
         if price_value is None or amount_value is None:
             continue
 
-        rows.append(
-            {
-                "date": date_value,
-                "symbol": symbol_value,
-                "action": action_value,
-                "qty": float(qty_abs),
-                "price": float(price_value),
-                "amount": float(amount_value),
-            }
-        )
+        row_data = {
+            "date": date_value,
+            "symbol": symbol_value,
+            "action": action_value,
+            "qty": float(qty_abs),
+            "price": float(price_value),
+            "amount": float(amount_value),
+        }
+        if include_notes:
+            row_data["note"] = values.get("notes", "")
+
+        rows.append(row_data)
 
     return rows
 

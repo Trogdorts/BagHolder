@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_session
 from app.core.logger import get_logger
-from app.core.models import DailySummary, Trade
+from app.core.models import DailySummary, NoteDaily, Trade
 from app.services.import_thinkorswim import parse_thinkorswim_csv
 from app.services.import_trades_csv import parse_trade_csv
 from app.services.trade_summaries import calculate_daily_trade_map, upsert_daily_summaries
@@ -117,6 +117,25 @@ def _persist_trade_rows(db: Session, rows):
     if not rows:
         return 0
 
+    notes_present = any("note" in row for row in rows)
+    notes_by_date: Dict[str, str] = {}
+    notes_has_content: Dict[str, bool] = {}
+    if notes_present:
+        for row in rows:
+            if "note" not in row:
+                continue
+            date_str = row["date"]
+            note_text = row.get("note", "") or ""
+            if date_str not in notes_by_date:
+                notes_by_date[date_str] = note_text
+                notes_has_content[date_str] = bool(note_text)
+                continue
+            if note_text and not notes_has_content.get(date_str, False):
+                notes_by_date[date_str] = note_text
+                notes_has_content[date_str] = True
+            elif not note_text and not notes_has_content.get(date_str, False):
+                notes_by_date[date_str] = ""
+
     deduped_rows = []
     seen = set()
     for row in rows:
@@ -161,6 +180,24 @@ def _persist_trade_rows(db: Session, rows):
     for row in deduped_rows:
         db.add(Trade(**row))
         inserted += 1
+
+    if notes_by_date:
+        timestamp = datetime.utcnow().isoformat()
+        for date_str, note_text in notes_by_date.items():
+            record = db.get(NoteDaily, date_str)
+            if record:
+                record.note = note_text
+                record.is_markdown = False
+                record.updated_at = timestamp
+            else:
+                db.add(
+                    NoteDaily(
+                        date=date_str,
+                        note=note_text,
+                        is_markdown=False,
+                        updated_at=timestamp,
+                    )
+                )
 
     db.commit()
     log.info("Persisted %s trades to database", inserted)
