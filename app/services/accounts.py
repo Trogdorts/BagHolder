@@ -2,16 +2,26 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 from app.core.seed import ensure_seed
+from app.services.data_reset import clear_all_data
 
 DEFAULT_ACCOUNT_ID = "primary"
 DEFAULT_ACCOUNT_NAME = "Primary account"
 DEFAULT_ACCOUNT_STORAGE = "."
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+class AccountOperationError(ValueError):
+    """Represents an account operation failure with a machine-friendly code."""
+
+    def __init__(self, code: str, message: str | None = None):
+        super().__init__(message or code)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -221,3 +231,70 @@ def serialize_accounts(accounts: Sequence[AccountRecord], active: AccountRecord)
         }
         for account in accounts
     ]
+
+
+def clear_account(cfg, base_dir: str, account_id: str) -> AccountRecord:
+    """Clear all stored data for the specified account."""
+
+    prepare_accounts(cfg, base_dir)
+    _, entries = _ensure_account_sections(cfg)
+    entry = entries.get(account_id)
+    if entry is None:
+        raise AccountOperationError("missing", "Account does not exist")
+
+    storage = entry.get("storage")
+    if not isinstance(storage, str) or not storage.strip():
+        storage = DEFAULT_ACCOUNT_STORAGE if account_id == DEFAULT_ACCOUNT_ID else os.path.join("accounts", account_id)
+        entry["storage"] = storage
+        cfg.save()
+
+    account_path = os.path.abspath(os.path.join(base_dir, storage))
+    os.makedirs(account_path, exist_ok=True)
+    clear_all_data(account_path)
+
+    name = entry.get("name")
+    if not isinstance(name, str) or not name.strip():
+        name = DEFAULT_ACCOUNT_NAME if account_id == DEFAULT_ACCOUNT_ID else account_id.title()
+
+    return AccountRecord(id=account_id, name=name, storage=storage, path=account_path)
+
+
+def delete_account(cfg, base_dir: str, account_id: str) -> AccountRecord:
+    """Remove an account and its associated data directory."""
+
+    prepare_accounts(cfg, base_dir)
+    accounts_section, entries = _ensure_account_sections(cfg)
+
+    if account_id == DEFAULT_ACCOUNT_ID:
+        raise AccountOperationError("protected", "The primary account cannot be deleted")
+
+    entry = entries.get(account_id)
+    if entry is None:
+        raise AccountOperationError("missing", "Account does not exist")
+
+    if len(entries) <= 1:
+        raise AccountOperationError("last_account", "At least one account must remain")
+
+    storage = entry.get("storage")
+    if not isinstance(storage, str) or not storage.strip():
+        storage = os.path.join("accounts", account_id)
+
+    name = entry.get("name")
+    if not isinstance(name, str) or not name.strip():
+        name = account_id.title()
+
+    account_path = os.path.abspath(os.path.join(base_dir, storage))
+    record = AccountRecord(id=account_id, name=name, storage=storage, path=account_path)
+
+    del entries[account_id]
+
+    if accounts_section.get("active") == account_id:
+        fallback_id = DEFAULT_ACCOUNT_ID if DEFAULT_ACCOUNT_ID in entries else next(iter(entries.keys()))
+        accounts_section["active"] = fallback_id
+
+    cfg.save()
+
+    if os.path.isdir(account_path):
+        shutil.rmtree(account_path, ignore_errors=True)
+    return record
+

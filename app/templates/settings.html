@@ -9,7 +9,7 @@
 {% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
 {% set server_port = cfg.get('server', {}).get('port', 8012) %}
-<div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+<div class="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
   <header class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
     <div class="flex flex-col gap-2">
       <div>
@@ -52,9 +52,8 @@
     {% endif %}
   </div>
 
-  <div class="grid gap-6 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)] xl:gap-8">
-    <div class="flex flex-col gap-6">
-      <section id="account-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+  <div class="flex flex-col gap-6">
+    <section id="account-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
         <header class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-neutral-50">Accounts</h2>
           <p class="text-sm text-neutral-400">Create dedicated data sets, rename them, and switch between portfolios with a click.</p>
@@ -68,6 +67,7 @@
           </form>
           <div class="space-y-3">
             {% for account in accounts %}
+              {% set is_primary = account.id == 'primary' %}
               <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -89,6 +89,25 @@
                   <input id="account-name-{{ account.id }}" name="account_name" value="{{ account.name }}" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" autocomplete="off">
                   <button class="btn btn-outline-primary px-3 py-2 text-sm sm:w-auto">Rename</button>
                 </form>
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <form method="post" action="/settings/accounts/clear" class="flex w-full sm:w-auto"
+                        onsubmit="return confirm('This will delete all trades, summaries, and notes for this account. Continue?');">
+                    <input type="hidden" name="account_id" value="{{ account.id }}">
+                    <input type="hidden" name="redirect_to" value="/settings">
+                    <button class="btn btn-outline-danger w-full px-3 py-2 text-sm sm:w-auto">
+                      Clear data
+                    </button>
+                  </form>
+                  <form method="post" action="/settings/accounts/delete" class="flex w-full sm:w-auto"
+                        onsubmit="return confirm('This will permanently delete the account and its data. Continue?');">
+                    <input type="hidden" name="account_id" value="{{ account.id }}">
+                    <input type="hidden" name="redirect_to" value="/settings">
+                    <button class="btn btn-danger w-full px-3 py-2 text-sm sm:w-auto {% if is_primary %}opacity-60 cursor-not-allowed pointer-events-none{% endif %}"
+                            {% if is_primary %}aria-disabled="true" tabindex="-1" disabled{% endif %}>
+                      Delete account
+                    </button>
+                  </form>
+                </div>
               </div>
             {% endfor %}
           </div>
@@ -117,9 +136,9 @@
             </form>
           </div>
         </div>
-      </section>
+    </section>
 
-      <form method="post" action="/settings" class="flex flex-col gap-6" x-data="settingsForm()" @submit="resetChanges()">
+    <form method="post" action="/settings" class="flex flex-col gap-6" x-data="settingsForm()" @submit="resetChanges()">
         <div x-show="hasChanges" x-cloak x-transition.opacity.duration.200ms class="rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
           You have unsaved changes. Don't forget to save before leaving this page.
         </div>
@@ -351,10 +370,8 @@
         </button>
       </div>
     </form>
-    </div>
 
-    <aside class="flex flex-col gap-6">
-      <section id="stock-data-import" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+    <section id="stock-data-import" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-neutral-50">Import trade history</h2>
           <p class="mt-1 text-sm text-neutral-400">Upload CSV trade summaries or ThinkOrSwim statements.</p>
@@ -383,9 +400,9 @@
             </form>
           </div>
         </div>
-      </section>
+    </section>
 
-      <section id="configuration-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+    <section id="configuration-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-neutral-50">Configuration</h2>
           <p class="mt-1 text-sm text-neutral-400">Export the current configuration or apply a previously exported JSON file.</p>
@@ -403,9 +420,9 @@
             <button type="submit" class="btn btn-primary w-full px-4 py-2">Import config</button>
           </form>
         </div>
-      </section>
+    </section>
 
-      <section id="backup-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
+    <section id="backup-settings" class="rounded-xl border border-neutral-800 bg-neutral-900/80 p-6 shadow-sm">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-neutral-50">Full backup</h2>
           <p class="mt-1 text-sm text-neutral-400">Create or restore a ZIP archive containing all application data.</p>
@@ -423,9 +440,9 @@
             <button class="btn btn-primary w-full px-4 py-2">Import backup</button>
           </form>
         </div>
-      </section>
+    </section>
 
-      <section id="danger-zone" class="rounded-xl border border-red-900/60 bg-red-950/40 p-6 shadow-sm">
+    <section id="danger-zone" class="rounded-xl border border-red-900/60 bg-red-950/40 p-6 shadow-sm">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-red-200">Danger zone</h2>
           <p class="mt-1 text-sm text-red-200/80">Clearing data removes every imported trade, calculated summary, and saved note. This action cannot be undone.</p>
@@ -436,12 +453,11 @@
         <form method="post" action="/settings/shutdown" onsubmit="return confirm('This will stop the server. Continue?');" class="mt-2 flex flex-col gap-3">
           <button class="btn btn-outline-danger w-full px-4 py-2">Shut down server</button>
         </form>
-      </section>
-      <a href="https://buymeacoffee.com/crissejdav6" target="_blank" rel="noopener noreferrer"
-         class="btn btn-outline-danger mt-4 inline-flex w-full justify-center px-3 py-1 text-xs uppercase tracking-wide">
-        Buy me a coffee
-      </a>
-    </aside>
+    </section>
+    <a href="https://buymeacoffee.com/crissejdav6" target="_blank" rel="noopener noreferrer"
+       class="btn btn-outline-danger inline-flex w-full justify-center px-3 py-1 text-xs uppercase tracking-wide">
+      Buy me a coffee
+    </a>
   </div>
 </div>
 <script>
