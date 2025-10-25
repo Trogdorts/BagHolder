@@ -32,7 +32,7 @@
     <a href="#stock-data-import" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Imports</a>
     <a href="#configuration-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Configuration</a>
     <a href="#backup-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Backups</a>
-    <a href="#danger-zone" class="rounded-full border border-red-900/40 bg-red-950/30 px-4 py-2 font-medium text-red-200 transition hover:border-red-500/70 hover:text-red-100">Danger zone</a>
+    <a href="#user-management" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">User management</a>
   </nav>
 
   <div class="space-y-3">
@@ -87,7 +87,7 @@
       <a href="#stock-data-import" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Import history</a>
       <a href="#configuration-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Configuration</a>
       <a href="#backup-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Full backup</a>
-      <a href="#danger-zone" class="rounded-lg px-3 py-2 font-medium text-red-200 transition hover:bg-red-950/40 hover:text-red-100">Danger zone</a>
+      <a href="#user-management" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">User management</a>
     </aside>
 
     <div class="flex flex-col gap-6">
@@ -480,67 +480,67 @@
         </div>
     </section>
 
-    <section id="danger-zone" class="rounded-2xl border border-red-900/70 bg-gradient-to-br from-red-950/40 via-red-950/60 to-black/50 p-6 shadow-2xl shadow-red-900/20">
+    <section id="user-management" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4">
-          <h2 class="text-lg font-semibold text-red-200">Danger zone</h2>
-          <p class="mt-1 text-sm text-red-200/80">Use these tools carefully—most actions cannot be undone.</p>
+          <h2 class="text-lg font-semibold text-neutral-50">User management</h2>
+          <p class="mt-1 text-sm text-neutral-400">Invite teammates, update credentials, and manage administrative tools.</p>
         </header>
         {% if current_user and current_user.is_admin %}
           <div class="space-y-6">
-            <div class="rounded-xl border border-red-900/40 bg-red-950/30 p-5">
+            <div class="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-5">
               <div class="mb-4">
-                <h3 class="text-sm font-semibold text-red-100">Team access</h3>
-                <p class="text-xs text-red-200/80">Invite new administrators or remove existing users from BagHolder.</p>
+                <h3 class="text-sm font-semibold text-neutral-100">Team access</h3>
+                <p class="text-xs text-neutral-400">Invite new administrators or remove existing users from BagHolder.</p>
               </div>
               <div class="space-y-4">
                 <div>
-                  <p class="text-xs font-semibold uppercase tracking-wide text-red-300/80">Current users</p>
+                  <p class="text-xs font-semibold uppercase tracking-wide text-neutral-500">Current users</p>
                   <div class="mt-2 space-y-2">
                     {% if managed_users %}
                       {% for user in managed_users %}
-                        <div class="flex items-center justify-between rounded-lg border border-red-900/40 bg-red-950/20 px-3 py-2">
+                        <div class="flex items-center justify-between rounded-lg border border-neutral-800/60 bg-neutral-900/70 px-3 py-2">
                           <div>
-                            <p class="text-sm font-medium text-red-100">
+                            <p class="text-sm font-medium text-neutral-100">
                               {{ user.username }}
-                              {% if current_user and user.id|int == current_user.id %}<span class="text-xs text-red-300/80">(you)</span>{% endif %}
+                              {% if current_user and user.id|int == current_user.id %}<span class="text-xs text-neutral-400">(you)</span>{% endif %}
                             </p>
-                            <p class="text-[11px] text-red-300/70">Added {{ user.created_at }}</p>
+                            <p class="text-[11px] text-neutral-500">Added {{ user.created_at }}</p>
                           </div>
-                          <span class="rounded-full border border-red-500/40 px-2 py-0.5 text-[10px] uppercase tracking-widest text-red-200/90">{% if user.is_admin %}Admin{% else %}User{% endif %}</span>
+                          <span class="rounded-full border border-blue-500/40 px-2 py-0.5 text-[10px] uppercase tracking-widest text-blue-200/90">{% if user.is_admin %}Admin{% else %}User{% endif %}</span>
                         </div>
                       {% endfor %}
                     {% else %}
-                      <p class="text-xs text-red-200/80">No users have been configured yet.</p>
+                      <p class="text-xs text-neutral-400">No users have been configured yet.</p>
                     {% endif %}
                   </div>
                 </div>
                 <form method="post" action="/settings/users/create" class="grid gap-3 sm:grid-cols-2">
                   <input type="hidden" name="redirect_to" value="/settings">
-                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
                     Username
-                    <input name="username" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" autocomplete="off" required>
+                    <input name="username" class="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40" autocomplete="off" required>
                   </label>
-                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
                     Password
-                    <input type="password" name="password" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" minlength="8" required>
+                    <input type="password" name="password" class="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40" minlength="8" required>
                   </label>
-                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
                     Confirm password
-                    <input type="password" name="confirm_password" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" minlength="8" required>
+                    <input type="password" name="confirm_password" class="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40" minlength="8" required>
                   </label>
-                  <label class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-red-200/80">
-                    <input type="checkbox" name="is_admin" value="true" class="h-4 w-4 rounded border-red-800 bg-red-950 text-red-500 focus:ring-red-500">
+                  <label class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    <input type="checkbox" name="is_admin" value="true" class="h-4 w-4 rounded border-neutral-700 bg-neutral-900 text-blue-500 focus:ring-blue-500">
                     Grant administrator access
                   </label>
                   <div class="sm:col-span-2">
-                    <button class="btn btn-danger w-full px-4 py-2 text-sm">Add user</button>
+                    <button class="btn btn-primary w-full px-4 py-2 text-sm">Add user</button>
                   </div>
                 </form>
                 <form method="post" action="/settings/users/reset-password" class="grid gap-3 sm:grid-cols-2">
                   <input type="hidden" name="redirect_to" value="/settings">
-                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                  <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
                     Select user
-                    <select name="user_id" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" required>
+                    <select name="user_id" class="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40" required>
                       <option value="" disabled selected>Choose a user</option>
                       {% for user in managed_users %}
                         <option value="{{ user.id }}">{{ user.username }}{% if user.is_admin %} (admin){% endif %}</option>
@@ -548,13 +548,13 @@
                     </select>
                   </label>
                   <div class="grid gap-3 sm:grid-cols-2 sm:col-span-2">
-                    <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                    <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
                       New password
-                      <input type="password" name="new_password" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" minlength="8" required>
+                      <input type="password" name="new_password" class="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40" minlength="8" required>
                     </label>
-                    <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                    <label class="flex flex-col gap-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
                       Confirm password
-                      <input type="password" name="confirm_password" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" minlength="8" required>
+                      <input type="password" name="confirm_password" class="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40" minlength="8" required>
                     </label>
                   </div>
                   <div class="sm:col-span-2">
@@ -563,9 +563,9 @@
                 </form>
                 <form method="post" action="/settings/users/delete" class="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <input type="hidden" name="redirect_to" value="/settings">
-                  <label class="flex w-full flex-col gap-1 text-xs font-medium uppercase tracking-wide text-red-200/80">
+                  <label class="flex w-full flex-col gap-1 text-xs font-medium uppercase tracking-wide text-neutral-500">
                     Remove user
-                    <select name="user_id" class="rounded-lg border border-red-900/50 bg-red-950/30 px-3 py-2 text-sm text-red-100 focus:outline-none focus:ring-2 focus:ring-red-500/60" required>
+                    <select name="user_id" class="rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40" required>
                       <option value="" disabled selected>Select a user</option>
                       {% for user in managed_users %}
                         <option value="{{ user.id }}">{{ user.username }}{% if user.is_admin %} (admin){% endif %}</option>
@@ -574,13 +574,13 @@
                   </label>
                   <button class="btn btn-outline-danger w-full px-4 py-2 text-sm sm:w-auto">Delete user</button>
                 </form>
-                <p class="text-[11px] text-red-300/70">Administrators cannot delete their own account from this list. Use the personal controls below to remove yourself.</p>
+                <p class="text-[11px] text-neutral-500">Administrators cannot delete their own account from this list. Use the personal controls below to remove yourself.</p>
               </div>
             </div>
-            <div class="rounded-xl border border-red-900/40 bg-red-950/30 p-5">
+            <div class="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-5">
               <div class="mb-4">
-                <h3 class="text-sm font-semibold text-red-100">Application maintenance</h3>
-                <p class="text-xs text-red-200/80">Reset trading data or safely restart the server when maintenance is required.</p>
+                <h3 class="text-sm font-semibold text-neutral-100">Application maintenance</h3>
+                <p class="text-xs text-neutral-400">Reset trading data or safely restart the server when maintenance is required.</p>
               </div>
               <form method="post" action="/settings/clear-data" class="flex flex-col gap-3"
                     onsubmit="return confirm('This will remove all trades, summaries, notes, and configuration data for every portfolio. User accounts will remain. Continue?');">
@@ -592,10 +592,10 @@
                 <button class="btn btn-outline-danger w-full px-4 py-2">Shut down server</button>
               </form>
             </div>
-            <div class="rounded-xl border border-red-900/40 bg-red-950/30 p-5">
+            <div class="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-5">
               <div class="mb-3">
-                <h3 class="text-sm font-semibold text-red-100">Personal account</h3>
-                <p class="text-xs text-red-200/80">Remove your own login once another administrator is available to manage the system.</p>
+                <h3 class="text-sm font-semibold text-neutral-100">Personal account</h3>
+                <p class="text-xs text-neutral-400">Remove your own login once another administrator is available to manage the system.</p>
               </div>
               <form method="post" action="/settings/account/delete" class="flex flex-col gap-3"
                     onsubmit="return confirm('This will permanently delete your user account and sign you out. Continue?');">
@@ -605,17 +605,17 @@
             </div>
           </div>
         {% else %}
-          <div class="rounded-xl border border-red-900/40 bg-red-950/30 p-5">
+          <div class="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-5">
             <div class="mb-3">
-              <h3 class="text-sm font-semibold text-red-100">Delete my account</h3>
-              <p class="text-xs text-red-200/80">Remove your access to BagHolder. This action is permanent and cannot be undone.</p>
+              <h3 class="text-sm font-semibold text-neutral-100">Delete my account</h3>
+              <p class="text-xs text-neutral-400">Remove your access to BagHolder. This action is permanent and cannot be undone.</p>
             </div>
             <form method="post" action="/settings/account/delete" class="flex flex-col gap-3"
                   onsubmit="return confirm('This will permanently delete your user account and sign you out. Continue?');">
               <input type="hidden" name="redirect_to" value="/settings">
               <button class="btn btn-danger w-full px-4 py-2">Delete my account</button>
             </form>
-            <p class="mt-3 text-xs text-red-200/80">Need other help? Contact an administrator to reset data or invite you again.</p>
+            <p class="mt-3 text-xs text-neutral-400">Need other help? Contact an administrator to reset data or invite you again.</p>
           </div>
         {% endif %}
     </section>
