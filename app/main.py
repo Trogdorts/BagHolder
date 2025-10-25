@@ -54,7 +54,12 @@ def create_app():
             return await call_next(request)
 
         request.state.user = None
-        session_user_id = request.session.get("user_id") if hasattr(request, "session") else None
+
+        session_data = request.scope.get("session")
+        if not isinstance(session_data, dict):
+            session_data = {}
+            request.scope["session"] = session_data
+        session_user_id = session_data.get("user_id")
 
         if session_user_id is not None and database.SessionLocal is not None:
             with database.SessionLocal() as db_session:
@@ -62,7 +67,7 @@ def create_app():
                 if user is not None:
                     request.state.user = user
                 else:
-                    request.session.pop("user_id", None)
+                    session_data.pop("user_id", None)
 
         public_paths = {"/login", "/login/register"}
         is_public = (
