@@ -36,39 +36,6 @@ BAGHOLDER_BOOTSTRAP_PASSWORD=super-secret-password
 When both bootstrap variables are provided the container automatically creates
 the initial administrator account on startup.
 
-### Fresh Docker image with interactive first-run setup
-
-To rebuild the container for a clean install that prompts for new credentials
-on first launch:
-
-1. Stop any running containers and remove the persisted application data:
-
-   ```bash
-   docker compose down
-   rm -rf app/data
-   ```
-
-   Removing `app/data` ensures the bundled SQLite database and configuration are
-   recreated the next time the container starts.
-
-2. Clear any bootstrap credentials from your environment (unset
-   `BAGHOLDER_BOOTSTRAP_USERNAME` / `BAGHOLDER_BOOTSTRAP_PASSWORD` in `.env` if
-   present) so the application will ask for a username and password interactively.
-
-3. Build a fresh image and start the stack:
-
-   ```bash
-   docker compose build --no-cache
-   docker compose up -d
-   ```
-
-4. Open [http://localhost:8012](http://localhost:8012). Because the database is
-   empty, the login page displays the **Create administrator** prompt. Supply a
-   new username and password to finish the first-run setup.
-
-Once the account is created you can sign in immediately and begin importing
-data.
-
 ## Manual dev
 
 ```bash
