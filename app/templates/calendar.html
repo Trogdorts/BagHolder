@@ -3,7 +3,7 @@
 {% set ui_cfg = cfg.get('ui', {}) %}
 {% set notes_cfg = cfg.get('notes', {}) %}
 {% set show_unrealized_default = show_unrealized_flag if show_unrealized_flag is defined else ui_cfg.get('show_unrealized', True) %}
-{% set show_trade_count_badges = show_trade_badges if show_trade_badges is defined else ui_cfg.get('show_trade_count', True) %}
+{% set show_trade_count_badges = show_trade_badges if show_trade_badges is defined else ui_cfg.get('show_trade_count', False) %}
 {% set show_text_default = show_text_flag if show_text_flag is defined else ui_cfg.get('show_text', True) %}
 {% set show_percentages_default = show_percentages_flag if show_percentages_flag is defined else ui_cfg.get('show_percentages', True) %}
 {% set show_weekends = show_weekends_flag if show_weekends_flag is defined else ui_cfg.get('show_weekends', True) %}
@@ -13,7 +13,8 @@
         showUnrealized: {{ 'true' if show_unrealized_default else 'false' }},
         showExcludeControls: {{ 'true' if show_exclude_controls else 'false' }},
         showPercentages: {{ 'true' if show_percentages_default else 'false' }},
-        showWeekends: {{ 'true' if show_weekends else 'false' }}
+        showWeekends: {{ 'true' if show_weekends else 'false' }},
+        showTradeCounts: {{ 'true' if show_trade_count_badges else 'false' }}
       })"
      data-calendar-root="true"
      data-calendar-year="{{ year }}"
@@ -68,7 +69,7 @@
 </style>
 <div class="flex items-center justify-between">
   <div class="text-lg font-semibold">{{ year }}-{{ "%02d"|format(month) }}</div>
-  <div class="flex items-center gap-2 flex-wrap justify-end" @keydown.escape.window="exportOpen = false">
+  <div class="flex items-center gap-2 flex-wrap justify-end">
     {% set prev_year = (month == 1) and year-1 or year %}
     {% set prev_month = (month == 1) and 12 or month-1 %}
     {% set next_year = (month == 12) and year+1 or year %}
@@ -76,48 +77,6 @@
     <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Prev</a>
     <a href="/calendar/{{ current_year }}/{{ current_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Home</a>
     <a href="/calendar/{{ next_year }}/{{ next_month }}" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800">Next</a>
-    <div class="relative">
-      <button type="button"
-              class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
-              :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': exportOpen }"
-              @click="exportOpen = !exportOpen"
-              aria-haspopup="true"
-              :aria-expanded="exportOpen.toString()">
-        Export
-      </button>
-      <div x-show="exportOpen"
-           x-cloak
-           @click.outside="exportOpen = false"
-           class="absolute right-0 z-30 mt-2 w-72 space-y-3 rounded border border-neutral-800 bg-neutral-950 p-4 shadow-xl">
-        <form method="get" action="/export" class="space-y-3">
-          <p class="text-sm text-neutral-300">Download data from the selected date range.</p>
-          <div class="space-y-2">
-            <label class="block text-sm">
-              <span class="text-neutral-400">Start date</span>
-              <input type="date" name="start" value="{{ export_default_start }}"
-                     class="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500" />
-            </label>
-            <label class="block text-sm">
-              <span class="text-neutral-400">End date</span>
-              <input type="date" name="end" value="{{ export_default_end }}"
-                     class="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500" />
-            </label>
-            <label class="block text-sm">
-              <span class="text-neutral-400">Data type</span>
-              <select name="dataset"
-                      class="mt-1 w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-neutral-100 focus:outline-none focus:ring-1 focus:ring-neutral-500">
-                <option value="summaries">Daily summaries (CSV)</option>
-                <option value="trades">Trades with notes (CSV)</option>
-              </select>
-            </label>
-          </div>
-          <div class="flex items-center justify-end gap-2 pt-2 border-t border-neutral-800">
-            <button type="button" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800" @click="exportOpen = false">Cancel</button>
-            <button type="submit" class="btn btn-primary px-3 py-1 text-sm">Download</button>
-          </div>
-        </form>
-      </div>
-    </div>
     <button type="button"
             class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
             :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': !showUnrealized }"
@@ -156,6 +115,16 @@
             :aria-pressed="showWeekends.toString()">
       <span x-text="showWeekends ? 'Hide weekends' : 'Show weekends'">
         {% if show_weekends %}Hide weekends{% else %}Show weekends{% endif %}
+      </span>
+    </button>
+    <button type="button"
+            class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition"
+            :class="{ 'bg-neutral-800 text-neutral-100 border-neutral-600': showTradeCounts }"
+            @click="toggleTradeCounts"
+            aria-pressed="{{ 'true' if show_trade_count_badges else 'false' }}"
+            :aria-pressed="showTradeCounts.toString()">
+      <span x-text="showTradeCounts ? 'Hide trade count' : 'Show trade count'">
+        {% if show_trade_count_badges %}Hide trade count{% else %}Show trade count{% endif %}
       </span>
     </button>
   </div>
@@ -208,8 +177,11 @@
             </svg>
             <span class="sr-only">View trades</span>
             {% set trade_count = d.trades|length %}
-            {% if trade_count and show_trade_count_badges %}
-            <span class="trade-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full text-[10px] font-semibold px-1 text-center">{{ trade_count }}</span>
+            {% if trade_count %}
+              <span class="trade-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full text-[10px] font-semibold px-1 text-center"
+                    x-cloak
+                    x-show="showTradeCounts"
+                    {% if not show_trade_count_badges %}style="display: none;"{% endif %}>{{ trade_count }}</span>
             {% endif %}
           </button>
         </div>
@@ -587,7 +559,10 @@ function calendarToolbar(initialState = {}) {
         ? true
         : !!initialState.showPercentages,
     showWeekends: !!initialState.showWeekends,
-    exportOpen: false,
+    showTradeCounts:
+      initialState.showTradeCounts === undefined
+        ? false
+        : !!initialState.showTradeCounts,
     async toggleUnrealized() {
       const previous = this.showUnrealized;
       const next = !previous;
@@ -625,6 +600,15 @@ function calendarToolbar(initialState = {}) {
         return;
       }
       window.location.reload();
+    },
+    async toggleTradeCounts() {
+      const previous = this.showTradeCounts;
+      const next = !previous;
+      this.showTradeCounts = next;
+      const saved = await updateUiPreferences({ show_trade_count: next });
+      if (!saved) {
+        this.showTradeCounts = previous;
+      }
     },
   };
 }
