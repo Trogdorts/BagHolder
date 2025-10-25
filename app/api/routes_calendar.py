@@ -226,6 +226,19 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             return None
         return round((realized_value / total_invested) * 100.0, 2)
 
+    def invested_max(rows: List[DailySummary]) -> float:
+        max_value = 0.0
+        for row in rows:
+            try:
+                magnitude = abs(float(row.total_invested))
+            except (TypeError, ValueError):
+                continue
+            if math.isclose(magnitude, 0.0, abs_tol=0.005):
+                continue
+            if magnitude > max_value:
+                max_value = magnitude
+        return max_value
+
     for week in month_days:
         iso_year, iso_week, _ = week[0].isocalendar()
         wk = []
@@ -366,6 +379,10 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     year_realized = sum(float(r.realized) for r in year_rows)
     year_unrealized = sum(float(r.unrealized) for r in year_rows)
     year_trading_days = sum(1 for r in year_rows if r)
+    year_percent = calculate_percentage(
+        year_realized,
+        [float(r.total_invested) for r in year_rows],
+    )
 
     # Rolling 12 month totals ending at the current month
     rolling_rows = (
@@ -376,6 +393,24 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     rolling_realized = sum(float(r.realized) for r in rolling_rows)
     rolling_unrealized = sum(float(r.unrealized) for r in rolling_rows)
     rolling_trading_days = sum(1 for r in rolling_rows if r)
+    rolling_year_percent = calculate_percentage(
+        rolling_realized,
+        [float(r.total_invested) for r in rolling_rows],
+    )
+
+    year_other_rows = []
+    rolling_other_rows = []
+    for row in year_rows:
+        row_date = date.fromisoformat(row.date)
+        if row_date.year != year or row_date.month != month:
+            year_other_rows.append(row)
+    for row in rolling_rows:
+        row_date = date.fromisoformat(row.date)
+        if row_date.year != year or row_date.month != month:
+            rolling_other_rows.append(row)
+
+    year_other_invested_max = invested_max(year_other_rows)
+    rolling_other_invested_max = invested_max(rolling_other_rows)
 
     ctx = {
         "request": request,
@@ -388,9 +423,13 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "year_realized": year_realized,
         "year_unrealized": year_unrealized,
         "year_trading_days": year_trading_days,
+        "year_percent": year_percent,
         "rolling_year_realized": rolling_realized,
         "rolling_year_unrealized": rolling_unrealized,
         "rolling_year_trading_days": rolling_trading_days,
+        "rolling_year_percent": rolling_year_percent,
+        "year_other_invested_max": year_other_invested_max,
+        "rolling_year_other_invested_max": rolling_other_invested_max,
         "cfg": request.app.state.config.raw,
         "show_trade_badges": show_trade_badges,
         "show_unrealized_flag": show_unrealized_default,
