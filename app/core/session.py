@@ -63,6 +63,14 @@ class SignedCookieSessionMiddleware(BaseHTTPMiddleware):
     def _load_cookie(self, value: str | None) -> dict[str, Any]:
         if not value:
             return {}
+        # Some HTTP client implementations (notably curl and certain browsers)
+        # wrap cookie values in double quotes when the payload contains
+        # characters such as ``=``. The session cookie relies on a ``.``
+        # separated pair of base64 blobs, so we trim matching quotes before
+        # attempting to decode the payload.
+        value = value.strip()
+        if value.startswith("\"") and value.endswith("\"") and len(value) >= 2:
+            value = value[1:-1]
         try:
             signature_b64, payload_b64 = value.split(".", 1)
             signature = base64.urlsafe_b64decode(signature_b64.encode("utf-8"))
