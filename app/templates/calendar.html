@@ -171,6 +171,19 @@
   .hide-percentages [data-month-percent] {
     display: none !important;
   }
+
+  [data-day-realized-amount],
+  [data-day-percent] {
+    display: block;
+  }
+
+  [data-calendar-root]:not(.hide-percentages) [data-day-realized-amount][data-has-percent="true"] {
+    display: none;
+  }
+
+  [data-calendar-root]:not(.hide-percentages) [data-day-percent]:not(.hidden) {
+    display: block;
+  }
 </style>
 <div class="toolbar-card">
   <div class="toolbar-top">
@@ -298,11 +311,9 @@
         <div class="text-sm space-y-1">
           {% set realized_class = 'text-profit' if d.realized > 0 else ('text-loss' if d.realized < 0 else 'text-neutral-200') %}
             {% if d.show_realized %}
-          <div class="{{ realized_class }}">
-            Realized: {{ d.realized|money }}
-            {% if show_percentages_default and d.percent is not none %}
-            <span class="block text-[11px] text-neutral-300 md:inline md:ml-1" data-day-percent>{{ '{:+.2f}%'.format(d.percent) }}</span>
-            {% endif %}
+          <div class="{{ realized_class }} space-y-1">
+            <span data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">Realized: {{ d.realized|money }}</span>
+            <span data-day-percent class="{% if d.percent is none %}hidden{% endif %}">Realized: {{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span>
           </div>
           {% endif %}
           <div class="{{ 'text-profit' if d.unrealized > 0 else ('text-loss' if d.unrealized < 0 else 'text-neutral-200') }}"
