@@ -16,7 +16,7 @@ from app.core.models import NoteDaily, NoteWeekly, NoteMonthly  # noqa: E402
 
 
 def _build_request(app):
-    return Request({"type": "http", "app": app, "method": "GET", "headers": []})
+    return Request({"type": "http", "app": app, "method": "GET", "path": "/", "headers": []})
 
 
 def _find_day(weeks, target_date: date):

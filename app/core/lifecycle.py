@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from dataclasses import asdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from fastapi import FastAPI
@@ -15,6 +16,7 @@ from app.core.database import dispose_engine, init_db
 from app.core.logger import configure_logging
 from app.core.seed import ensure_seed
 from app.core.utils import coerce_bool
+from app.services.accounts import prepare_accounts, serialize_accounts
 
 
 _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -111,6 +113,7 @@ def reload_application_state(app: FastAPI, data_dir: str | None = None) -> AppCo
     os.makedirs(data_dir, exist_ok=True)
 
     cfg = AppConfig.load(data_dir)
+    accounts, active_account = prepare_accounts(cfg, data_dir)
     diagnostics_cfg = cfg.raw.get("diagnostics", {}) if isinstance(cfg.raw, dict) else {}
     debug_logging = coerce_bool(diagnostics_cfg.get("debug_logging"), False)
     log_path = configure_logging(
@@ -120,7 +123,7 @@ def reload_application_state(app: FastAPI, data_dir: str | None = None) -> AppCo
         retention=diagnostics_cfg.get("log_retention", 5),
     )
 
-    db_path = os.path.join(data_dir, "profitloss.db")
+    db_path = os.path.join(active_account.path, "profitloss.db")
 
     # Recreate the engine to ensure SQLite reloads the database file.
     dispose_engine()
@@ -130,8 +133,14 @@ def reload_application_state(app: FastAPI, data_dir: str | None = None) -> AppCo
     templates = _build_templates(cfg)
     app.state.templates = templates
     app.state.config = cfg
+    app.state.accounts = accounts
+    app.state.active_account = active_account
+    app.state.account_data_dir = active_account.path
     app.state.log_path = str(log_path)
     app.state.debug_logging_enabled = debug_logging
+
+    templates.env.globals["accounts"] = serialize_accounts(accounts, active_account)
+    templates.env.globals["active_account"] = asdict(active_account)
 
     log.info(
         "Application state reloaded (debug_logging=%s, log_path=%s)",

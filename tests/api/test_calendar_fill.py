@@ -17,7 +17,7 @@ from app.services.trade_summaries import recompute_daily_summaries
 
 
 def _build_request(app):
-    return Request({"type": "http", "app": app, "method": "GET", "headers": []})
+    return Request({"type": "http", "app": app, "method": "GET", "path": "/", "headers": []})
 
 
 def _get_day(weeks, target_date):

@@ -380,9 +380,14 @@
         <div class="space-y-1"
              data-rolling-summary
              data-base-realized="{{ '%.10g'|format(rolling_year_realized) }}"
-             data-base-unrealized="{{ '%.10g'|format(rolling_year_unrealized) }}">
+             data-base-unrealized="{{ '%.10g'|format(rolling_year_unrealized) }}"
+             data-base-trading-days="{{ rolling_year_trading_days }}">
           <p class="text-[11px] uppercase tracking-wide text-neutral-400">Last 12 months</p>
           <div>Realized: <span data-rolling-realized-value class="{{ 'text-profit' if rolling_year_realized > 0 else ('text-loss' if rolling_year_realized < 0 else 'text-neutral-200') }}">{{ rolling_year_realized|money }}</span></div>
+          <div class="text-sm hidden" data-rolling-average>
+            <span class="text-neutral-300">Avg realized per day (<span data-rolling-average-count>0</span> days):</span>
+            <span data-rolling-average-value class="text-neutral-200"></span>
+          </div>
           <div x-show="showUnrealized" x-cloak>
             Unrealized (invested): <span data-rolling-unrealized-value class="{{ 'text-profit' if rolling_year_unrealized > 0 else ('text-loss' if rolling_year_unrealized < 0 else 'text-neutral-200') }}">{{ rolling_year_unrealized|money }}</span>
           </div>
@@ -390,9 +395,14 @@
         <div class="space-y-1"
              data-year-summary
              data-base-realized="{{ '%.10g'|format(year_realized) }}"
-             data-base-unrealized="{{ '%.10g'|format(year_unrealized) }}">
+             data-base-unrealized="{{ '%.10g'|format(year_unrealized) }}"
+             data-base-trading-days="{{ year_trading_days }}">
           <p class="text-[11px] uppercase tracking-wide text-neutral-400">Since Jan 1</p>
           <div>Realized: <span data-year-realized-value class="{{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
+          <div class="text-sm hidden" data-year-average>
+            <span class="text-neutral-300">Avg realized per day (<span data-year-average-count>0</span> days):</span>
+            <span data-year-average-value class="text-neutral-200"></span>
+          </div>
           <div x-show="showUnrealized" x-cloak>
             Unrealized (invested): <span data-year-unrealized-value class="{{ 'text-profit' if year_unrealized > 0 else ('text-loss' if year_unrealized < 0 else 'text-neutral-200') }}">{{ year_unrealized|money }}</span>
           </div>
@@ -845,10 +855,16 @@ const dayImpactSimulator = (() => {
   const rollingSummaryEl = document.querySelector('[data-rolling-summary]');
   const rollingRealizedEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-realized-value]') : null;
   const rollingUnrealizedEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-unrealized-value]') : null;
+  const rollingAverageContainer = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-average]') : null;
+  const rollingAverageCountEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-average-count]') : null;
+  const rollingAverageValueEl = rollingSummaryEl ? rollingSummaryEl.querySelector('[data-rolling-average-value]') : null;
 
   const yearSummaryEl = document.querySelector('[data-year-summary]');
   const yearRealizedEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-realized-value]') : null;
   const yearUnrealizedEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-unrealized-value]') : null;
+  const yearAverageContainer = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-average]') : null;
+  const yearAverageCountEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-average-count]') : null;
+  const yearAverageValueEl = yearSummaryEl ? yearSummaryEl.querySelector('[data-year-average-value]') : null;
 
   const weekSummaries = new Map();
   document.querySelectorAll('[data-week-summary]').forEach((weekEl) => {
@@ -868,13 +884,17 @@ const dayImpactSimulator = (() => {
 
   const yearBaseRealized = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseRealized);
   const yearBaseUnrealized = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseUnrealized);
+  const yearBaseTradingDays = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseTradingDays);
   const rollingBaseRealized = parseNumber(rollingSummaryEl && rollingSummaryEl.dataset.baseRealized);
   const rollingBaseUnrealized = parseNumber(rollingSummaryEl && rollingSummaryEl.dataset.baseUnrealized);
+  const rollingBaseTradingDays = parseNumber(rollingSummaryEl && rollingSummaryEl.dataset.baseTradingDays);
 
   let monthInitialRealized = 0;
   let monthInitialUnrealized = 0;
   let rollingMonthRealized = 0;
   let rollingMonthUnrealized = 0;
+  let monthInitialYearTradingDays = 0;
+  let monthInitialRollingTradingDays = 0;
 
   dayMap.forEach((day) => {
     if (day.inMonth && day.hasValues) {
@@ -883,6 +903,10 @@ const dayImpactSimulator = (() => {
       if (day.inRolling) {
         rollingMonthRealized += day.realized;
         rollingMonthUnrealized += day.unrealized;
+        monthInitialRollingTradingDays += 1;
+      }
+      if (day.belongsToYear) {
+        monthInitialYearTradingDays += 1;
       }
     }
   });
@@ -891,6 +915,8 @@ const dayImpactSimulator = (() => {
   const yearOtherUnrealized = yearBaseUnrealized - monthInitialUnrealized;
   const rollingOtherRealized = rollingBaseRealized - rollingMonthRealized;
   const rollingOtherUnrealized = rollingBaseUnrealized - rollingMonthUnrealized;
+  const yearOtherTradingDays = Math.max(0, yearBaseTradingDays - monthInitialYearTradingDays);
+  const rollingOtherTradingDays = Math.max(0, rollingBaseTradingDays - monthInitialRollingTradingDays);
 
   function applySignClass(element, value) {
     if (!element) {
@@ -963,8 +989,10 @@ const dayImpactSimulator = (() => {
     let monthTradingDays = 0;
     let yearRealized = yearOtherRealized;
     let yearUnrealized = yearOtherUnrealized;
+    let yearTradingDays = yearOtherTradingDays;
     let rollingRealized = rollingOtherRealized;
     let rollingUnrealized = rollingOtherUnrealized;
+    let rollingTradingDays = rollingOtherTradingDays;
 
     dayMap.forEach((day) => {
       if (!day.included) {
@@ -979,10 +1007,14 @@ const dayImpactSimulator = (() => {
       if (day.inMonth && day.hasValues && day.belongsToYear) {
         yearRealized += day.realized;
         yearUnrealized += day.unrealized;
+        yearTradingDays += 1;
       }
       if (day.inRolling && day.hasValues) {
         rollingRealized += day.realized;
         rollingUnrealized += day.unrealized;
+        if (day.inMonth) {
+          rollingTradingDays += 1;
+        }
       }
     });
 
@@ -1026,6 +1058,18 @@ const dayImpactSimulator = (() => {
       applySignClass(rollingUnrealizedEl, rollingUnrealized);
     }
 
+    if (rollingAverageContainer && rollingAverageCountEl && rollingAverageValueEl) {
+      if (rollingTradingDays > 0) {
+        rollingAverageCountEl.textContent = rollingTradingDays.toString();
+        const rollingAverage = rollingRealized / rollingTradingDays;
+        rollingAverageValueEl.textContent = formatMoney(rollingAverage);
+        applySignClass(rollingAverageValueEl, rollingAverage);
+        rollingAverageContainer.classList.remove('hidden');
+      } else {
+        rollingAverageContainer.classList.add('hidden');
+      }
+    }
+
     if (yearRealizedEl) {
       yearRealizedEl.textContent = formatMoney(yearRealized);
       applySignClass(yearRealizedEl, yearRealized);
@@ -1033,6 +1077,18 @@ const dayImpactSimulator = (() => {
     if (yearUnrealizedEl) {
       yearUnrealizedEl.textContent = formatMoney(yearUnrealized);
       applySignClass(yearUnrealizedEl, yearUnrealized);
+    }
+
+    if (yearAverageContainer && yearAverageCountEl && yearAverageValueEl) {
+      if (yearTradingDays > 0) {
+        yearAverageCountEl.textContent = yearTradingDays.toString();
+        const yearAverage = yearRealized / yearTradingDays;
+        yearAverageValueEl.textContent = formatMoney(yearAverage);
+        applySignClass(yearAverageValueEl, yearAverage);
+        yearAverageContainer.classList.remove('hidden');
+      } else {
+        yearAverageContainer.classList.add('hidden');
+      }
     }
 
     weekStructure.forEach((entries, key) => {

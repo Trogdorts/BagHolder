@@ -8,6 +8,15 @@ from dataclasses import dataclass, field
 from typing import Any, Dict
 
 DEFAULT_CONFIG = {
+    "accounts": {
+        "active": "primary",
+        "entries": {
+            "primary": {
+                "name": "Primary account",
+                "storage": ".",
+            }
+        },
+    },
     "server": {"host": "0.0.0.0", "port": 8012, "data_folder": "/app/data"},
     "ui": {
         "theme": "dark",
@@ -46,6 +55,7 @@ DEFAULT_CONFIG = {
         "auto_recalculate": True,
         "backup_before_import": True,
         "accepted_formats": [".csv"],
+        "max_upload_bytes": 5_000_000,
     },
     "view": {"default": "latest", "remember_last_view": True, "month_start_day": "monday"},
     "backup": {"enable_auto_backup": True, "retention_days": 7},

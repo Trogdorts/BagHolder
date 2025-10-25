@@ -375,19 +375,20 @@
   <nav class="w-full border-b border-neutral-800 bg-neutral-950">
     <div class="max-w-6xl mx-auto flex items-center gap-4 px-4 py-3">
       <a href="/" class="font-semibold">BagHolder</a>
-      <div class="ml-auto flex items-center gap-4 text-sm text-neutral-300">
-        {% if request.state.user %}
-          <span class="hidden sm:inline">Signed in as <span class="font-medium text-neutral-100">{{ request.state.user.username }}</span></span>
-          <a href="/settings" class="hover:underline">Settings</a>
-          <form method="post" action="/logout" class="inline">
-            <button type="submit" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 transition">Log out</button>
-          </form>
-          <button type="button" id="dev-reload" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition">
-            Reload app
-          </button>
-        {% else %}
-          <a href="/login" class="hover:underline">Sign in</a>
-        {% endif %}
+      <form method="post" action="/settings/accounts/switch" class="ml-auto flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
+        <input type="hidden" name="redirect_to" value="{{ request.url.path }}">
+        <label for="nav-account" class="uppercase tracking-wide">Account</label>
+        <select id="nav-account" name="account_id" class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" onchange="this.form.submit()" {% if (accounts | default([]) | length) <= 1 %}disabled{% endif %}>
+          {% for account in accounts | default([]) %}
+            <option value="{{ account.id }}" {% if account.is_active %}selected{% endif %}>{{ account.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      <div class="flex items-center gap-4 text-sm">
+        <a href="/settings" class="hover:underline">Settings</a>
+        <button type="button" id="dev-reload" class="px-3 py-1 border border-neutral-700 rounded hover:bg-neutral-800 transition">
+          Reload app
+        </button>
       </div>
     </div>
   </nav>
