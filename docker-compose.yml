@@ -1,7 +1,13 @@
 version: "3.9"
 services:
   bagholder:
-    build: ./docker
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-0.1.0-alpha.1}
+        BAGHOLDER_UID: ${BAGHOLDER_UID:-1000}
+        BAGHOLDER_GID: ${BAGHOLDER_GID:-1000}
     container_name: bagholder
     ports:
       - "8012:8012"
@@ -10,3 +16,6 @@ services:
     restart: unless-stopped
     environment:
       - TZ=UTC
+      - BAGHOLDER_SECRET_KEY=${BAGHOLDER_SECRET_KEY:-change-me}
+      - BAGHOLDER_BOOTSTRAP_USERNAME=${BAGHOLDER_BOOTSTRAP_USERNAME:-}
+      - BAGHOLDER_BOOTSTRAP_PASSWORD=${BAGHOLDER_BOOTSTRAP_PASSWORD:-}
