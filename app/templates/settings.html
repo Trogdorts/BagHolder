@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 {% set show_unrealized = cfg.ui.get('show_unrealized', True) %}
-{% set show_trade_count = cfg.ui.get('show_trade_count', True) %}
+{% set show_trade_count = cfg.ui.get('show_trade_count', False) %}
 {% set show_text = cfg.ui.get('show_text', True) %}
 {% set show_weekends = cfg.ui.get('show_weekends', False) %}
 {% set show_percentages = cfg.ui.get('show_percentages', True) %}
