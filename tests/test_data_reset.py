@@ -3,7 +3,7 @@ import os
 from app.core import database
 from app.core.seed import ensure_seed
 from app.core.database import init_db
-from app.core.models import DailySummary, Meta, Trade
+from app.core.models import DailySummary, Meta, Trade, User
 from app.services import data_reset
 from app.services.data_reset import clear_all_data
 
@@ -38,8 +38,19 @@ def test_clear_all_data_resets_database(tmp_path):
         )
         session.commit()
 
+        session.add(
+            User(
+                username="admin",
+                password_hash="hash",
+                password_salt="salt",
+                is_admin=True,
+            )
+        )
+        session.commit()
+
         assert session.query(Trade).count() == 1
         assert session.query(DailySummary).count() == 1
+        assert session.query(User).count() == 1
 
     clear_all_data(str(data_dir))
 
@@ -47,6 +58,10 @@ def test_clear_all_data_resets_database(tmp_path):
     with Session() as session:
         assert session.query(Trade).count() == 0
         assert session.query(DailySummary).count() == 0
+        users = session.query(User).all()
+        assert len(users) == 1
+        assert users[0].username == "admin"
+        assert users[0].is_admin is True
         assert session.get(Meta, "schema_version") is not None
         assert session.get(Meta, "last_viewed_month") is not None
 

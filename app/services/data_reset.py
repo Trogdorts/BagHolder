@@ -4,11 +4,55 @@ from __future__ import annotations
 
 import os
 from contextlib import suppress
+from typing import Any
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm.session import close_all_sessions
 
-from app.core.database import SessionLocal, dispose_engine, init_db
+from app.core import database
+from app.core.database import dispose_engine, init_db
+from app.core.models import User
 from app.core.seed import ensure_seed
+
+
+def _capture_users() -> list[dict[str, Any]]:
+    """Serialize existing users for restoration after reset."""
+
+    if database.SessionLocal is None:
+        return []
+
+    try:
+        with database.SessionLocal() as session:
+            users = (
+                session.query(User)
+                .order_by(User.id.asc())
+                .all()
+            )
+            return [
+                {
+                    "username": user.username,
+                    "password_hash": user.password_hash,
+                    "password_salt": user.password_salt,
+                    "is_admin": bool(user.is_admin),
+                    "created_at": user.created_at,
+                }
+                for user in users
+            ]
+    except SQLAlchemyError:
+        return []
+
+
+def _restore_users(payload: list[dict[str, Any]]) -> None:
+    """Repopulate the users table with preserved credentials."""
+
+    if not payload or database.SessionLocal is None:
+        return
+
+    with database.SessionLocal() as session:
+        for item in payload:
+            user = User(**item)
+            session.add(user)
+        session.commit()
 
 
 def clear_all_data(data_dir: str) -> None:
@@ -27,7 +71,9 @@ def clear_all_data(data_dir: str) -> None:
     os.makedirs(data_dir, exist_ok=True)
     db_path = os.path.join(data_dir, "profitloss.db")
 
-    if SessionLocal is not None:
+    preserved_users = _capture_users()
+
+    if database.SessionLocal is not None:
         # Ensure any live sessions release their file handles before deletion.
         close_all_sessions()
 
@@ -45,3 +91,4 @@ def clear_all_data(data_dir: str) -> None:
     # calling init_db here makes the intent explicit and guarantees future
     # changes keep SessionLocal pointing at the new database file.
     init_db(db_path)
+    _restore_users(preserved_users)
