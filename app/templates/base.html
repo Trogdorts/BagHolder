@@ -375,11 +375,23 @@
 <body class="min-h-screen bg-neutral-900 text-neutral-100">
   <nav class="w-full border-b border-neutral-800 bg-neutral-950">
     <div class="max-w-6xl mx-auto flex items-center gap-4 px-4 py-3">
-      <a href="/" class="font-semibold">BagHolder</a>
+      <div class="flex items-center gap-3">
+        <a href="https://buymeacoffee.com/crissejdav6"
+           class="text-amber-400 transition hover:text-amber-300"
+           target="_blank"
+           rel="noopener noreferrer"
+           aria-label="Buy me a coffee">
+          <svg class="h-6 w-6" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M19 4h-2.18L16.6 2.8A1 1 0 0 0 15.64 2H8.36a1 1 0 0 0-.96.8L7.18 4H5a1 1 0 0 0 0 2h1.13l1.54 9.64A3.5 3.5 0 0 0 11.13 18h1.74a3.5 3.5 0 0 0 3.46-2.36L17.87 6H19a2 2 0 1 1 0 4h-1a1 1 0 0 0 0 2h1a4 4 0 0 0 0-8ZM9.13 4h5.74l.25 1.5H8.88Zm5.29 10.93a1.5 1.5 0 0 1-1.45 1.07h-1.74a1.5 1.5 0 0 1-1.45-1.07L8.45 8h7.1Z" />
+          </svg>
+        </a>
+        <a href="/" class="font-semibold">BagHolder</a>
+        {% block nav_title_extra %}{% endblock %}
+      </div>
       {% if current_user %}
         <form method="post" action="/settings/accounts/switch" class="ml-auto flex items-center gap-2 text-xs text-neutral-400 sm:text-sm">
           <input type="hidden" name="redirect_to" value="{{ request.url.path }}">
-          <label for="nav-account" class="uppercase tracking-wide">Account</label>
+          <label for="nav-account" class="uppercase tracking-wide">Portfolio</label>
           <select id="nav-account" name="account_id" class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" onchange="this.form.submit()" {% if (accounts | default([]) | length) <= 1 %}disabled{% endif %}>
             {% for account in accounts | default([]) %}
               <option value="{{ account.id }}" {% if account.is_active %}selected{% endif %}>{{ account.name }}</option>
