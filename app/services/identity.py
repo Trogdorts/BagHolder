@@ -84,6 +84,12 @@ class UserRepository:
     def save(self) -> None:
         self._session.commit()
 
+    def list_users(self) -> list[User]:
+        return list(self._session.query(User).order_by(User.username.asc()).all())
+
+    def count_admins(self) -> int:
+        return int(self._session.query(func.count(User.id)).filter(User.is_admin.is_(True)).scalar() or 0)
+
 
 class IdentityService:
     """High-level user account and authentication operations."""
@@ -100,6 +106,11 @@ class IdentityService:
         """Return ``True`` if self-service registration is currently permitted."""
 
         return self._repo.count() == 0
+
+    def list_users(self) -> list[User]:
+        """Return all users ordered by username."""
+
+        return self._repo.list_users()
 
     def authenticate(self, username: str, password: str) -> IdentityOperationResult:
         normalized = self._normalize_username(username)
@@ -126,6 +137,71 @@ class IdentityService:
             )
 
         return IdentityOperationResult(success=True, user=user)
+
+    def create_user(
+        self,
+        username: str,
+        password: str,
+        *,
+        confirm_password: str,
+        is_admin: bool = False,
+    ) -> IdentityOperationResult:
+        if not all([username, password, confirm_password]):
+            return IdentityOperationResult(
+                success=False,
+                error_code="missing_fields",
+                error_message="Username and password are required.",
+            )
+
+        normalized = self._normalize_username(username)
+        if not normalized:
+            return IdentityOperationResult(
+                success=False,
+                error_code="username_required",
+                error_message="Username is required.",
+            )
+
+        validation = self._policy.validate(password)
+        if not validation.valid:
+            return IdentityOperationResult(
+                success=False,
+                error_code=validation.error_code,
+                error_message=validation.error_message,
+            )
+
+        if password != confirm_password:
+            return IdentityOperationResult(
+                success=False,
+                error_code="mismatch",
+                error_message="Passwords do not match.",
+            )
+
+        if self._repo.get_by_username(normalized) is not None:
+            return IdentityOperationResult(
+                success=False,
+                error_code="username_taken",
+                error_message="Username is already in use.",
+            )
+
+        salt, password_hash = hash_password(password)
+        user = User(
+            username=normalized,
+            password_hash=password_hash,
+            password_salt=salt,
+            is_admin=is_admin,
+        )
+
+        try:
+            persisted = self._repo.add(user)
+        except SQLAlchemyError:
+            self.session.rollback()
+            return IdentityOperationResult(
+                success=False,
+                error_code="unknown",
+                error_message="Failed to create the account due to an unexpected error.",
+            )
+
+        return IdentityOperationResult(success=True, user=persisted)
 
     def register(self, username: str, password: str, *, confirm_password: str) -> IdentityOperationResult:
         user_count = self._repo.count()
@@ -249,6 +325,109 @@ class IdentityService:
 
     def get_user_by_id(self, user_id: int) -> Optional[User]:
         return self._repo.get_by_id(user_id)
+
+    def set_password(
+        self,
+        user_id: int,
+        new_password: str,
+        *,
+        confirm_password: str,
+    ) -> IdentityOperationResult:
+        if not all([new_password, confirm_password]):
+            return IdentityOperationResult(
+                success=False,
+                error_code="missing_fields",
+                error_message="Password is required.",
+            )
+
+        validation = self._policy.validate(new_password)
+        if not validation.valid:
+            return IdentityOperationResult(
+                success=False,
+                error_code=validation.error_code,
+                error_message=validation.error_message,
+            )
+
+        if new_password != confirm_password:
+            return IdentityOperationResult(
+                success=False,
+                error_code="mismatch",
+                error_message="Passwords do not match.",
+            )
+
+        user = self._repo.get_by_id(user_id)
+        if user is None:
+            return IdentityOperationResult(
+                success=False,
+                error_code="missing_user",
+                error_message="User could not be found.",
+            )
+
+        salt, password_hash = hash_password(new_password)
+        user.password_salt = salt
+        user.password_hash = password_hash
+
+        try:
+            self._repo.save()
+        except SQLAlchemyError:
+            self.session.rollback()
+            return IdentityOperationResult(
+                success=False,
+                error_code="unknown",
+                error_message="Failed to update the password due to an unexpected error.",
+            )
+
+        return IdentityOperationResult(success=True, user=user)
+
+    def delete_user(
+        self,
+        user_id: int,
+        *,
+        acting_user_id: Optional[int] = None,
+        allow_self: bool = False,
+    ) -> IdentityOperationResult:
+        user = self._repo.get_by_id(user_id)
+        if user is None:
+            return IdentityOperationResult(
+                success=False,
+                error_code="missing_user",
+                error_message="User could not be found.",
+            )
+
+        if not allow_self and acting_user_id is not None and acting_user_id == user_id:
+            return IdentityOperationResult(
+                success=False,
+                error_code="self_forbidden",
+                error_message="You cannot delete your own account from this action.",
+            )
+
+        total_users = self._repo.count()
+        if total_users <= 1:
+            return IdentityOperationResult(
+                success=False,
+                error_code="last_user",
+                error_message="At least one user must remain configured.",
+            )
+
+        if user.is_admin and self._repo.count_admins() <= 1:
+            return IdentityOperationResult(
+                success=False,
+                error_code="last_admin",
+                error_message="At least one administrator must remain configured.",
+            )
+
+        try:
+            self.session.delete(user)
+            self.session.commit()
+        except SQLAlchemyError:
+            self.session.rollback()
+            return IdentityOperationResult(
+                success=False,
+                error_code="unknown",
+                error_message="Failed to delete the account due to an unexpected error.",
+            )
+
+        return IdentityOperationResult(success=True, user=None)
 
     @staticmethod
     def _normalize_username(username: str | None) -> str:

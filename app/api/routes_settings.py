@@ -223,19 +223,45 @@ _LOG_EXPORT_ERRORS = {
 
 
 _ACCOUNT_STATUS_MESSAGES = {
-    "created": "Account created successfully.",
-    "renamed": "Account name updated.",
-    "switched": "Active account changed.",
-    "cleared": "Account data cleared successfully.",
-    "deleted": "Account deleted successfully.",
+    "created": "Portfolio created successfully.",
+    "renamed": "Portfolio name updated.",
+    "switched": "Active portfolio changed.",
+    "cleared": "Portfolio data cleared successfully.",
+    "deleted": "Portfolio deleted successfully.",
 }
 
 _ACCOUNT_ERROR_MESSAGES = {
-    "missing": "The selected account could not be found.",
-    "empty_name": "Account name cannot be empty.",
-    "protected": "The primary account cannot be deleted.",
-    "last_account": "At least one account must remain configured.",
-    "unknown": "Unable to update account due to an unexpected error.",
+    "missing": "The selected portfolio could not be found.",
+    "empty_name": "Portfolio name cannot be empty.",
+    "protected": "The primary portfolio cannot be deleted.",
+    "last_account": "At least one portfolio must remain configured.",
+    "unknown": "Unable to update portfolio due to an unexpected error.",
+}
+
+_USER_STATUS_MESSAGES = {
+    "created": "User account created successfully.",
+    "password_reset": "User password reset successfully.",
+    "deleted": "User account deleted successfully.",
+}
+
+_USER_ERROR_MESSAGES = {
+    "missing_fields": "All fields are required.",
+    "username_required": "Username is required.",
+    "username_taken": "Username is already in use.",
+    "mismatch": "Passwords do not match.",
+    "too_short": "Password must be at least 8 characters long.",
+    "missing_user": "The selected user could not be found.",
+    "last_user": "At least one user must remain configured.",
+    "last_admin": "At least one administrator must remain configured.",
+    "self_forbidden": "Use the personal account controls to delete your own account.",
+    "unknown": "Unable to complete the requested action due to an unexpected error.",
+    "forbidden": "You do not have permission to perform that action.",
+}
+
+_SELF_ACCOUNT_ERROR_MESSAGES = {
+    "last_user": "You are the last remaining user and cannot delete this account.",
+    "last_admin": "You are the last administrator and cannot delete this account.",
+    "unknown": "Unable to delete your account due to an unexpected error.",
 }
 
 _PASSWORD_STATUS_MESSAGES = {
@@ -325,7 +351,7 @@ def _build_color_context(cfg: AppConfig) -> tuple[list[dict[str, Any]], dict[str
 
 
 @router.get("/settings", response_class=HTMLResponse)
-def settings_page(request: Request):
+def settings_page(request: Request, db: Session = Depends(get_session)):
     cfg: AppConfig = request.app.state.config
     params = request.query_params
     cleared = params.get("cleared") is not None
@@ -342,6 +368,9 @@ def settings_page(request: Request):
     log_error_message = _resolve_message(params.get("log_error"), _LOG_EXPORT_ERRORS)
     account_status_message = _resolve_message(params.get("account_status"), _ACCOUNT_STATUS_MESSAGES)
     account_error_message = _resolve_message(params.get("account_error"), _ACCOUNT_ERROR_MESSAGES)
+    user_status_message = _resolve_message(params.get("user_status"), _USER_STATUS_MESSAGES)
+    user_error_message = _resolve_message(params.get("user_error"), _USER_ERROR_MESSAGES)
+    self_error_message = _resolve_message(params.get("self_error"), _SELF_ACCOUNT_ERROR_MESSAGES)
     password_status_message = _resolve_message(
         params.get("password_status"), _PASSWORD_STATUS_MESSAGES
     )
@@ -362,6 +391,20 @@ def settings_page(request: Request):
 
     serialized_accounts = serialize_accounts(accounts_records, active_record)
     active_account_payload = asdict(active_record)
+
+    current_user = getattr(request.state, "user", None)
+    managed_users: list[dict[str, str]] = []
+    if current_user is not None and current_user.is_admin:
+        identity = IdentityService(db)
+        managed_users = [
+            {
+                "id": str(user.id),
+                "username": user.username,
+                "is_admin": user.is_admin,
+                "created_at": user.created_at.strftime("%Y-%m-%d %H:%M"),
+            }
+            for user in identity.list_users()
+        ]
 
     context = {
         "request": request,
@@ -385,6 +428,10 @@ def settings_page(request: Request):
         "account_error_message": account_error_message,
         "password_status_message": password_status_message,
         "password_error_message": password_error_message,
+        "user_status_message": user_status_message,
+        "user_error_message": user_error_message,
+        "self_error_message": self_error_message,
+        "managed_users": managed_users,
     }
     return request.app.state.templates.TemplateResponse(
         request,
@@ -518,6 +565,168 @@ def update_account_password(
 
     log.info("Password updated for user %s", getattr(user, "username", user.id))
     return _password_success_redirect("updated", redirect_target)
+
+
+@router.post("/settings/users/create", response_class=HTMLResponse)
+def create_user_account(
+    request: Request,
+    username: str = Form(""),
+    password: str = Form(""),
+    confirm_password: str = Form(""),
+    is_admin: str = Form("false"),
+    redirect_to: str = Form("/settings"),
+    db: Session = Depends(get_session),
+):
+    redirect_target = _normalize_redirect_target(redirect_to)
+    current_user = getattr(request.state, "user", None)
+    if current_user is None or not current_user.is_admin:
+        if redirect_target == "/settings":
+            return RedirectResponse(url="/settings?user_error=forbidden", status_code=303)
+        return JSONResponse({"detail": "Forbidden."}, status_code=403)
+
+    promote_admin = is_admin.lower() in {"1", "true", "on", "yes"}
+    identity = IdentityService(db)
+    result = identity.create_user(
+        username=username,
+        password=password,
+        confirm_password=confirm_password,
+        is_admin=promote_admin,
+    )
+
+    if not result.success:
+        code = result.error_code or "unknown"
+        if redirect_target == "/settings":
+            return RedirectResponse(
+                url=f"/settings?user_error={quote_plus(code, safe='')}",
+                status_code=303,
+            )
+        return RedirectResponse(url=redirect_target, status_code=303)
+
+    if redirect_target == "/settings":
+        return RedirectResponse(url="/settings?user_status=created", status_code=303)
+    return RedirectResponse(url=redirect_target, status_code=303)
+
+
+@router.post("/settings/users/reset-password", response_class=HTMLResponse)
+def reset_user_password(
+    request: Request,
+    user_id: str = Form(""),
+    new_password: str = Form(""),
+    confirm_password: str = Form(""),
+    redirect_to: str = Form("/settings"),
+    db: Session = Depends(get_session),
+):
+    redirect_target = _normalize_redirect_target(redirect_to)
+    current_user = getattr(request.state, "user", None)
+    if current_user is None or not current_user.is_admin:
+        if redirect_target == "/settings":
+            return RedirectResponse(url="/settings?user_error=forbidden", status_code=303)
+        return JSONResponse({"detail": "Forbidden."}, status_code=403)
+
+    try:
+        target_id = int(user_id)
+    except (TypeError, ValueError):
+        target_id = None
+
+    if target_id is None:
+        if redirect_target == "/settings":
+            return RedirectResponse(url="/settings?user_error=missing_user", status_code=303)
+        return RedirectResponse(url=redirect_target, status_code=303)
+
+    identity = IdentityService(db)
+    result = identity.set_password(
+        user_id=target_id,
+        new_password=new_password,
+        confirm_password=confirm_password,
+    )
+
+    if not result.success:
+        code = result.error_code or "unknown"
+        if redirect_target == "/settings":
+            return RedirectResponse(
+                url=f"/settings?user_error={quote_plus(code, safe='')}",
+                status_code=303,
+            )
+        return RedirectResponse(url=redirect_target, status_code=303)
+
+    if redirect_target == "/settings":
+        return RedirectResponse(url="/settings?user_status=password_reset", status_code=303)
+    return RedirectResponse(url=redirect_target, status_code=303)
+
+
+@router.post("/settings/users/delete", response_class=HTMLResponse)
+def delete_user_account(
+    request: Request,
+    user_id: str = Form(""),
+    redirect_to: str = Form("/settings"),
+    db: Session = Depends(get_session),
+):
+    redirect_target = _normalize_redirect_target(redirect_to)
+    current_user = getattr(request.state, "user", None)
+    if current_user is None or not current_user.is_admin:
+        if redirect_target == "/settings":
+            return RedirectResponse(url="/settings?user_error=forbidden", status_code=303)
+        return JSONResponse({"detail": "Forbidden."}, status_code=403)
+
+    try:
+        target_id = int(user_id)
+    except (TypeError, ValueError):
+        target_id = None
+
+    if target_id is None:
+        if redirect_target == "/settings":
+            return RedirectResponse(url="/settings?user_error=missing_user", status_code=303)
+        return RedirectResponse(url=redirect_target, status_code=303)
+
+    identity = IdentityService(db)
+    result = identity.delete_user(
+        user_id=target_id,
+        acting_user_id=current_user.id,
+    )
+
+    if not result.success:
+        code = result.error_code or "unknown"
+        if redirect_target == "/settings":
+            return RedirectResponse(
+                url=f"/settings?user_error={quote_plus(code, safe='')}",
+                status_code=303,
+            )
+        return RedirectResponse(url=redirect_target, status_code=303)
+
+    if redirect_target == "/settings":
+        return RedirectResponse(url="/settings?user_status=deleted", status_code=303)
+    return RedirectResponse(url=redirect_target, status_code=303)
+
+
+@router.post("/settings/account/delete", response_class=HTMLResponse)
+def delete_self_account(
+    request: Request,
+    redirect_to: str = Form("/settings"),
+    db: Session = Depends(get_session),
+):
+    redirect_target = _normalize_redirect_target(redirect_to)
+    current_user = getattr(request.state, "user", None)
+    if current_user is None:
+        return RedirectResponse(url="/login", status_code=303)
+
+    identity = IdentityService(db)
+    result = identity.delete_user(
+        user_id=current_user.id,
+        acting_user_id=current_user.id,
+        allow_self=True,
+    )
+
+    if not result.success:
+        code = result.error_code or "unknown"
+        if redirect_target == "/settings":
+            return RedirectResponse(
+                url=f"/settings?self_error={quote_plus(code, safe='')}",
+                status_code=303,
+            )
+        return RedirectResponse(url=redirect_target, status_code=303)
+
+    request.session.pop("user_id", None)
+    return RedirectResponse(url="/login", status_code=303)
 
 
 @router.post("/settings/accounts/create", response_class=HTMLResponse)
@@ -709,12 +918,26 @@ async def import_settings_config(request: Request, config_file: UploadFile = Fil
 
 
 @router.post("/settings/clear-data", response_class=HTMLResponse)
-def clear_settings_data(request: Request):
+def clear_settings_data(
+    request: Request,
+    redirect_to: str = Form("/settings"),
+):
+    redirect_target = _normalize_redirect_target(redirect_to)
+    current_user = getattr(request.state, "user", None)
+    if current_user is None:
+        return RedirectResponse(url="/login", status_code=303)
+    if not current_user.is_admin:
+        if redirect_target == "/settings":
+            return RedirectResponse(url="/settings?user_error=forbidden", status_code=303)
+        return JSONResponse({"detail": "Forbidden."}, status_code=403)
+
     cfg: AppConfig = request.app.state.config
     account_dir = _resolve_account_directory(request, cfg)
     clear_all_data(account_dir)
     log.warning("All application data cleared via settings page")
-    return RedirectResponse(url="/settings?cleared=1", status_code=303)
+    if redirect_target == "/settings":
+        return RedirectResponse(url="/settings?cleared=1", status_code=303)
+    return RedirectResponse(url=redirect_target, status_code=303)
 
 
 @router.post("/settings/shutdown", response_class=HTMLResponse)
