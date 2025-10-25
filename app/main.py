@@ -8,6 +8,8 @@ if __package__ in (None, ""):
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import JSONResponse, RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.types import ASGIApp
 
 if __package__ in {None, ""}:
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -18,36 +20,11 @@ from app.core import database
 from app.core.session import SignedCookieSessionMiddleware
 
 
-def _is_api_like_request(request: Request, path: str) -> bool:
-    accept_header = (request.headers.get("accept") or "").lower()
-    content_type = (request.headers.get("content-type") or "").lower()
-    return any(
-        [
-            path.startswith("/api"),
-            "application/json" in accept_header,
-            "application/json" in content_type,
-            request.headers.get("hx-request", "").lower() == "true",
-            request.headers.get("x-requested-with", "").lower() == "xmlhttprequest",
-            request.method.upper() != "GET" and "text/html" not in accept_header,
-        ]
-    )
+class LoginRequiredMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp) -> None:
+        super().__init__(app)
 
-
-def create_app():
-    app = FastAPI(title="BagHolder")
-    app.mount(
-        "/static",
-        StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),
-        name="static",
-    )
-
-    secret_key = os.environ.get("BAGHOLDER_SECRET_KEY", "bagholder-dev-secret")
-    app.add_middleware(SignedCookieSessionMiddleware, secret_key=secret_key)
-
-    reload_application_state(app)
-
-    @app.middleware("http")
-    async def enforce_login(request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
         path = request.url.path
 
         if path.startswith("/static"):
@@ -59,6 +36,7 @@ def create_app():
         if not isinstance(session_data, dict):
             session_data = {}
             request.scope["session"] = session_data
+
         session_user_id = session_data.get("user_id")
 
         if session_user_id is not None and database.SessionLocal is not None:
@@ -86,6 +64,36 @@ def create_app():
 
         response = await call_next(request)
         return response
+
+
+def _is_api_like_request(request: Request, path: str) -> bool:
+    accept_header = (request.headers.get("accept") or "").lower()
+    content_type = (request.headers.get("content-type") or "").lower()
+    return any(
+        [
+            path.startswith("/api"),
+            "application/json" in accept_header,
+            "application/json" in content_type,
+            request.headers.get("hx-request", "").lower() == "true",
+            request.headers.get("x-requested-with", "").lower() == "xmlhttprequest",
+            request.method.upper() != "GET" and "text/html" not in accept_header,
+        ]
+    )
+
+
+def create_app():
+    app = FastAPI(title="BagHolder")
+    app.mount(
+        "/static",
+        StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")),
+        name="static",
+    )
+
+    secret_key = os.environ.get("BAGHOLDER_SECRET_KEY", "bagholder-dev-secret")
+    app.add_middleware(SignedCookieSessionMiddleware, secret_key=secret_key)
+    app.add_middleware(LoginRequiredMiddleware)
+
+    reload_application_state(app)
 
     from app.api.routes_import import router as import_router
     from app.api.routes_calendar import router as calendar_router
