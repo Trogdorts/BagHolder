@@ -26,7 +26,11 @@ from app.api.routes_settings import (
     rename_existing_account,
     save_settings,
     switch_active_account,
+    update_account_password,
 )  # noqa: E402
+from app.core.auth import hash_password, verify_password  # noqa: E402
+from app.core.models import User  # noqa: E402
+from app.core import database as db  # noqa: E402
 from app.services.data_backup import create_backup_archive  # noqa: E402
 
 
@@ -351,3 +355,71 @@ def test_import_full_backup_replaces_data_and_reloads_state(tmp_path, monkeypatc
     assert (new_dir / "extra.txt").read_text(encoding="utf-8") == "extra"
     assert app.state.config.raw["ui"]["theme"] == "light"
     assert app.state.templates.env.globals["cfg"]["ui"]["theme"] == "light"
+
+
+def test_update_account_password_changes_credentials(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    with db.SessionLocal() as session:
+        salt, password_hash = hash_password("password123")
+        user = User(username="admin", password_salt=salt, password_hash=password_hash)
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    request = _build_request(app)
+    request.state.user = user
+
+    response = update_account_password(
+        request,
+        current_password="password123",
+        new_password="newpassword456",
+        confirm_password="newpassword456",
+        redirect_to="/settings",
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/settings?password_status=updated"
+
+    with db.SessionLocal() as session:
+        updated = session.get(User, user.id)
+        assert updated is not None
+        assert verify_password("newpassword456", updated.password_salt, updated.password_hash)
+
+    db.dispose_engine()
+
+
+def test_update_account_password_rejects_invalid_current(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    with db.SessionLocal() as session:
+        salt, password_hash = hash_password("password123")
+        user = User(username="admin", password_salt=salt, password_hash=password_hash)
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+
+    request = _build_request(app)
+    request.state.user = user
+
+    response = update_account_password(
+        request,
+        current_password="wrongpass",
+        new_password="newpassword456",
+        confirm_password="newpassword456",
+        redirect_to="/settings",
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/settings?password_error=invalid_current"
+
+    with db.SessionLocal() as session:
+        persisted = session.get(User, user.id)
+        assert persisted is not None
+        assert verify_password("password123", persisted.password_salt, persisted.password_hash)
+
+    db.dispose_engine()
