@@ -11,11 +11,19 @@ from fastapi.responses import (
     RedirectResponse,
     StreamingResponse,
 )
+from sqlalchemy import tuple_
 from sqlalchemy.orm import Session
 import calendar
 from app.core.config import AppConfig
 from app.core.database import get_session
-from app.core.models import DailySummary, Meta, NoteDaily, Trade
+from app.core.models import (
+    DailySummary,
+    Meta,
+    NoteDaily,
+    NoteMonthly,
+    NoteWeekly,
+    Trade,
+)
 from app.core.utils import coerce_bool, month_bounds
 from app.services.trade_summaries import recompute_daily_summaries
 from pydantic import BaseModel, Field, field_validator
