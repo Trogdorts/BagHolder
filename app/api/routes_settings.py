@@ -17,11 +17,15 @@ from fastapi.responses import (
     Response,
 )
 from starlette.background import BackgroundTask
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import AppConfig, DEFAULT_CONFIG
+from app.core.auth import hash_password, verify_password
+from app.core import database
 from app.core.lifecycle import reload_application_state
 from app.core.logger import configure_logging
 from app.core.utils import coerce_bool
+from app.core.models import User
 from app.services.accounts import (
     create_account,
     prepare_accounts,
@@ -228,6 +232,19 @@ _ACCOUNT_ERROR_MESSAGES = {
     "unknown": "Unable to update account due to an unexpected error.",
 }
 
+_PASSWORD_STATUS_MESSAGES = {
+    "updated": "Password updated successfully.",
+}
+
+_PASSWORD_ERROR_MESSAGES = {
+    "missing_fields": "All password fields are required.",
+    "invalid_current": "The current password you entered is incorrect.",
+    "mismatch": "New password and confirmation do not match.",
+    "too_short": "New password must be at least 8 characters long.",
+    "missing_user": "Unable to locate your account. Please sign in again.",
+    "unknown": "Unable to update password due to an unexpected error.",
+}
+
 
 def _resolve_message(code: str | None, mapping: dict[str, str]) -> str | None:
     if not code:
@@ -246,6 +263,20 @@ def _account_error_redirect(code: str, redirect_to: str | None) -> RedirectRespo
     target = _normalize_redirect_target(redirect_to)
     if target == "/settings":
         return RedirectResponse(url=f"/settings?account_error={quote_plus(code, safe='')}", status_code=303)
+    return RedirectResponse(url=target, status_code=303)
+
+
+def _password_success_redirect(status: str, redirect_to: str | None) -> RedirectResponse:
+    target = _normalize_redirect_target(redirect_to)
+    if target == "/settings":
+        return RedirectResponse(url=f"/settings?password_status={quote_plus(status, safe='')}", status_code=303)
+    return RedirectResponse(url=target, status_code=303)
+
+
+def _password_error_redirect(code: str, redirect_to: str | None) -> RedirectResponse:
+    target = _normalize_redirect_target(redirect_to)
+    if target == "/settings":
+        return RedirectResponse(url=f"/settings?password_error={quote_plus(code, safe='')}", status_code=303)
     return RedirectResponse(url=target, status_code=303)
 
 
@@ -305,6 +336,12 @@ def settings_page(request: Request):
     log_error_message = _resolve_message(params.get("log_error"), _LOG_EXPORT_ERRORS)
     account_status_message = _resolve_message(params.get("account_status"), _ACCOUNT_STATUS_MESSAGES)
     account_error_message = _resolve_message(params.get("account_error"), _ACCOUNT_ERROR_MESSAGES)
+    password_status_message = _resolve_message(
+        params.get("password_status"), _PASSWORD_STATUS_MESSAGES
+    )
+    password_error_message = _resolve_message(
+        params.get("password_error"), _PASSWORD_ERROR_MESSAGES
+    )
     color_groups, color_defaults = _build_color_context(cfg)
     diagnostics_cfg = cfg.raw.get("diagnostics", {}) if isinstance(cfg.raw, dict) else {}
     debug_logging_enabled = coerce_bool(diagnostics_cfg.get("debug_logging"), False)
@@ -340,6 +377,8 @@ def settings_page(request: Request):
         "active_account": active_account_payload,
         "account_status_message": account_status_message,
         "account_error_message": account_error_message,
+        "password_status_message": password_status_message,
+        "password_error_message": password_error_message,
     }
     return request.app.state.templates.TemplateResponse(
         request,
@@ -430,6 +469,66 @@ def save_settings(
         server_section["port"],
     )
     return RedirectResponse(url="/settings", status_code=303)
+
+
+@router.post("/settings/account/password", response_class=HTMLResponse)
+def update_account_password(
+    request: Request,
+    current_password: str = Form(""),
+    new_password: str = Form(""),
+    confirm_password: str = Form(""),
+    redirect_to: str = Form("/settings"),
+):
+    """Update the authenticated user's password."""
+
+    if not all([current_password, new_password, confirm_password]):
+        return _password_error_redirect("missing_fields", redirect_to)
+
+    if len(new_password) < 8:
+        return _password_error_redirect("too_short", redirect_to)
+
+    if new_password != confirm_password:
+        return _password_error_redirect("mismatch", redirect_to)
+
+    if database.SessionLocal is None:
+        log.error("Password update attempted before database initialization")
+        return _password_error_redirect("unknown", redirect_to)
+
+    user = getattr(request.state, "user", None)
+    if user is None:
+        return RedirectResponse(url="/login", status_code=303)
+
+    salt: str | None = None
+    password_hash: str | None = None
+
+    try:
+        with database.SessionLocal() as session:
+            db_user = session.get(User, user.id)
+            if db_user is None:
+                log.warning("Authenticated user %s not found during password update", user.id)
+                return _password_error_redirect("missing_user", redirect_to)
+
+            if not verify_password(current_password, db_user.password_salt, db_user.password_hash):
+                return _password_error_redirect("invalid_current", redirect_to)
+
+            salt, password_hash = hash_password(new_password)
+            db_user.password_salt = salt
+            db_user.password_hash = password_hash
+            session.add(db_user)
+            session.commit()
+    except SQLAlchemyError:
+        log.exception("Failed to update password for user %s", getattr(user, "username", user.id))
+        return _password_error_redirect("unknown", redirect_to)
+
+    if salt and password_hash:
+        try:
+            request.state.user.password_salt = salt
+            request.state.user.password_hash = password_hash
+        except AttributeError:
+            pass
+
+    log.info("Password updated for user %s", getattr(user, "username", user.id))
+    return _password_success_redirect("updated", redirect_to)
 
 
 @router.post("/settings/accounts/create", response_class=HTMLResponse)

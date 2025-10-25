@@ -31,6 +31,11 @@
     {% elif account_error_message %}
       <div class="alert alert-error px-4 py-3 text-sm">{{ account_error_message }}</div>
     {% endif %}
+    {% if password_status_message %}
+      <div class="alert alert-success px-4 py-3 text-sm">{{ password_status_message }}</div>
+    {% elif password_error_message %}
+      <div class="alert alert-error px-4 py-3 text-sm">{{ password_error_message }}</div>
+    {% endif %}
     {% if backup_restored %}
       <div class="alert alert-success px-4 py-3 text-sm">Backup imported successfully.</div>
     {% elif backup_error_message %}
@@ -86,6 +91,30 @@
                 </form>
               </div>
             {% endfor %}
+          </div>
+          <div class="rounded-lg border border-neutral-800/80 bg-neutral-950/40 p-4">
+            <div class="mb-3 flex flex-col gap-1">
+              <h3 class="text-sm font-semibold text-neutral-100">Update password</h3>
+              <p class="text-xs text-neutral-500">Change the credentials used to access BagHolder.</p>
+            </div>
+            <form method="post" action="/settings/account/password" class="grid gap-3 md:grid-cols-2">
+              <input type="hidden" name="redirect_to" value="/settings">
+              <div class="md:col-span-2">
+                <label for="current-password" class="block text-xs font-medium uppercase tracking-wide text-neutral-400">Current password</label>
+                <input id="current-password" name="current_password" type="password" autocomplete="current-password" required class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+              </div>
+              <div>
+                <label for="new-password" class="block text-xs font-medium uppercase tracking-wide text-neutral-400">New password</label>
+                <input id="new-password" name="new_password" type="password" minlength="8" autocomplete="new-password" required class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+              </div>
+              <div>
+                <label for="confirm-new-password" class="block text-xs font-medium uppercase tracking-wide text-neutral-400">Confirm new password</label>
+                <input id="confirm-new-password" name="confirm_password" type="password" minlength="8" autocomplete="new-password" required class="mt-1 w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+              </div>
+              <div class="md:col-span-2">
+                <button class="btn btn-outline-primary w-full px-4 py-2 text-sm md:w-auto">Save password</button>
+              </div>
+            </form>
           </div>
         </div>
       </section>
