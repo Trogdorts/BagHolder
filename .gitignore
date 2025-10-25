@@ -209,3 +209,5 @@ __marimo__/
 .idea/
 
 app/data/profitloss.db
+
+testings/
