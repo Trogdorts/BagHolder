@@ -309,9 +309,17 @@
         <div class="text-sm space-y-1">
           {% set realized_class = 'text-profit' if d.realized > 0 else ('text-loss' if d.realized < 0 else 'text-neutral-200') %}
             {% if d.show_realized %}
+          {% set day_percent_class = 'text-neutral-200' %}
+          {% if d.percent is not none %}
+            {% if d.percent > 0 %}
+              {% set day_percent_class = 'text-profit' %}
+            {% elif d.percent < 0 %}
+              {% set day_percent_class = 'text-loss' %}
+            {% endif %}
+          {% endif %}
           <div class="{{ realized_class }} space-y-1">
             <span data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">Realized: {{ d.realized|money }}</span>
-            <span data-day-percent class="text-[11px] text-neutral-300{% if d.percent is none %} hidden{% endif %} mt-0.5">Realized: {{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span>
+            <span data-day-percent class="text-[11px] {{ day_percent_class }}{% if d.percent is none %} hidden{% endif %} mt-0.5">Realized: {{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span>
           </div>
           {% endif %}
           <div class="{{ 'text-profit' if d.unrealized > 0 else ('text-loss' if d.unrealized < 0 else 'text-neutral-200') }}"
@@ -375,7 +383,15 @@
         <div data-week-realized
              class="{{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}{% if not week.show_week_realized %} hidden{% endif %}">
           <div>Realized: <span data-week-realized-value>{{ week.week_realized|money }}</span></div>
-          <div data-week-percent class="text-[11px] text-neutral-300{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %} mt-0.5">
+          {% set week_percent_class = 'text-neutral-200' %}
+          {% if week.week_percent is not none %}
+            {% if week.week_percent > 0 %}
+              {% set week_percent_class = 'text-profit' %}
+            {% elif week.week_percent < 0 %}
+              {% set week_percent_class = 'text-loss' %}
+            {% endif %}
+          {% endif %}
+          <div data-week-percent class="text-[11px] {{ week_percent_class }}{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %} mt-0.5">
             {% if show_percentages_default and week.week_percent is not none %}Realized: {{ '{:+.2f}%'.format(week.week_percent) }}{% endif %}
           </div>
         </div>
@@ -425,7 +441,15 @@
       <h2 class="font-semibold">Monthly summary</h2>
       <div class="space-y-1">
         <div>Realized: <span data-month-realized-value class="{{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span></div>
-        <div data-month-percent class="text-[12px] text-neutral-300{% if not (show_percentages_default and month_percent is not none) %} hidden{% endif %}">
+        {% set month_percent_class = 'text-neutral-200' %}
+        {% if month_percent is not none %}
+          {% if month_percent > 0 %}
+            {% set month_percent_class = 'text-profit' %}
+          {% elif month_percent < 0 %}
+            {% set month_percent_class = 'text-loss' %}
+          {% endif %}
+        {% endif %}
+        <div data-month-percent class="text-[12px] {{ month_percent_class }}{% if not (show_percentages_default and month_percent is not none) %} hidden{% endif %}">
           {% if show_percentages_default and month_percent is not none %}Realized: {{ '{:+.2f}%'.format(month_percent) }}{% endif %}
         </div>
       </div>
@@ -473,7 +497,15 @@
              data-other-invested-max="{{ '%.10g'|format(rolling_year_other_invested_max) }}">
           <p class="text-[11px] uppercase tracking-wide text-neutral-400">Last 12 months</p>
           <div>Realized: <span data-rolling-realized-value class="{{ 'text-profit' if rolling_year_realized > 0 else ('text-loss' if rolling_year_realized < 0 else 'text-neutral-200') }}">{{ rolling_year_realized|money }}</span></div>
-          <div data-rolling-percent class="text-[12px] text-neutral-300{% if not (show_percentages_default and rolling_year_percent is not none) %} hidden{% endif %}">
+          {% set rolling_percent_class = 'text-neutral-200' %}
+          {% if rolling_year_percent is not none %}
+            {% if rolling_year_percent > 0 %}
+              {% set rolling_percent_class = 'text-profit' %}
+            {% elif rolling_year_percent < 0 %}
+              {% set rolling_percent_class = 'text-loss' %}
+            {% endif %}
+          {% endif %}
+          <div data-rolling-percent class="text-[12px] {{ rolling_percent_class }}{% if not (show_percentages_default and rolling_year_percent is not none) %} hidden{% endif %}">
             {% if show_percentages_default and rolling_year_percent is not none %}Realized: {{ '{:+.2f}%'.format(rolling_year_percent) }}{% endif %}
           </div>
           <div class="text-sm hidden" data-rolling-average>
@@ -492,7 +524,15 @@
              data-other-invested-max="{{ '%.10g'|format(year_other_invested_max) }}">
           <p class="text-[11px] uppercase tracking-wide text-neutral-400">Since Jan 1</p>
           <div>Realized: <span data-year-realized-value class="{{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
-          <div data-year-percent class="text-[12px] text-neutral-300{% if not (show_percentages_default and year_percent is not none) %} hidden{% endif %}">
+          {% set year_percent_class = 'text-neutral-200' %}
+          {% if year_percent is not none %}
+            {% if year_percent > 0 %}
+              {% set year_percent_class = 'text-profit' %}
+            {% elif year_percent < 0 %}
+              {% set year_percent_class = 'text-loss' %}
+            {% endif %}
+          {% endif %}
+          <div data-year-percent class="text-[12px] {{ year_percent_class }}{% if not (show_percentages_default and year_percent is not none) %} hidden{% endif %}">
             {% if show_percentages_default and year_percent is not none %}Realized: {{ '{:+.2f}%'.format(year_percent) }}{% endif %}
           </div>
           <div class="text-sm hidden" data-year-average>
@@ -1085,9 +1125,11 @@ const dayImpactSimulator = (() => {
         if (percentValue === null) {
           dom.percent.textContent = '';
           dom.percent.classList.add('hidden');
+          applySignClass(dom.percent, 0);
         } else {
           dom.percent.textContent = `Realized: ${formatPercentage(percentValue)}`;
           dom.percent.classList.remove('hidden');
+          applySignClass(dom.percent, percentValue);
         }
       }
     }
@@ -1154,9 +1196,11 @@ const dayImpactSimulator = (() => {
       if (percentValue === null) {
         monthPercentEl.textContent = '';
         monthPercentEl.classList.add('hidden');
+        applySignClass(monthPercentEl, 0);
       } else {
         monthPercentEl.textContent = `Realized: ${formatPercentage(percentValue)}`;
         monthPercentEl.classList.remove('hidden');
+        applySignClass(monthPercentEl, percentValue);
       }
     }
     if (monthUnrealizedEl) {
@@ -1185,9 +1229,11 @@ const dayImpactSimulator = (() => {
       if (percentValue === null) {
         rollingPercentEl.textContent = '';
         rollingPercentEl.classList.add('hidden');
+        applySignClass(rollingPercentEl, 0);
       } else {
         rollingPercentEl.textContent = `Realized: ${formatPercentage(percentValue)}`;
         rollingPercentEl.classList.remove('hidden');
+        applySignClass(rollingPercentEl, percentValue);
       }
     }
     if (rollingUnrealizedEl) {
@@ -1216,9 +1262,11 @@ const dayImpactSimulator = (() => {
       if (percentValue === null) {
         yearPercentEl.textContent = '';
         yearPercentEl.classList.add('hidden');
+        applySignClass(yearPercentEl, 0);
       } else {
         yearPercentEl.textContent = `Realized: ${formatPercentage(percentValue)}`;
         yearPercentEl.classList.remove('hidden');
+        applySignClass(yearPercentEl, percentValue);
       }
     }
     if (yearUnrealizedEl) {
