@@ -129,36 +129,36 @@
                   <input id="account-name-{{ account.id }}" name="account_name" value="{{ account.name }}" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" autocomplete="off">
                   <button class="btn btn-outline-primary px-3 py-2 text-sm sm:w-auto">Rename</button>
                 </form>
-                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div class="mt-4">
                   <p class="text-xs text-neutral-400 sm:max-w-xs">
                     Replace this portfolio with simulated trades to explore BagHolder without importing your own data.
                   </p>
-                  <button type="button"
-                          class="btn btn-outline-primary px-3 py-2 text-sm sm:w-auto"
-                          data-simulate-trades="{{ account.id }}">
-                    Simulate trades
-                  </button>
+                  <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                    <button type="button"
+                            class="btn btn-outline-primary w-full px-3 py-2 text-sm sm:w-auto"
+                            data-simulate-trades="{{ account.id }}">
+                      Simulate trades
+                    </button>
+                    <form method="post" action="/settings/accounts/clear" class="flex w-full sm:w-auto"
+                          onsubmit="return confirm('This will delete all trades, summaries, and notes for this portfolio. Continue?');">
+                      <input type="hidden" name="account_id" value="{{ account.id }}">
+                      <input type="hidden" name="redirect_to" value="/settings">
+                      <button class="btn btn-outline-danger w-full px-3 py-2 text-sm sm:w-auto">
+                        Clear portfolio data
+                      </button>
+                    </form>
+                    <form method="post" action="/settings/accounts/delete" class="flex w-full sm:w-auto"
+                          onsubmit="return confirm('This will permanently delete the portfolio and its data. Continue?');">
+                      <input type="hidden" name="account_id" value="{{ account.id }}">
+                      <input type="hidden" name="redirect_to" value="/settings">
+                      <button class="btn btn-danger w-full px-3 py-2 text-sm sm:w-auto {% if is_primary %}opacity-60 cursor-not-allowed pointer-events-none{% endif %}"
+                              {% if is_primary %}aria-disabled="true" tabindex="-1" disabled{% endif %}>
+                        Delete portfolio
+                      </button>
+                    </form>
+                  </div>
                 </div>
                 <p class="mt-2 text-xs text-neutral-400 hidden" data-simulate-status aria-live="polite"></p>
-                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-                  <form method="post" action="/settings/accounts/clear" class="flex w-full sm:w-auto"
-                        onsubmit="return confirm('This will delete all trades, summaries, and notes for this portfolio. Continue?');">
-                    <input type="hidden" name="account_id" value="{{ account.id }}">
-                    <input type="hidden" name="redirect_to" value="/settings">
-                    <button class="btn btn-outline-danger w-full px-3 py-2 text-sm sm:w-auto">
-                      Clear portfolio data
-                    </button>
-                  </form>
-                  <form method="post" action="/settings/accounts/delete" class="flex w-full sm:w-auto"
-                        onsubmit="return confirm('This will permanently delete the portfolio and its data. Continue?');">
-                    <input type="hidden" name="account_id" value="{{ account.id }}">
-                    <input type="hidden" name="redirect_to" value="/settings">
-                    <button class="btn btn-danger w-full px-3 py-2 text-sm sm:w-auto {% if is_primary %}opacity-60 cursor-not-allowed pointer-events-none{% endif %}"
-                            {% if is_primary %}aria-disabled="true" tabindex="-1" disabled{% endif %}>
-                      Delete portfolio
-                    </button>
-                  </form>
-                </div>
               </div>
             {% endfor %}
           </div>
