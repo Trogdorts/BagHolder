@@ -33,7 +33,7 @@ def build_default_simulation_options(account_dir: str) -> SimulationOptions:
     os.makedirs(output_dir, exist_ok=True)
 
     return SimulationOptions(
-        years_back=2,
+        years_back=2.0,
         start_balance=10_000.0,
         risk_level=0.5,
         profit_target=0.05,

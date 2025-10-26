@@ -84,7 +84,7 @@ class TradeUpdatePayload(BaseModel):
 
 
 class SimulationRequest(BaseModel):
-    years_back: int = Field(2, ge=1, le=20)
+    years_back: float = Field(2.0, ge=0.25, le=20)
     start_balance: float = Field(10_000.0, gt=0)
     risk_level: float = Field(0.5, gt=0, le=1)
     profit_target: float = Field(0.05, gt=0)

@@ -715,8 +715,8 @@
         <div class="grid gap-5 sm:grid-cols-2">
           <div class="space-y-1">
             <label for="simulate-years-back" class="text-sm font-medium text-neutral-200">Years of history</label>
-            <input id="simulate-years-back" name="years_back" type="number" min="1" step="1" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-            <p class="text-xs text-neutral-500">How many years of market data to include.</p>
+            <input id="simulate-years-back" name="years_back" type="number" min="0.25" step="0.25" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">How many years of market data to include (supports quarter-year increments).</p>
           </div>
           <div class="space-y-1">
             <label for="simulate-start-balance" class="text-sm font-medium text-neutral-200">Starting balance</label>
@@ -1043,7 +1043,7 @@
         field.value = '';
       };
 
-      assignNumeric(fieldMap.years_back, options.years_back, true);
+      assignNumeric(fieldMap.years_back, options.years_back);
       assignNumeric(fieldMap.start_balance, options.start_balance);
       assignNumeric(fieldMap.risk_level, options.risk_level);
       assignNumeric(fieldMap.profit_target, options.profit_target);
@@ -1130,7 +1130,7 @@
       };
 
       const overrides = {
-        years_back: readNumber(fieldMap.years_back, true),
+        years_back: readNumber(fieldMap.years_back),
         start_balance: readNumber(fieldMap.start_balance),
         risk_level: readNumber(fieldMap.risk_level),
         profit_target: readNumber(fieldMap.profit_target),
