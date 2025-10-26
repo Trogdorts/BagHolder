@@ -184,9 +184,24 @@
   }
 
   .calendar-metric-group {
+    color: #e4e4e7;
+  }
+
+  .calendar-metric-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.25rem;
     font-size: 0.9375rem;
     line-height: 1.5rem;
+    color: inherit;
+  }
+
+  .calendar-metric-label {
     color: #e4e4e7;
+  }
+
+  .calendar-metric-value {
+    color: inherit;
   }
 
   .calendar-primary-metric {
@@ -376,15 +391,23 @@
         {% if show_text_default %}
         <div class="calendar-metric-group space-y-2">
           {% set realized_class = 'text-profit' if d.realized > 0 else ('text-loss' if d.realized < 0 else 'text-neutral-200') %}
+          {% set market_value_class = 'text-profit' if d.market_value > 0 else ('text-loss' if d.market_value < 0 else 'text-neutral-200') %}
           {% if d.show_realized %}
           <div class="space-y-1">
-            <span class="calendar-primary-metric {{ realized_class }}" data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">Realized: {{ d.realized|money }}</span>
-            <span data-day-percent class="calendar-secondary-metric{% if d.percent is none %} hidden{% endif %} mt-1">Realized: <span data-day-percent-value class="{{ realized_class }}">{{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span></span>
+            <div class="calendar-metric-line" data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">
+              <span class="calendar-metric-label">Realized:</span>
+              <span class="calendar-metric-value {{ realized_class }}" data-day-realized-value>{{ d.realized|money }}</span>
+            </div>
+            <div data-day-percent class="calendar-metric-line{% if d.percent is none %} hidden{% endif %} mt-1">
+              <span class="calendar-metric-label">Realized:</span>
+              <span data-day-percent-value class="calendar-metric-value {{ realized_class }}">{{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span>
+            </div>
           </div>
           {% endif %}
-          <div class="calendar-secondary-metric"
+          <div class="calendar-metric-line"
                x-show="showMarketValue" x-cloak>
-            Market value: {{ d.market_value|money }}
+            <span class="calendar-metric-label">Market value:</span>
+            <span class="calendar-metric-value {{ market_value_class }}" data-day-market-value>{{ d.market_value|money }}</span>
           </div>
         </div>
         {% endif %}
