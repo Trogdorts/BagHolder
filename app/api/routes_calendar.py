@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field, field_validator
 router = APIRouter()
 class UIPreferencesUpdate(BaseModel):
     show_unrealized: Optional[bool] = None
+    show_total: Optional[bool] = None
     show_percentages: Optional[bool] = None
     show_weekends: Optional[bool] = None
     show_exclude_controls: Optional[bool] = None
@@ -103,6 +104,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     fill_strategy = ui_cfg.get("unrealized_fill_strategy", "carry_forward")
     show_trade_badges = coerce_bool(ui_cfg.get("show_trade_count", False), False)
     show_unrealized_default = coerce_bool(ui_cfg.get("show_unrealized", True), True)
+    show_total_default = coerce_bool(ui_cfg.get("show_total", True), True)
     show_text_default = coerce_bool(ui_cfg.get("show_text", True), True)
     show_percentages_default = coerce_bool(ui_cfg.get("show_percentages", True), True)
     show_weekends_default = coerce_bool(ui_cfg.get("show_weekends", True), True)
@@ -298,6 +300,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "invested": invested_value,
                 "show_realized": show_realized,
                 "percent": percent_value,
+                "total": invested_value,
                 "note": note_text,
                 "note_updated_at": note_updated_at,
                 "has_note": bool(note_text.strip()),
@@ -433,6 +436,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "cfg": request.app.state.config.raw,
         "show_trade_badges": show_trade_badges,
         "show_unrealized_flag": show_unrealized_default,
+        "show_total_flag": show_total_default,
         "show_text_flag": show_text_default,
         "show_percentages_flag": show_percentages_default,
         "show_weekends_flag": show_weekends_default,
@@ -456,6 +460,7 @@ def update_ui_preferences(payload: UIPreferencesUpdate, request: Request):
     updates: Dict[str, bool] = {}
     for field, key in (
         ("show_unrealized", "show_unrealized"),
+        ("show_total", "show_total"),
         ("show_percentages", "show_percentages"),
         ("show_weekends", "show_weekends"),
         ("show_exclude_controls", "show_exclude_controls"),
