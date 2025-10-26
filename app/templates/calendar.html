@@ -127,6 +127,57 @@
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
 
+  .toolbar-toggle[data-tooltip] {
+    position: relative;
+  }
+
+  .toolbar-toggle[data-tooltip]::after,
+  .toolbar-toggle[data-tooltip]::before {
+    position: absolute;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    transition-delay: 0s;
+    z-index: 20;
+  }
+
+  .toolbar-toggle[data-tooltip]::after {
+    content: attr(data-tooltip);
+    left: 50%;
+    bottom: calc(100% + 0.75rem);
+    transform: translateX(-50%);
+    max-width: 16rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background: rgba(24, 24, 27, 0.95);
+    color: #fafafa;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  }
+
+  .toolbar-toggle[data-tooltip]::before {
+    content: '';
+    left: 50%;
+    bottom: calc(100% + 0.25rem);
+    transform: translateX(-50%);
+    border-width: 0.45rem 0.4rem 0 0.4rem;
+    border-style: solid;
+    border-color: rgba(24, 24, 27, 0.95) transparent transparent transparent;
+  }
+
+  .toolbar-toggle[data-tooltip]:hover::after,
+  .toolbar-toggle[data-tooltip]:hover::before,
+  .toolbar-toggle[data-tooltip]:focus-visible::after,
+  .toolbar-toggle[data-tooltip]:focus-visible::before {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 2s;
+  }
+
   .toolbar-toggle:hover,
   .toolbar-toggle:focus-visible {
     background: rgba(63, 63, 70, 0.6);
@@ -173,7 +224,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.35rem 0.85rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     border: 1px solid #3f3f46;
     background-color: #171717;
@@ -313,6 +364,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showMarketValue }"
                   @click="toggleMarketValue()"
+                  data-tooltip="Show or hide each day's total portfolio market value on the calendar."
                   aria-pressed="{{ 'true' if show_market_value_default else 'false' }}"
                   :aria-pressed="showMarketValue.toString()">
             <span x-text="showMarketValue ? 'Hide market value' : 'Show market value'">
@@ -323,6 +375,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showExcludeControls }"
                   @click="toggleExcludeControls()"
+                  data-tooltip="Show or hide the exclude controls used to remove specific days from performance calculations."
                   aria-pressed="{{ 'true' if show_exclude_controls else 'false' }}"
                   :aria-pressed="showExcludeControls.toString()">
             <span x-text="showExcludeControls ? 'Hide exclude' : 'Show exclude'">
@@ -333,6 +386,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showPercentages }"
                   @click="togglePercentages()"
+                  data-tooltip="Show or hide percentage return metrics for each time frame displayed on the calendar."
                   aria-pressed="{{ 'true' if show_percentages_default else 'false' }}"
                   :aria-pressed="showPercentages.toString()">
             <span x-text="showPercentages ? 'Hide percent' : 'Show percent'">
@@ -343,6 +397,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': showWeekends }"
                   @click="toggleWeekends()"
+                  data-tooltip="Include or remove weekend columns so you can focus on trading days only."
                   aria-pressed="{{ 'true' if show_weekends else 'false' }}"
                   :aria-pressed="showWeekends.toString()">
             <span x-text="showWeekends ? 'Hide weekends' : 'Show weekends'">
@@ -353,6 +408,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': showTradeCounts }"
                   @click="toggleTradeCounts()"
+                  data-tooltip="Show or hide the badges that display how many trades were recorded each day."
                   aria-pressed="{{ 'true' if show_trade_count_badges else 'false' }}"
                   :aria-pressed="showTradeCounts.toString()">
             <span x-text="showTradeCounts ? 'Hide trade count' : 'Show trade count'">
@@ -488,41 +544,53 @@
   {% endfor %}
   {% set week_key = week.week_year ~ '-' ~ week.week_number %}
   {% set week_cls = (week.week_realized > 0) and 'cell-bg-pos' or (week.week_realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
-  <div class="relative min-h-[10rem] rounded-xl border border-neutral-800 p-4 flex flex-col justify-between {{ week_cls }}"
+  <div class="relative min-h-[10rem] rounded-xl border border-neutral-800 p-4 flex flex-col gap-3 {{ week_cls }}"
        data-week-summary="{{ week_key }}">
-    <div>
+    <div class="flex flex-col gap-2">
       <div class="calendar-section-label">Week {{ week.week_index }}</div>
-      <div class="calendar-metric-group space-y-2 text-right">
-        <div data-week-realized
-             class="space-y-1 {{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}{% if not week.show_week_realized %} hidden{% endif %}">
-          <div class="calendar-primary-metric">Realized: <span data-week-realized-value>{{ week.week_realized|money }}</span></div>
-          {% set week_percent_class = 'text-neutral-200' %}
-          {% if week.week_percent is not none %}
-            {% if week.week_percent > 0 %}
-              {% set week_percent_class = 'text-profit' %}
-            {% elif week.week_percent < 0 %}
-              {% set week_percent_class = 'text-loss' %}
-            {% endif %}
+      <div class="calendar-metric-group space-y-2">
+        {% set week_realized_class = 'text-neutral-200' %}
+        {% if week.week_realized > 0 %}
+          {% set week_realized_class = 'text-profit' %}
+        {% elif week.week_realized < 0 %}
+          {% set week_realized_class = 'text-loss' %}
+        {% endif %}
+        {% set week_percent_class = 'text-neutral-200' %}
+        {% if week.week_percent is not none %}
+          {% if week.week_percent > 0 %}
+            {% set week_percent_class = 'text-profit' %}
+          {% elif week.week_percent < 0 %}
+            {% set week_percent_class = 'text-loss' %}
           {% endif %}
-          <div data-week-percent class="calendar-secondary-metric{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %} mt-0.5">
-            {% if show_percentages_default and week.week_percent is not none %}Realized: <span data-week-percent-value class="{{ week_percent_class }}">{{ '{:+.2f}%'.format(week.week_percent) }}</span>{% endif %}
+        {% endif %}
+        <div data-week-realized
+             class="space-y-1{% if not week.show_week_realized %} hidden{% endif %}">
+          <div class="calendar-metric-line">
+            <span class="calendar-metric-label">Realized:</span>
+            <span class="calendar-metric-value {{ week_realized_class }}" data-week-realized-value>{{ week.week_realized|money }}</span>
+          </div>
+          <div data-week-percent class="calendar-metric-line{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %}">
+            {% if show_percentages_default and week.week_percent is not none %}
+            <span class="calendar-metric-label">Realized:</span>
+            <span data-week-percent-value class="calendar-metric-value {{ week_percent_class }}">{{ '{:+.2f}%'.format(week.week_percent) }}</span>
+            {% endif %}
           </div>
         </div>
       </div>
     </div>
-    {% if show_exclude_controls %}
-    <div class="flex justify-end mt-2">
+    {% if show_exclude_controls or notes_enabled %}
+    <div class="mt-auto flex items-center gap-2">
+      {% if show_exclude_controls %}
       <button type="button"
               class="week-include-toggle"
               data-week-toggle="{{ week_key }}"
               aria-pressed="true">
         Include week
       </button>
-    </div>
-    {% endif %}
-    {% if notes_enabled %}
-    <div class="flex justify-end">
-      <a class="note-trigger weekly-note-trigger z-10{% if week.has_note %} has-note{% else %} icon-translucent{% endif %}" href="#"
+      {% endif %}
+      {% if notes_enabled %}
+      <a class="note-trigger weekly-note-trigger relative inline-flex items-center justify-center ml-auto z-10{% if week.has_note %} has-note{% else %} icon-translucent{% endif %}"
+         href="#"
          aria-label="{{ 'Edit weekly note' if week.has_note else 'Add weekly note' }}"
          data-week-year="{{ week.week_year }}"
          data-week-index="{{ week.week_number }}"
@@ -544,6 +612,7 @@
           </div>
         </div>
       </a>
+      {% endif %}
     </div>
     {% endif %}
   </div>
