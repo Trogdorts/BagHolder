@@ -127,6 +127,57 @@
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
 
+  .toolbar-toggle[data-tooltip] {
+    position: relative;
+  }
+
+  .toolbar-toggle[data-tooltip]::after,
+  .toolbar-toggle[data-tooltip]::before {
+    position: absolute;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    transition-delay: 0s;
+    z-index: 20;
+  }
+
+  .toolbar-toggle[data-tooltip]::after {
+    content: attr(data-tooltip);
+    left: 50%;
+    bottom: calc(100% + 0.75rem);
+    transform: translateX(-50%);
+    max-width: 16rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    background: rgba(24, 24, 27, 0.95);
+    color: #fafafa;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  }
+
+  .toolbar-toggle[data-tooltip]::before {
+    content: '';
+    left: 50%;
+    bottom: calc(100% + 0.25rem);
+    transform: translateX(-50%);
+    border-width: 0.45rem 0.4rem 0 0.4rem;
+    border-style: solid;
+    border-color: rgba(24, 24, 27, 0.95) transparent transparent transparent;
+  }
+
+  .toolbar-toggle[data-tooltip]:hover::after,
+  .toolbar-toggle[data-tooltip]:hover::before,
+  .toolbar-toggle[data-tooltip]:focus-visible::after,
+  .toolbar-toggle[data-tooltip]:focus-visible::before {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 2s;
+  }
+
   .toolbar-toggle:hover,
   .toolbar-toggle:focus-visible {
     background: rgba(63, 63, 70, 0.6);
@@ -313,6 +364,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showMarketValue }"
                   @click="toggleMarketValue()"
+                  data-tooltip="Show or hide each day's total portfolio market value on the calendar."
                   aria-pressed="{{ 'true' if show_market_value_default else 'false' }}"
                   :aria-pressed="showMarketValue.toString()">
             <span x-text="showMarketValue ? 'Hide market value' : 'Show market value'">
@@ -323,6 +375,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showExcludeControls }"
                   @click="toggleExcludeControls()"
+                  data-tooltip="Show or hide the exclude controls used to remove specific days from performance calculations."
                   aria-pressed="{{ 'true' if show_exclude_controls else 'false' }}"
                   :aria-pressed="showExcludeControls.toString()">
             <span x-text="showExcludeControls ? 'Hide exclude' : 'Show exclude'">
@@ -333,6 +386,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showPercentages }"
                   @click="togglePercentages()"
+                  data-tooltip="Show or hide percentage return metrics for each time frame displayed on the calendar."
                   aria-pressed="{{ 'true' if show_percentages_default else 'false' }}"
                   :aria-pressed="showPercentages.toString()">
             <span x-text="showPercentages ? 'Hide percent' : 'Show percent'">
@@ -343,6 +397,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': showWeekends }"
                   @click="toggleWeekends()"
+                  data-tooltip="Include or remove weekend columns so you can focus on trading days only."
                   aria-pressed="{{ 'true' if show_weekends else 'false' }}"
                   :aria-pressed="showWeekends.toString()">
             <span x-text="showWeekends ? 'Hide weekends' : 'Show weekends'">
@@ -353,6 +408,7 @@
                   class="toolbar-toggle"
                   :class="{ 'is-active': showTradeCounts }"
                   @click="toggleTradeCounts()"
+                  data-tooltip="Show or hide the badges that display how many trades were recorded each day."
                   aria-pressed="{{ 'true' if show_trade_count_badges else 'false' }}"
                   :aria-pressed="showTradeCounts.toString()">
             <span x-text="showTradeCounts ? 'Hide trade count' : 'Show trade count'">
