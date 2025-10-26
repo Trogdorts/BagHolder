@@ -237,7 +237,7 @@ def simulate_trades(price_map: Mapping[str, pd.DataFrame], options: SimulationOp
     symbols = list(price_map.items())
     rng.shuffle(symbols)
 
-    log.info("Starting simulation with balance $%,.2f", cash)
+    log.info("Starting simulation with balance $%s", f"{cash:,.2f}")
 
     for symbol, raw_df in symbols:
         if len(raw_df) < 60:
@@ -341,7 +341,11 @@ def simulate_trades(price_map: Mapping[str, pd.DataFrame], options: SimulationOp
     result["_date"] = pd.to_datetime(result["date"], format="%m/%d/%Y")
     result.sort_values(["_date", "symbol", "action"], inplace=True)
     result.drop(columns=["_date"], inplace=True)
-    log.info("Generated %s trades. Final cash balance $%,.2f", len(result), cash)
+    log.info(
+        "Generated %s trades. Final cash balance $%s",
+        len(result),
+        f"{cash:,.2f}",
+    )
     return result
 
 

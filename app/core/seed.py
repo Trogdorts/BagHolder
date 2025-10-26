@@ -6,7 +6,21 @@ from sqlalchemy.orm import Session
 from app.core.models import Base, Meta
 
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
+
+
+def _ensure_daily_summary_unrealized_column(engine) -> None:
+    """Add the ``unrealized`` column to ``daily_summary`` if it is missing."""
+
+    with engine.begin() as conn:
+        columns = conn.execute(text("PRAGMA table_info(daily_summary)"))
+        has_column = any(row[1] == "unrealized" for row in columns)
+        if not has_column:
+            conn.execute(
+                text(
+                    "ALTER TABLE daily_summary ADD COLUMN unrealized FLOAT NOT NULL DEFAULT 0.0"
+                )
+            )
 
 
 def _ensure_daily_notes_markdown_column(engine) -> None:
@@ -71,6 +85,10 @@ def ensure_seed(db_path: str):
         if current_version < 3:
             _ensure_users_admin_column(engine)
             current_version = 3
+
+        if current_version < 5:
+            _ensure_daily_summary_unrealized_column(engine)
+            current_version = 5
 
         if current_version < SCHEMA_VERSION:
             schema_meta.value = str(SCHEMA_VERSION)
