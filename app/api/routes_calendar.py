@@ -218,6 +218,37 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     cal = calendar.Calendar(firstweekday=0)  # Monday=0 or Sunday=6; we'll keep 0
     weeks = []
     month_days = cal.monthdatescalendar(year, month)
+    displayed_end = month_days[-1][-1] if month_days else date(year, month, 1)
+
+    cumulative_rows = (
+        db.query(DailySummary)
+        .filter(DailySummary.date <= displayed_end.strftime("%Y-%m-%d"))
+        .order_by(DailySummary.date.asc())
+        .all()
+    )
+    cumulative_realized_dates: List[date] = []
+    cumulative_realized_values: List[float] = []
+    cumulative_running_total = 0.0
+    for row in cumulative_rows:
+        try:
+            row_date = date.fromisoformat(row.date)
+        except (TypeError, ValueError):
+            continue
+        try:
+            realized_amount = float(row.realized)
+        except (TypeError, ValueError):
+            realized_amount = 0.0
+        cumulative_running_total += realized_amount
+        cumulative_realized_dates.append(row_date)
+        cumulative_realized_values.append(cumulative_running_total)
+
+    def get_cumulative_realized(day: date) -> float:
+        if not cumulative_realized_dates:
+            return 0.0
+        idx = bisect_right(cumulative_realized_dates, day) - 1
+        if idx < 0:
+            return 0.0
+        return cumulative_realized_values[idx]
     def calculate_percentage(realized_value: float, invested_samples: List[float]) -> Optional[float]:
         total_invested = sum(
             abs(sample)
@@ -290,6 +321,11 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             percent_value = (
                 calculate_percentage(realized_value, [invested_value]) if ds else None
             )
+            cumulative_realized_total = get_cumulative_realized(d)
+            if is_future_day and not ds:
+                total_value = 0.0
+            else:
+                total_value = cumulative_realized_total + day_unrealized
 
             wk.append({
                 "date": d,
@@ -300,7 +336,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "invested": invested_value,
                 "show_realized": show_realized,
                 "percent": percent_value,
-                "total": invested_value,
+                "total": total_value,
                 "note": note_text,
                 "note_updated_at": note_updated_at,
                 "has_note": bool(note_text.strip()),

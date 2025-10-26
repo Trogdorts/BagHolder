@@ -116,6 +116,67 @@ def test_average_fill_for_missing_unrealized(tmp_path, monkeypatch):
     db.dispose_engine()
 
 
+def test_total_includes_cumulative_realized_and_unrealized(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    with db.SessionLocal() as session:
+        session.add(
+            DailySummary(
+                date="2024-02-29",
+                realized=25.0,
+                unrealized=0.0,
+                total_invested=0.0,
+                updated_at="now",
+            )
+        )
+        session.add(
+            DailySummary(
+                date="2024-03-01",
+                realized=10.0,
+                unrealized=100.0,
+                total_invested=0.0,
+                updated_at="now",
+            )
+        )
+        session.add(
+            DailySummary(
+                date="2024-03-02",
+                realized=90.0,
+                unrealized=150.0,
+                total_invested=0.0,
+                updated_at="now",
+            )
+        )
+        session.add(
+            DailySummary(
+                date="2024-03-04",
+                realized=-20.0,
+                unrealized=90.0,
+                total_invested=0.0,
+                updated_at="now",
+            )
+        )
+        session.commit()
+
+    with db.SessionLocal() as session:
+        request = _build_request(app)
+        response = calendar_view(2024, 3, request, db=session)
+        weeks = response.context["weeks"]
+
+        march_first = _get_day(weeks, date(2024, 3, 1))
+        assert march_first["total"] == pytest.approx(135.0)
+
+        march_second = _get_day(weeks, date(2024, 3, 2))
+        assert march_second["total"] == pytest.approx(275.0)
+
+        march_fourth = _get_day(weeks, date(2024, 3, 4))
+        assert march_fourth["total"] == pytest.approx(195.0)
+
+    db.dispose_engine()
+
+
 def test_weekly_notes_follow_iso_week(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
