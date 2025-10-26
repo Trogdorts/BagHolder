@@ -271,12 +271,22 @@ def simulate_trades(price_map: Mapping[str, pd.DataFrame], options: SimulationOp
     log.info("Starting simulation with balance $%s", f"{cash:,.2f}")
 
     for symbol, raw_df in symbols:
-        if len(raw_df) < 60:
+        if len(raw_df) < 15:
             continue
         df = raw_df.sort_values("Date").copy()
-        df["SMA_short"] = df["Close"].rolling(10).mean()
-        df["SMA_long"] = df["Close"].rolling(30).mean()
-        df["RSI"] = _calculate_rsi(df["Close"])
+        available = len(df)
+
+        short_window = 10
+        long_window = 30
+        rsi_window = 14
+        if available < long_window:
+            short_window = max(3, min(short_window, available // 3))
+            long_window = max(short_window + 1, min(long_window, available // 2))
+            rsi_window = max(3, min(rsi_window, available // 3))
+
+        df["SMA_short"] = df["Close"].rolling(short_window).mean()
+        df["SMA_long"] = df["Close"].rolling(long_window).mean()
+        df["RSI"] = _calculate_rsi(df["Close"], window=rsi_window)
         df.dropna(inplace=True)
         if df.empty:
             continue
