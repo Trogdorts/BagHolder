@@ -90,6 +90,9 @@ def import_simulated_trades(
 ) -> Dict[str, Any]:
     """Execute a simulation and import the resulting trades into ``account_dir``."""
 
+    if not options.generate_only:
+        clear_all_data(account_dir)
+
     result = run_trade_simulation(options)
     metadata = dict(result.metadata)
 
@@ -107,8 +110,6 @@ def import_simulated_trades(
         raise SimulationError("The simulator did not return any trades to import.")
 
     prepared = _prepare_trade_records(result.trades.to_dict("records"))
-
-    clear_all_data(account_dir)
 
     if database.SessionLocal is None:
         raise RuntimeError(

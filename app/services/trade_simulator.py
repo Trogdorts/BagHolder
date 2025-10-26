@@ -13,6 +13,7 @@ import os
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from math import ceil
 from io import StringIO
 from typing import Dict, Iterable, List, Mapping, MutableMapping, Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -219,8 +220,14 @@ def update_price_cache(
     return [f[:-4] for f in os.listdir(cache_dir) if f.endswith(".csv")]
 
 
-def load_prices(cache_dir: str) -> Dict[str, pd.DataFrame]:
+def load_prices(cache_dir: str, lookback_years: float | None = None) -> Dict[str, pd.DataFrame]:
     data: Dict[str, pd.DataFrame] = {}
+    cutoff = None
+    if lookback_years is not None:
+        if lookback_years <= 0:
+            raise SimulationError("Lookback period must be positive.")
+        days = max(ceil(lookback_years * 365.25), 1)
+        cutoff = datetime.today() - timedelta(days=days)
     if not os.path.isdir(cache_dir):
         return data
     for filename in os.listdir(cache_dir):
@@ -236,6 +243,8 @@ def load_prices(cache_dir: str) -> Dict[str, pd.DataFrame]:
             continue
         df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
         df.dropna(subset=["Close"], inplace=True)
+        if cutoff is not None:
+            df = df[df["Date"] >= cutoff]
         if df.empty:
             continue
         data[filename[:-4]] = df
@@ -410,7 +419,7 @@ def run_trade_simulation(options: SimulationOptions) -> SimulationResult:
         metadata["status"] = "cache_updated"
         return SimulationResult(trades=pd.DataFrame(), metadata=metadata)
 
-    price_map = load_prices(options.price_cache_dir)
+    price_map = load_prices(options.price_cache_dir, lookback_years)
     if not price_map:
         raise SimulationError("No cached price data is available for simulation.")
 
