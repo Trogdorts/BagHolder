@@ -124,22 +124,80 @@
   }
 
   .toolbar-quick-nav-panel h3 {
-    margin: 0 0 0.5rem;
+    margin: 0 0 0.75rem;
     font-size: 0.95rem;
     font-weight: 600;
     color: #fafafa;
   }
 
-  .toolbar-quick-nav-panel label {
-    display: block;
-    margin-bottom: 0.25rem;
+  .toolbar-quick-nav-form {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .toolbar-quick-nav-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .toolbar-quick-nav-field label {
     font-size: 0.75rem;
     letter-spacing: 0.05em;
     text-transform: uppercase;
     color: #a1a1aa;
   }
 
-  .toolbar-quick-nav-panel input[type="month"] {
+  .toolbar-quick-nav-stepper {
+    display: flex;
+    align-items: stretch;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(82, 82, 91, 0.75);
+    background: rgba(15, 15, 15, 0.9);
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .toolbar-quick-nav-stepper:focus-within {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.35);
+  }
+
+  .toolbar-quick-nav-stepper input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: transparent;
+    color: #fafafa;
+    font-size: 0.95rem;
+    text-align: center;
+  }
+
+  .toolbar-quick-nav-stepper input:focus {
+    outline: none;
+  }
+
+  .toolbar-quick-nav-step {
+    flex: 0 0 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #a1a1aa;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .toolbar-quick-nav-step:hover,
+  .toolbar-quick-nav-step:focus-visible {
+    background-color: rgba(63, 63, 70, 0.65);
+    color: #fafafa;
+  }
+
+  .toolbar-quick-nav-select {
     width: 100%;
     padding: 0.55rem 0.75rem;
     border-radius: 0.5rem;
@@ -150,14 +208,42 @@
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
-  .toolbar-quick-nav-panel input[type="month"]:focus {
+  .toolbar-quick-nav-select:focus {
     outline: none;
     border-color: #818cf8;
     box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.35);
   }
 
+  .toolbar-quick-nav-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .toolbar-quick-nav-go {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(82, 82, 91, 0.75);
+    background: rgba(39, 39, 42, 0.95);
+    color: #fafafa;
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .toolbar-quick-nav-go:hover,
+  .toolbar-quick-nav-go:focus-visible {
+    background-color: rgba(63, 63, 70, 0.9);
+    border-color: rgba(113, 113, 122, 0.85);
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.35);
+  }
+
   .toolbar-quick-nav-panel p {
-    margin-top: 0.5rem;
+    margin-top: 0.75rem;
     font-size: 0.75rem;
     color: #71717a;
   }
@@ -453,13 +539,62 @@
                  x-ref="panel"
                  @keydown.escape.window="close()">
               <h3>Quick navigation</h3>
-              <label for="quick-month-input">Month</label>
-              <input id="quick-month-input"
-                     type="month"
-                     x-ref="input"
-                     x-model="value"
-                     @change="go()"
-                     @keydown.enter.prevent="go()" />
+              <div class="toolbar-quick-nav-form">
+                <div class="toolbar-quick-nav-field">
+                  <label for="quick-year-input">Year</label>
+                  <div class="toolbar-quick-nav-stepper">
+                    <button type="button"
+                            class="toolbar-quick-nav-step"
+                            @click="stepYear(-1)"
+                            aria-label="Previous year">
+                      −
+                    </button>
+                    <input id="quick-year-input"
+                           type="number"
+                           inputmode="numeric"
+                           min="1"
+                           x-ref="yearInput"
+                           x-model="year"
+                           @change="normalizeYear()"
+                           @blur="normalizeYear()"
+                           @keydown.enter.prevent="go()" />
+                    <button type="button"
+                            class="toolbar-quick-nav-step"
+                            @click="stepYear(1)"
+                            aria-label="Next year">
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div class="toolbar-quick-nav-field">
+                  <label for="quick-month-select">Month</label>
+                  <select id="quick-month-select"
+                          class="toolbar-quick-nav-select"
+                          x-ref="monthSelect"
+                          x-model="month"
+                          @keydown.enter.prevent="go()">
+                    <option value="01">January</option>
+                    <option value="02">February</option>
+                    <option value="03">March</option>
+                    <option value="04">April</option>
+                    <option value="05">May</option>
+                    <option value="06">June</option>
+                    <option value="07">July</option>
+                    <option value="08">August</option>
+                    <option value="09">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </select>
+                </div>
+                <div class="toolbar-quick-nav-actions">
+                  <button type="button"
+                          class="toolbar-quick-nav-go"
+                          @click="go()">
+                    Go
+                  </button>
+                </div>
+              </div>
               <p>Select a year and month to jump to that calendar view.</p>
             </div>
           </div>
@@ -1119,30 +1254,60 @@ function calendarToolbar(initialState = {}) {
 function quickMonthPicker() {
   return {
     isOpen: false,
-    value: '',
+    year: '',
+    month: '',
     init() {
-      this.value = this.currentMonth();
+      const current = this.currentParts();
+      this.year = current.year || this.defaultYear();
+      this.month = current.month || this.defaultMonth();
     },
-    currentMonth() {
+    currentParts() {
       const root = document.querySelector('[data-calendar-root]');
       if (!root) {
-        return '';
+        return { year: '', month: '' };
       }
-      const year = root.dataset.calendarYear || '';
+      const year = Number.parseInt(root.dataset.calendarYear, 10);
       const month = root.dataset.calendarMonth || '';
-      if (!year || !month) {
-        return '';
-      }
-      return `${year}-${month}`;
+      const normalizedMonth = /^(0[1-9]|1[0-2])$/.test(month)
+        ? month
+        : '';
+      return {
+        year: Number.isFinite(year) ? year : '',
+        month: normalizedMonth,
+      };
+    },
+    defaultYear() {
+      return new Date().getFullYear();
+    },
+    defaultMonth() {
+      return String(new Date().getMonth() + 1).padStart(2, '0');
     },
     open() {
       this.isOpen = true;
-      this.value = this.currentMonth();
+      const current = this.currentParts();
+      this.year = current.year || this.sanitizedYear() || this.defaultYear();
+      this.month = current.month || this.ensureMonth(this.month) || this.defaultMonth();
       this.$nextTick(() => {
-        if (this.$refs.input) {
-          this.$refs.input.focus();
+        if (this.$refs.yearInput) {
+          this.$refs.yearInput.focus();
+          if (typeof this.$refs.yearInput.select === 'function') {
+            this.$refs.yearInput.select();
+          }
         }
       });
+    },
+    ensureMonth(value) {
+      if (typeof value !== 'string') {
+        return '';
+      }
+      const trimmed = value.trim();
+      if (/^(0[1-9]|1[0-2])$/.test(trimmed)) {
+        return trimmed;
+      }
+      if (/^([1-9]|1[0-2])$/.test(trimmed)) {
+        return String(Number.parseInt(trimmed, 10)).padStart(2, '0');
+      }
+      return '';
     },
     close() {
       this.isOpen = false;
@@ -1169,12 +1334,42 @@ function quickMonthPicker() {
       }
       this.close();
     },
-    go() {
-      const match = /^([0-9]{4})-([0-9]{2})$/.exec(this.value || '');
-      if (!match) {
+    sanitizedYear() {
+      const numeric = Number.parseInt(String(this.year).trim(), 10);
+      if (!Number.isFinite(numeric) || numeric < 1) {
+        return null;
+      }
+      return numeric;
+    },
+    normalizeYear() {
+      const sanitized = this.sanitizedYear();
+      if (sanitized === null) {
+        const current = this.currentParts();
+        this.year = current.year || this.defaultYear();
         return;
       }
-      const [, year, month] = match;
+      this.year = sanitized;
+    },
+    stepYear(delta) {
+      const sanitized = this.sanitizedYear();
+      const base = sanitized !== null
+        ? sanitized
+        : this.currentParts().year || this.defaultYear();
+      const next = base + delta;
+      this.year = next < 1 ? 1 : next;
+    },
+    go() {
+      const year = this.sanitizedYear();
+      const month = this.ensureMonth(this.month);
+      if (year === null) {
+        this.normalizeYear();
+        return;
+      }
+      if (!month) {
+        this.month = this.defaultMonth();
+        return;
+      }
+      this.month = month;
       this.close();
       window.location.href = `/calendar/${year}/${month}`;
     },
