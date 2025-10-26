@@ -70,6 +70,10 @@
     gap: 0.5rem;
   }
 
+  .toolbar-quick-nav {
+    position: relative;
+  }
+
   @media (min-width: 768px) {
     .toolbar-actions {
       flex-direction: row;
@@ -92,10 +96,70 @@
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
+  .toolbar-nav-button {
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+
   .toolbar-nav-link:hover,
   .toolbar-nav-link:focus-visible {
     background-color: rgba(63, 63, 70, 0.7);
     color: #fafafa;
+  }
+
+  .toolbar-quick-nav-panel {
+    position: absolute;
+    top: calc(100% + 0.6rem);
+    left: 50%;
+    transform: translateX(-50%);
+    width: max(16rem, 100%);
+    padding: 0.85rem 1rem 1rem;
+    border-radius: 0.75rem;
+    background: rgba(24, 24, 27, 0.96);
+    border: 1px solid rgba(63, 63, 70, 0.85);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    color: #e4e4e7;
+    z-index: 40;
+  }
+
+  .toolbar-quick-nav-panel h3 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fafafa;
+  }
+
+  .toolbar-quick-nav-panel label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #a1a1aa;
+  }
+
+  .toolbar-quick-nav-panel input[type="month"] {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(82, 82, 91, 0.75);
+    background: rgba(15, 15, 15, 0.9);
+    color: #fafafa;
+    font-size: 0.95rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .toolbar-quick-nav-panel input[type="month"]:focus {
+    outline: none;
+    border-color: #818cf8;
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.35);
+  }
+
+  .toolbar-quick-nav-panel p {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: #71717a;
   }
 
   .toolbar-controls {
@@ -366,6 +430,39 @@
           <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="toolbar-nav-link">Prev</a>
           <a href="/calendar/{{ current_year }}/{{ current_month }}" class="toolbar-nav-link">Today</a>
           <a href="/calendar/{{ next_year }}/{{ next_month }}" class="toolbar-nav-link">Next</a>
+          <div class="toolbar-quick-nav"
+               x-data="quickMonthPicker()"
+               x-init="init()"
+               @pointerdown.window="handleOutside($event)">
+            <button type="button"
+                    class="toolbar-nav-link toolbar-nav-button"
+                    x-ref="trigger"
+                    @click="toggle()"
+                    :aria-expanded="isOpen.toString()"
+                    aria-controls="quick-month-picker"
+                    aria-haspopup="dialog">
+              Jump to…
+            </button>
+            <div x-show="isOpen"
+                 x-transition.origin.top
+                 id="quick-month-picker"
+                 class="toolbar-quick-nav-panel"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Jump to month"
+                 x-ref="panel"
+                 @keydown.escape.window="close()">
+              <h3>Quick navigation</h3>
+              <label for="quick-month-input">Month</label>
+              <input id="quick-month-input"
+                     type="month"
+                     x-ref="input"
+                     x-model="value"
+                     @change="go()"
+                     @keydown.enter.prevent="go()" />
+              <p>Select a year and month to jump to that calendar view.</p>
+            </div>
+          </div>
         </nav>
         <div class="toolbar-controls">
           {% set market_value_tooltip_id = 'toolbar-tooltip-market-value' %}
@@ -1015,6 +1112,71 @@ function calendarToolbar(initialState = {}) {
       if (!saved) {
         this.showTradeCounts = previous;
       }
+    },
+  };
+}
+
+function quickMonthPicker() {
+  return {
+    isOpen: false,
+    value: '',
+    init() {
+      this.value = this.currentMonth();
+    },
+    currentMonth() {
+      const root = document.querySelector('[data-calendar-root]');
+      if (!root) {
+        return '';
+      }
+      const year = root.dataset.calendarYear || '';
+      const month = root.dataset.calendarMonth || '';
+      if (!year || !month) {
+        return '';
+      }
+      return `${year}-${month}`;
+    },
+    open() {
+      this.isOpen = true;
+      this.value = this.currentMonth();
+      this.$nextTick(() => {
+        if (this.$refs.input) {
+          this.$refs.input.focus();
+        }
+      });
+    },
+    close() {
+      this.isOpen = false;
+    },
+    toggle() {
+      if (this.isOpen) {
+        this.close();
+      } else {
+        this.open();
+      }
+    },
+    handleOutside(event) {
+      if (!this.isOpen) {
+        return;
+      }
+      const panel = this.$refs.panel;
+      const trigger = this.$refs.trigger;
+      const target = event ? event.target : null;
+      if (!target) {
+        return;
+      }
+      if ((panel && panel.contains(target)) || (trigger && trigger.contains(target))) {
+        return;
+      }
+      this.close();
+    },
+    go() {
+      const match = /^([0-9]{4})-([0-9]{2})$/.exec(this.value || '');
+      if (!match) {
+        return;
+      }
+      const [, year, month] = match;
+      this.close();
+      window.location.href = `/calendar/${year}/${month}`;
     },
   };
 }
