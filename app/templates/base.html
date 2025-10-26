@@ -372,6 +372,8 @@
     }
   </style>
 </head>
+{% set nav_accounts = accounts | default([]) %}
+{% set active_account_id = (nav_accounts | selectattr('is_active') | map(attribute='id') | list | first) %}
 <body class="min-h-screen bg-neutral-900 text-neutral-100">
   <nav class="w-full border-b border-neutral-800 bg-neutral-950">
     <div class="max-w-6xl mx-auto flex items-center gap-6 px-6 py-3 sm:px-8">
@@ -397,10 +399,22 @@
           <form method="post" action="/settings/accounts/switch" class="flex items-center gap-2 text-xs text-neutral-400 sm:text-sm sm:justify-end">
             <input type="hidden" name="redirect_to" value="{{ request.url.path }}">
             <label for="nav-account" class="uppercase tracking-wide">Portfolio</label>
-            <select id="nav-account" name="account_id" class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" onchange="this.form.submit()" {% if (accounts | default([]) | length) <= 1 %}disabled{% endif %}>
-              {% for account in accounts | default([]) %}
-                <option value="{{ account.id }}" {% if account.is_active %}selected{% endif %}>{{ account.name }}</option>
-              {% endfor %}
+            <select id="nav-account"
+                    name="account_id"
+                    class="rounded-md border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    data-active-account="{{ active_account_id or '' }}"
+                    onchange="return handleNavAccountChange(this)"
+                    {% if nav_accounts | length == 0 %}disabled{% endif %}>
+              {% if nav_accounts %}
+                {% for account in nav_accounts %}
+                  <option value="{{ account.id }}" {% if account.is_active %}selected{% endif %}>{{ account.name }}</option>
+                {% endfor %}
+                {% if nav_accounts | length <= 1 %}
+                  <option value="__create__">Create new portfolio…</option>
+                {% endif %}
+              {% else %}
+                <option value="" disabled selected>No portfolios available</option>
+              {% endif %}
             </select>
           </form>
           <div class="flex items-center gap-4 text-sm">
@@ -434,6 +448,29 @@
   <div id="modal-root"></div>
 
   <script>
+    function handleNavAccountChange(selectEl) {
+      if (!selectEl) {
+        return false;
+      }
+
+      const selectedValue = selectEl.value;
+      if (selectedValue === "__create__") {
+        const activeValue = selectEl.dataset.activeAccount;
+        if (activeValue) {
+          selectEl.value = activeValue;
+        }
+        window.location.href = "/settings#account-settings";
+        return false;
+      }
+
+      if (selectEl.form) {
+        selectEl.form.submit();
+        return false;
+      }
+
+      return true;
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       const reloadButton = document.getElementById('dev-reload');
       if (!reloadButton) {
