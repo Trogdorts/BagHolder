@@ -9,7 +9,7 @@ from typing import Any, Optional
 from urllib.parse import quote_plus
 from zipfile import BadZipFile
 
-from fastapi import APIRouter, Request, Form, UploadFile, File, Depends
+from fastapi import APIRouter, Request, Form, UploadFile, File, Depends, HTTPException
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -37,6 +37,11 @@ from app.services.accounts import (
 from app.services.data_backup import create_backup_archive, restore_backup_archive
 from app.services.data_reset import clear_all_data
 from app.services.identity import IdentityService
+from app.services.simulation_runner import (
+    build_default_simulation_options,
+    import_simulated_trades,
+)
+from app.services.trade_simulator import SimulationError
 
 router = APIRouter()
 
@@ -927,6 +932,63 @@ def switch_active_account(
     reload_application_state(request.app, data_dir=base_dir)
     log.info("Active account set to %s", account_id)
     return _account_success_redirect("switched", redirect_to)
+
+
+@router.post("/api/accounts/{account_id}/simulate")
+def simulate_portfolio_trades(request: Request, account_id: str):
+    cfg: AppConfig = request.app.state.config
+    base_dir = _resolve_data_directory(cfg)
+
+    accounts_records, active_record = prepare_accounts(cfg, base_dir)
+    record_lookup = {account.id: account for account in accounts_records}
+
+    target = record_lookup.get(account_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Portfolio not found.")
+
+    switched = False
+    if active_record.id != target.id:
+        try:
+            changed = set_active_account(cfg, base_dir, account_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="Portfolio not found.") from exc
+        switched = changed
+
+    if switched:
+        reload_application_state(request.app, data_dir=base_dir)
+        account_dir = getattr(request.app.state, "account_data_dir", target.path)
+    else:
+        account_dir = target.path
+
+    if not account_dir:
+        raise HTTPException(
+            status_code=500,
+            detail="The portfolio directory could not be determined.",
+        )
+
+    options = build_default_simulation_options(account_dir)
+
+    try:
+        result = import_simulated_trades(
+            request.app,
+            account_dir,
+            base_dir,
+            options,
+        )
+    except SimulationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:  # pragma: no cover - defensive guard
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive logging
+        log.exception("Failed to simulate trades for account %s", account_id)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate simulated trades.",
+        ) from exc
+
+    result.setdefault("metadata", {})["portfolio_id"] = account_id
+    result["redirect"] = "/"
+    return JSONResponse(result)
 
 
 @router.get("/settings/config/export")

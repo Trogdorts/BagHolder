@@ -106,7 +106,7 @@
           <div class="space-y-3">
             {% for account in accounts %}
               {% set is_primary = account.id == 'primary' %}
-              <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/50 p-4 shadow-inner shadow-black/30">
+              <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/50 p-4 shadow-inner shadow-black/30" data-account-card="{{ account.id }}">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p class="text-sm font-semibold text-neutral-100">{{ account.name }}</p>
@@ -127,6 +127,17 @@
                   <input id="account-name-{{ account.id }}" name="account_name" value="{{ account.name }}" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50" autocomplete="off">
                   <button class="btn btn-outline-primary px-3 py-2 text-sm sm:w-auto">Rename</button>
                 </form>
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p class="text-xs text-neutral-400 sm:max-w-xs">
+                    Replace this portfolio with simulated trades to explore BagHolder without importing your own data.
+                  </p>
+                  <button type="button"
+                          class="btn btn-outline-primary px-3 py-2 text-sm sm:w-auto"
+                          data-simulate-trades="{{ account.id }}">
+                    Simulate trades
+                  </button>
+                </div>
+                <p class="mt-2 text-xs text-neutral-400 hidden" data-simulate-status aria-live="polite"></p>
                 <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <form method="post" action="/settings/accounts/clear" class="flex w-full sm:w-auto"
                         onsubmit="return confirm('This will delete all trades, summaries, and notes for this portfolio. Continue?');">
@@ -767,6 +778,103 @@
     } catch (error) {
       console.warn('Unable to clear stored exclusions after portfolio reset', error);
     }
+  })();
+
+  (function setupSimulationControls() {
+    const buttons = document.querySelectorAll('[data-simulate-trades]');
+    if (!buttons.length) {
+      return;
+    }
+
+    const setStatus = (statusEl, message, tone = 'info') => {
+      if (!statusEl) {
+        return;
+      }
+      statusEl.classList.remove('hidden');
+      statusEl.classList.remove('text-danger', 'text-success', 'text-neutral-400', 'text-neutral-300');
+      if (tone === 'error') {
+        statusEl.classList.add('text-danger');
+      } else if (tone === 'success') {
+        statusEl.classList.add('text-success');
+      } else {
+        statusEl.classList.add('text-neutral-300');
+      }
+      statusEl.textContent = message;
+    };
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', async () => {
+        const accountId = button.dataset.simulateTrades;
+        if (!accountId) {
+          return;
+        }
+
+        if (!window.confirm('This will clear existing data for this portfolio and replace it with simulated trades. Continue?')) {
+          return;
+        }
+
+        const card = button.closest('[data-account-card]');
+        const statusEl = card ? card.querySelector('[data-simulate-status]') : null;
+
+        const originalLabel = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Simulating…';
+        setStatus(statusEl, 'Running trade simulation…');
+
+        let payload = null;
+
+        try {
+          const response = await fetch(`/api/accounts/${encodeURIComponent(accountId)}/simulate`, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' },
+          });
+
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            payload = await response.json();
+          }
+
+          if (!response.ok || !payload || payload.ok !== true) {
+            const message = (payload && payload.detail) ? payload.detail : 'Failed to simulate trades.';
+            setStatus(statusEl, message, 'error');
+            button.disabled = false;
+            button.textContent = originalLabel;
+            return;
+          }
+
+          if (payload.generate_only) {
+            const message = payload.message || 'Symbol and price caches have been updated.';
+            setStatus(statusEl, message, 'success');
+            button.disabled = false;
+            button.textContent = originalLabel;
+            return;
+          }
+
+          const tradesImported = typeof payload.trades_imported === 'number' ? payload.trades_imported : null;
+          const daysWithTrades = typeof payload.days_with_trades === 'number' ? payload.days_with_trades : null;
+          let successMessage = 'Simulation completed successfully.';
+          if (tradesImported !== null && daysWithTrades !== null) {
+            successMessage = `Imported ${tradesImported} simulated trades across ${daysWithTrades} day${daysWithTrades === 1 ? '' : 's'}.`;
+          }
+          setStatus(statusEl, `${successMessage} Reloading calendar…`, 'success');
+
+          const redirect = typeof payload.redirect === 'string' && payload.redirect ? payload.redirect : '/';
+          if (payload.reload) {
+            setTimeout(() => {
+              window.location.href = redirect;
+            }, 1200);
+          } else {
+            button.disabled = false;
+            button.textContent = originalLabel;
+          }
+        } catch (error) {
+          console.error('Failed to simulate trades', error);
+          setStatus(statusEl, 'Failed to simulate trades. Please try again.', 'error');
+          button.disabled = false;
+          button.textContent = originalLabel;
+        }
+      });
+    });
   })();
 </script>
 {% endblock %}
