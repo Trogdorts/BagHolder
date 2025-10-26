@@ -575,6 +575,10 @@
             <span data-week-percent-value class="calendar-metric-value {{ week_percent_class }}">{{ '{:+.2f}%'.format(week.week_percent) }}</span>
             {% endif %}
           </div>
+          <div data-week-average class="calendar-metric-line hidden">
+            <span class="calendar-metric-label">Avg realized per day (<span data-week-average-count>0</span> days):</span>
+            <span class="calendar-metric-value text-neutral-200" data-week-average-value></span>
+          </div>
         </div>
       </div>
     </div>
@@ -1232,6 +1236,9 @@ const dayImpactSimulator = (() => {
       realizedValue: weekEl.querySelector('[data-week-realized-value]'),
       percent: weekEl.querySelector('[data-week-percent]'),
       percentValue: weekEl.querySelector('[data-week-percent-value]'),
+      averageContainer: weekEl.querySelector('[data-week-average]'),
+      averageCount: weekEl.querySelector('[data-week-average-count]'),
+      averageValue: weekEl.querySelector('[data-week-average-value]'),
       toggle,
     });
   });
@@ -1360,6 +1367,19 @@ const dayImpactSimulator = (() => {
           dom.percentValue.textContent = formatPercentage(percentValue);
           applySignClass(dom.percentValue, percentValue);
         }
+      }
+    }
+
+    if (dom.averageContainer && dom.averageCount && dom.averageValue) {
+      const tradingDays = state.tradingDays && isIncluded ? state.tradingDays : 0;
+      if (state.hasIncluded && isIncluded && tradingDays > 0) {
+        dom.averageCount.textContent = tradingDays.toString();
+        const averageValue = realizedValue / tradingDays;
+        dom.averageValue.textContent = formatMoney(averageValue);
+        applySignClass(dom.averageValue, averageValue);
+        dom.averageContainer.classList.remove('hidden');
+      } else {
+        dom.averageContainer.classList.add('hidden');
       }
     }
 
@@ -1496,6 +1516,7 @@ const dayImpactSimulator = (() => {
         investedSamples: [],
         hasIncluded: false,
         included: weekIncluded,
+        tradingDays: 0,
       };
 
       if (weekIncluded) {
@@ -1507,6 +1528,7 @@ const dayImpactSimulator = (() => {
           if (day.hasValues) {
             state.realized += day.realized;
             collectInvestedSample(state.investedSamples, day.invested);
+            state.tradingDays += 1;
           }
           state.hasIncluded = true;
         });
