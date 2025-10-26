@@ -225,7 +225,7 @@
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showUnrealized }"
-                  @click="toggleUnrealized"
+                  @click="toggleUnrealized()"
                   aria-pressed="{{ 'true' if show_unrealized_default else 'false' }}"
                   :aria-pressed="showUnrealized.toString()">
             <span x-text="showUnrealized ? 'Hide unrealized' : 'Show unrealized'">
@@ -235,7 +235,7 @@
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showExcludeControls }"
-                  @click="toggleExcludeControls"
+                  @click="toggleExcludeControls()"
                   aria-pressed="{{ 'true' if show_exclude_controls else 'false' }}"
                   :aria-pressed="showExcludeControls.toString()">
             <span x-text="showExcludeControls ? 'Hide exclude' : 'Show exclude'">
@@ -245,7 +245,7 @@
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showPercentages }"
-                  @click="togglePercentages"
+                  @click="togglePercentages()"
                   aria-pressed="{{ 'true' if show_percentages_default else 'false' }}"
                   :aria-pressed="showPercentages.toString()">
             <span x-text="showPercentages ? 'Hide percent' : 'Show percent'">
@@ -255,7 +255,7 @@
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': showWeekends }"
-                  @click="toggleWeekends"
+                  @click="toggleWeekends()"
                   aria-pressed="{{ 'true' if show_weekends else 'false' }}"
                   :aria-pressed="showWeekends.toString()">
             <span x-text="showWeekends ? 'Hide weekends' : 'Show weekends'">
@@ -265,7 +265,7 @@
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': showTradeCounts }"
-                  @click="toggleTradeCounts"
+                  @click="toggleTradeCounts()"
                   aria-pressed="{{ 'true' if show_trade_count_badges else 'false' }}"
                   :aria-pressed="showTradeCounts.toString()">
             <span x-text="showTradeCounts ? 'Hide trade count' : 'Show trade count'">
