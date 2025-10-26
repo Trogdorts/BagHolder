@@ -173,7 +173,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.35rem 0.85rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     border: 1px solid #3f3f46;
     background-color: #171717;
@@ -488,41 +488,53 @@
   {% endfor %}
   {% set week_key = week.week_year ~ '-' ~ week.week_number %}
   {% set week_cls = (week.week_realized > 0) and 'cell-bg-pos' or (week.week_realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
-  <div class="relative min-h-[10rem] rounded-xl border border-neutral-800 p-4 flex flex-col justify-between {{ week_cls }}"
+  <div class="relative min-h-[10rem] rounded-xl border border-neutral-800 p-4 flex flex-col gap-3 {{ week_cls }}"
        data-week-summary="{{ week_key }}">
-    <div>
+    <div class="flex flex-col gap-2">
       <div class="calendar-section-label">Week {{ week.week_index }}</div>
-      <div class="calendar-metric-group space-y-2 text-right">
-        <div data-week-realized
-             class="space-y-1 {{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}{% if not week.show_week_realized %} hidden{% endif %}">
-          <div class="calendar-primary-metric">Realized: <span data-week-realized-value>{{ week.week_realized|money }}</span></div>
-          {% set week_percent_class = 'text-neutral-200' %}
-          {% if week.week_percent is not none %}
-            {% if week.week_percent > 0 %}
-              {% set week_percent_class = 'text-profit' %}
-            {% elif week.week_percent < 0 %}
-              {% set week_percent_class = 'text-loss' %}
-            {% endif %}
+      <div class="calendar-metric-group space-y-2">
+        {% set week_realized_class = 'text-neutral-200' %}
+        {% if week.week_realized > 0 %}
+          {% set week_realized_class = 'text-profit' %}
+        {% elif week.week_realized < 0 %}
+          {% set week_realized_class = 'text-loss' %}
+        {% endif %}
+        {% set week_percent_class = 'text-neutral-200' %}
+        {% if week.week_percent is not none %}
+          {% if week.week_percent > 0 %}
+            {% set week_percent_class = 'text-profit' %}
+          {% elif week.week_percent < 0 %}
+            {% set week_percent_class = 'text-loss' %}
           {% endif %}
-          <div data-week-percent class="calendar-secondary-metric{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %} mt-0.5">
-            {% if show_percentages_default and week.week_percent is not none %}Realized: <span data-week-percent-value class="{{ week_percent_class }}">{{ '{:+.2f}%'.format(week.week_percent) }}</span>{% endif %}
+        {% endif %}
+        <div data-week-realized
+             class="space-y-1{% if not week.show_week_realized %} hidden{% endif %}">
+          <div class="calendar-metric-line">
+            <span class="calendar-metric-label">Realized:</span>
+            <span class="calendar-metric-value {{ week_realized_class }}" data-week-realized-value>{{ week.week_realized|money }}</span>
+          </div>
+          <div data-week-percent class="calendar-metric-line{% if not (show_percentages_default and week.week_percent is not none) %} hidden{% endif %}">
+            {% if show_percentages_default and week.week_percent is not none %}
+            <span class="calendar-metric-label">Realized:</span>
+            <span data-week-percent-value class="calendar-metric-value {{ week_percent_class }}">{{ '{:+.2f}%'.format(week.week_percent) }}</span>
+            {% endif %}
           </div>
         </div>
       </div>
     </div>
-    {% if show_exclude_controls %}
-    <div class="flex justify-end mt-2">
+    {% if show_exclude_controls or notes_enabled %}
+    <div class="mt-auto flex items-center gap-2">
+      {% if show_exclude_controls %}
       <button type="button"
               class="week-include-toggle"
               data-week-toggle="{{ week_key }}"
               aria-pressed="true">
         Include week
       </button>
-    </div>
-    {% endif %}
-    {% if notes_enabled %}
-    <div class="flex justify-end">
-      <a class="note-trigger weekly-note-trigger z-10{% if week.has_note %} has-note{% else %} icon-translucent{% endif %}" href="#"
+      {% endif %}
+      {% if notes_enabled %}
+      <a class="note-trigger weekly-note-trigger relative inline-flex items-center justify-center ml-auto z-10{% if week.has_note %} has-note{% else %} icon-translucent{% endif %}"
+         href="#"
          aria-label="{{ 'Edit weekly note' if week.has_note else 'Add weekly note' }}"
          data-week-year="{{ week.week_year }}"
          data-week-index="{{ week.week_number }}"
@@ -544,6 +556,7 @@
           </div>
         </div>
       </a>
+      {% endif %}
     </div>
     {% endif %}
   </div>
