@@ -100,3 +100,7 @@ Theme defaults to **dark**. Toggle numeric text visibility, default month view, 
 ## Support
 
 If this project has been useful, consider [buying me a coffee](https://buymeacoffee.com/crissejdav6).
+
+## Contact
+
+- [Reddit: r/bagholder_dev](https://www.reddit.com/r/bagholder_dev)
