@@ -244,6 +244,51 @@ def test_import_trades_overwrites_existing_rows(tmp_path, monkeypatch):
         db.dispose_engine()
 
 
+def test_import_trades_accumulates_notes_per_day(tmp_path, monkeypatch):
+    _init_app(tmp_path, monkeypatch)
+    try:
+        rows = [
+            {
+                "date": "2025-11-01",
+                "symbol": "AAPL",
+                "action": "BUY",
+                "qty": 10.0,
+                "price": 150.0,
+                "amount": -1500.0,
+                "note": "Opened starter position",
+            },
+            {
+                "date": "2025-11-01",
+                "symbol": "AAPL",
+                "action": "SELL",
+                "qty": 5.0,
+                "price": 155.0,
+                "amount": 775.0,
+                "note": "Trimmed after pop",
+            },
+            {
+                "date": "2025-11-01",
+                "symbol": "AAPL",
+                "action": "BUY",
+                "qty": 2.0,
+                "price": 152.0,
+                "amount": -304.0,
+                "note": "Added back",
+            },
+        ]
+
+        with db.SessionLocal() as session:
+            inserted = _persist_trade_rows(session, rows)
+            assert inserted == 3
+
+        with db.SessionLocal() as session:
+            note = session.get(NoteDaily, "2025-11-01")
+            assert note is not None
+            assert note.note == "Opened starter position\nTrimmed after pop\nAdded back"
+    finally:
+        db.dispose_engine()
+
+
 def test_import_trades_auto_resolves_missing_summaries(tmp_path, monkeypatch):
     app = _init_app(tmp_path, monkeypatch)
     try:
