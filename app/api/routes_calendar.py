@@ -136,8 +136,22 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         .order_by(DailySummary.date.desc())
         .first()
     )
-    running_unrealized = float(prev_summary.unrealized) if prev_summary else 0.0
-    has_running_unrealized = prev_summary is not None
+    if prev_summary:
+        try:
+            running_unrealized = float(prev_summary.unrealized)
+        except (TypeError, ValueError):
+            running_unrealized = 0.0
+        has_running_unrealized = True
+        try:
+            running_invested = float(prev_summary.total_invested)
+        except (TypeError, ValueError):
+            running_invested = 0.0
+        has_running_invested = True
+    else:
+        running_unrealized = 0.0
+        has_running_unrealized = False
+        running_invested = 0.0
+        has_running_invested = False
 
     actual_unrealized_map = {}
     actual_unrealized_dates = []
@@ -286,10 +300,17 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             note_updated_at = note_entry["updated_at"] if note_entry else ""
             is_weekend = d.weekday() >= 5
             is_future_day = d > today
+            invested_value = 0.0
             if ds:
                 running_unrealized = float(ds.unrealized)
                 has_running_unrealized = True
                 day_unrealized = running_unrealized
+                try:
+                    invested_value = float(ds.total_invested)
+                except (TypeError, ValueError):
+                    invested_value = 0.0
+                running_invested = invested_value
+                has_running_invested = True
             elif d.month == month:
                 if is_future_day:
                     day_unrealized = 0.0
@@ -306,8 +327,12 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                     day_unrealized = running_unrealized
                 else:
                     day_unrealized = 0.0
+                if has_running_invested and not is_future_day:
+                    invested_value = running_invested
             else:
                 day_unrealized = 0.0
+                if has_running_invested and not is_future_day:
+                    invested_value = running_invested
             day_trades = trades_by_day.get(day_key, [])
             has_trades = bool(day_trades)
             has_sell_trade = any(
@@ -317,7 +342,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             show_realized = bool(ds) and (
                 not math.isclose(realized_value, 0.0, abs_tol=0.005) or has_sell_trade
             )
-            invested_value = float(ds.total_invested) if ds else 0.0
             percent_value = (
                 calculate_percentage(realized_value, [invested_value]) if ds else None
             )
@@ -325,7 +349,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             if is_future_day and not ds:
                 total_value = 0.0
             else:
-                total_value = cumulative_realized_total + day_unrealized
+                total_value = invested_value + cumulative_realized_total + day_unrealized
 
             wk.append({
                 "date": d,
