@@ -694,7 +694,7 @@
   </div>
   </div>
 
-  <div class="fixed inset-0 z-40 hidden items-center justify-center bg-black/70 px-4 py-6" data-simulate-dialog aria-hidden="true">
+  <div class="fixed inset-0 z-40 hidden flex items-center justify-center bg-black/70 px-4 py-6" data-simulate-dialog aria-hidden="true">
     <div class="w-full max-w-2xl rounded-2xl border border-neutral-800/80 bg-neutral-950/90 p-6 shadow-2xl shadow-black/40" role="dialog" aria-modal="true" aria-labelledby="simulate-dialog-title">
       <div class="flex items-start justify-between gap-4">
         <div>
@@ -748,32 +748,50 @@
             <input id="simulate-max-workers" name="max_workers" type="number" min="1" step="1" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
             <p class="text-xs text-neutral-500">Concurrent requests when refreshing price data.</p>
           </div>
-          <div class="space-y-1 sm:col-span-2">
-            <label for="simulate-symbol-cache" class="text-sm font-medium text-neutral-200">Symbol cache file</label>
-            <input id="simulate-symbol-cache" name="symbol_cache" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-            <p class="text-xs text-neutral-500">File that stores cached U.S. ticker symbols.</p>
-          </div>
-          <div class="space-y-1 sm:col-span-2">
-            <label for="simulate-price-cache" class="text-sm font-medium text-neutral-200">Price cache directory</label>
-            <input id="simulate-price-cache" name="price_cache_dir" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-            <p class="text-xs text-neutral-500">Where downloaded historical price data is stored.</p>
-          </div>
-          <div class="space-y-1 sm:col-span-2">
-            <label for="simulate-output-dir" class="text-sm font-medium text-neutral-200">Output directory</label>
-            <input id="simulate-output-dir" name="output_dir" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-            <p class="text-xs text-neutral-500">Destination for generated trades and supporting files.</p>
-          </div>
-          <div class="space-y-1">
-            <label for="simulate-output-name" class="text-sm font-medium text-neutral-200">Output filename</label>
-            <input id="simulate-output-name" name="output_name" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-            <p class="text-xs text-neutral-500">Trade file that will be imported into the portfolio.</p>
-          </div>
-          <div class="space-y-1">
-            <span class="text-sm font-medium text-neutral-200">Update caches only</span>
-            <label class="flex items-center gap-2 text-sm text-neutral-300">
-              <input type="checkbox" name="generate_only" class="h-4 w-4 rounded border-neutral-600 bg-neutral-900 text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-              Update symbol and price caches without importing trades
-            </label>
+        </div>
+        <div class="space-y-3" x-data="{ open: false }">
+          <button type="button"
+                  class="flex w-full items-center justify-between rounded-lg border border-neutral-700 bg-neutral-900/80 px-4 py-2 text-left text-sm font-medium text-neutral-200 transition hover:border-neutral-500 hover:text-neutral-50 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  @click="open = !open"
+                  :aria-expanded="open ? 'true' : 'false'"
+                  aria-controls="simulate-advanced-file-settings">
+            <span>Advanced file settings</span>
+            <span class="text-xs font-semibold uppercase tracking-wide text-neutral-500" x-text="open ? 'Hide files' : 'Show files'"></span>
+          </button>
+          <div id="simulate-advanced-file-settings"
+               x-show="open"
+               x-transition.opacity.duration.150ms
+               x-cloak
+               class="rounded-lg border border-neutral-800/70 bg-neutral-900/80 p-4">
+            <div class="grid gap-5 sm:grid-cols-2">
+              <div class="space-y-1 sm:col-span-2">
+                <label for="simulate-symbol-cache" class="text-sm font-medium text-neutral-200">Symbol cache file</label>
+                <input id="simulate-symbol-cache" name="symbol_cache" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+                <p class="text-xs text-neutral-500">File that stores cached U.S. ticker symbols.</p>
+              </div>
+              <div class="space-y-1 sm:col-span-2">
+                <label for="simulate-price-cache" class="text-sm font-medium text-neutral-200">Price cache directory</label>
+                <input id="simulate-price-cache" name="price_cache_dir" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+                <p class="text-xs text-neutral-500">Where downloaded historical price data is stored.</p>
+              </div>
+              <div class="space-y-1 sm:col-span-2">
+                <label for="simulate-output-dir" class="text-sm font-medium text-neutral-200">Output directory</label>
+                <input id="simulate-output-dir" name="output_dir" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+                <p class="text-xs text-neutral-500">Destination for generated trades and supporting files.</p>
+              </div>
+              <div class="space-y-1">
+                <label for="simulate-output-name" class="text-sm font-medium text-neutral-200">Output filename</label>
+                <input id="simulate-output-name" name="output_name" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+                <p class="text-xs text-neutral-500">Trade file that will be imported into the portfolio.</p>
+              </div>
+              <div class="space-y-1">
+                <span class="text-sm font-medium text-neutral-200">Update caches only</span>
+                <label class="flex items-center gap-2 text-sm text-neutral-300">
+                  <input type="checkbox" name="generate_only" class="h-4 w-4 rounded border-neutral-600 bg-neutral-900 text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+                  Update symbol and price caches without importing trades
+                </label>
+              </div>
+            </div>
           </div>
         </div>
         <div class="flex flex-col gap-3 border-t border-neutral-800/60 pt-4 sm:flex-row sm:justify-end">
