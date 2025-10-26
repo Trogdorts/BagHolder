@@ -662,8 +662,103 @@
     </a>
     </div>
   </div>
-</div>
-<script>
+  </div>
+
+  <div class="fixed inset-0 z-40 hidden items-center justify-center bg-black/70 px-4 py-6" data-simulate-dialog aria-hidden="true">
+    <div class="w-full max-w-2xl rounded-2xl border border-neutral-800/80 bg-neutral-950/90 p-6 shadow-2xl shadow-black/40" role="dialog" aria-modal="true" aria-labelledby="simulate-dialog-title">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-blue-300">Trade simulation</p>
+          <h2 id="simulate-dialog-title" class="text-lg font-semibold text-neutral-100">Review simulation settings</h2>
+          <p class="mt-1 text-sm text-neutral-400">Adjust the simulator inputs before generating trades.</p>
+        </div>
+        <button type="button"
+                class="rounded-full p-2 text-neutral-400 transition hover:bg-neutral-800/60 hover:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                data-simulate-close
+                aria-label="Close simulation settings dialog">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form class="mt-6 space-y-6" data-simulate-form autocomplete="off">
+        <input type="hidden" name="account_id" data-simulate-account>
+        <p class="hidden rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-200" data-simulate-error></p>
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div class="space-y-1">
+            <label for="simulate-years-back" class="text-sm font-medium text-neutral-200">Years of history</label>
+            <input id="simulate-years-back" name="years_back" type="number" min="1" step="1" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">How many years of market data to include.</p>
+          </div>
+          <div class="space-y-1">
+            <label for="simulate-start-balance" class="text-sm font-medium text-neutral-200">Starting balance</label>
+            <input id="simulate-start-balance" name="start_balance" type="number" min="0" step="0.01" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">Initial account balance used by the simulator.</p>
+          </div>
+          <div class="space-y-1">
+            <label for="simulate-risk-level" class="text-sm font-medium text-neutral-200">Risk level</label>
+            <input id="simulate-risk-level" name="risk_level" type="number" min="0" max="1" step="0.05" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">0 keeps trades conservative; 1 takes maximum risk.</p>
+          </div>
+          <div class="space-y-1">
+            <label for="simulate-profit-target" class="text-sm font-medium text-neutral-200">Profit target</label>
+            <input id="simulate-profit-target" name="profit_target" type="number" min="0" step="0.01" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">Desired percentage gain before taking profit.</p>
+          </div>
+          <div class="space-y-1">
+            <label for="simulate-stop-loss" class="text-sm font-medium text-neutral-200">Stop loss</label>
+            <input id="simulate-stop-loss" name="stop_loss" type="number" min="0" step="0.01" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">Percentage drop that triggers an exit.</p>
+          </div>
+          <div class="space-y-1">
+            <label for="simulate-seed" class="text-sm font-medium text-neutral-200">Random seed</label>
+            <input id="simulate-seed" name="seed" type="number" step="1" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">Controls repeatability of generated trades.</p>
+          </div>
+          <div class="space-y-1">
+            <label for="simulate-max-workers" class="text-sm font-medium text-neutral-200">Download workers</label>
+            <input id="simulate-max-workers" name="max_workers" type="number" min="1" step="1" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">Concurrent requests when refreshing price data.</p>
+          </div>
+          <div class="space-y-1 sm:col-span-2">
+            <label for="simulate-symbol-cache" class="text-sm font-medium text-neutral-200">Symbol cache file</label>
+            <input id="simulate-symbol-cache" name="symbol_cache" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">File that stores cached U.S. ticker symbols.</p>
+          </div>
+          <div class="space-y-1 sm:col-span-2">
+            <label for="simulate-price-cache" class="text-sm font-medium text-neutral-200">Price cache directory</label>
+            <input id="simulate-price-cache" name="price_cache_dir" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">Where downloaded historical price data is stored.</p>
+          </div>
+          <div class="space-y-1 sm:col-span-2">
+            <label for="simulate-output-dir" class="text-sm font-medium text-neutral-200">Output directory</label>
+            <input id="simulate-output-dir" name="output_dir" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">Destination for generated trades and supporting files.</p>
+          </div>
+          <div class="space-y-1">
+            <label for="simulate-output-name" class="text-sm font-medium text-neutral-200">Output filename</label>
+            <input id="simulate-output-name" name="output_name" type="text" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">Trade file that will be imported into the portfolio.</p>
+          </div>
+          <div class="space-y-1">
+            <span class="text-sm font-medium text-neutral-200">Update caches only</span>
+            <label class="flex items-center gap-2 text-sm text-neutral-300">
+              <input type="checkbox" name="generate_only" class="h-4 w-4 rounded border-neutral-600 bg-neutral-900 text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+              Update symbol and price caches without importing trades
+            </label>
+          </div>
+        </div>
+        <div class="flex flex-col gap-3 border-t border-neutral-800/60 pt-4 sm:flex-row sm:justify-end">
+          <button type="button" class="rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:border-neutral-500 hover:text-neutral-50 focus:outline-none focus:ring-2 focus:ring-blue-500/40" data-simulate-cancel>
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-outline-primary px-4 py-2 text-sm" data-simulate-submit>
+            Run simulation
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
   document.addEventListener('alpine:init', () => {
     Alpine.data('settingsForm', () => ({
       showMarketValueSetting: {{ 'true' if show_market_value else 'false' }},
@@ -802,6 +897,279 @@
       statusEl.textContent = message;
     };
 
+    const dialog = document.querySelector('[data-simulate-dialog]');
+    const form = dialog ? dialog.querySelector('[data-simulate-form]') : null;
+    const submitButton = form ? form.querySelector('[data-simulate-submit]') : null;
+    const cancelButton = form ? form.querySelector('[data-simulate-cancel]') : null;
+    const closeButton = dialog ? dialog.querySelector('[data-simulate-close]') : null;
+    const errorEl = dialog ? dialog.querySelector('[data-simulate-error]') : null;
+    const accountInput = form ? form.querySelector('[data-simulate-account]') : null;
+
+    if (!dialog || !form || !submitButton || !accountInput) {
+      console.warn('Simulation dialog is not available.');
+      return;
+    }
+
+    const fieldMap = {
+      years_back: form.querySelector('[name="years_back"]'),
+      start_balance: form.querySelector('[name="start_balance"]'),
+      risk_level: form.querySelector('[name="risk_level"]'),
+      profit_target: form.querySelector('[name="profit_target"]'),
+      stop_loss: form.querySelector('[name="stop_loss"]'),
+      seed: form.querySelector('[name="seed"]'),
+      max_workers: form.querySelector('[name="max_workers"]'),
+      symbol_cache: form.querySelector('[name="symbol_cache"]'),
+      price_cache_dir: form.querySelector('[name="price_cache_dir"]'),
+      output_dir: form.querySelector('[name="output_dir"]'),
+      output_name: form.querySelector('[name="output_name"]'),
+      generate_only: form.querySelector('[name="generate_only"]'),
+    };
+
+    const defaultCache = new Map();
+    let activeContext = null;
+    let lastFocusedElement = null;
+
+    const loadDefaults = async (accountId) => {
+      if (defaultCache.has(accountId)) {
+        return { ...defaultCache.get(accountId) };
+      }
+
+      const response = await fetch(`/api/accounts/${encodeURIComponent(accountId)}/simulate/options`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to load defaults (${response.status})`);
+      }
+      const payload = await response.json();
+      if (!payload || typeof payload !== 'object' || typeof payload.options !== 'object' || payload.options === null) {
+        throw new Error('Invalid defaults payload');
+      }
+      const normalized = { ...payload.options };
+      defaultCache.set(accountId, normalized);
+      return { ...normalized };
+    };
+
+    const resetFormFields = () => {
+      Object.values(fieldMap).forEach((field) => {
+        if (!field) {
+          return;
+        }
+        if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {
+          if (field.type === 'checkbox') {
+            field.checked = false;
+          } else {
+            field.value = '';
+          }
+        }
+      });
+    };
+
+    const populateForm = (options) => {
+      const assignNumeric = (field, value, toInt = false) => {
+        if (!(field instanceof HTMLInputElement)) {
+          return;
+        }
+        let normalized = typeof value === 'number' ? value : Number.parseFloat(String(value));
+        if (!Number.isFinite(normalized)) {
+          field.value = '';
+          return;
+        }
+        if (toInt) {
+          normalized = Math.trunc(normalized);
+        }
+        field.value = String(normalized);
+      };
+
+      const assignText = (field, value) => {
+        if (!(field instanceof HTMLInputElement)) {
+          return;
+        }
+        if (typeof value === 'string') {
+          field.value = value;
+          return;
+        }
+        if (value !== undefined && value !== null) {
+          field.value = String(value);
+          return;
+        }
+        field.value = '';
+      };
+
+      assignNumeric(fieldMap.years_back, options.years_back, true);
+      assignNumeric(fieldMap.start_balance, options.start_balance);
+      assignNumeric(fieldMap.risk_level, options.risk_level);
+      assignNumeric(fieldMap.profit_target, options.profit_target);
+      assignNumeric(fieldMap.stop_loss, options.stop_loss);
+      assignNumeric(fieldMap.seed, options.seed, true);
+      assignNumeric(fieldMap.max_workers, options.max_workers, true);
+      assignText(fieldMap.symbol_cache, options.symbol_cache);
+      assignText(fieldMap.price_cache_dir, options.price_cache_dir);
+      assignText(fieldMap.output_dir, options.output_dir);
+      assignText(fieldMap.output_name, options.output_name);
+      if (fieldMap.generate_only instanceof HTMLInputElement) {
+        fieldMap.generate_only.checked = Boolean(options.generate_only);
+      }
+    };
+
+    const hideDialog = (restoreFocus = true) => {
+      dialog.classList.add('hidden');
+      dialog.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('overflow-hidden');
+      if (restoreFocus && lastFocusedElement instanceof HTMLElement) {
+        lastFocusedElement.focus();
+      }
+      lastFocusedElement = null;
+    };
+
+    const showDialog = async (context) => {
+      activeContext = context;
+      lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      accountInput.value = context.accountId;
+      dialog.classList.remove('hidden');
+      dialog.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('overflow-hidden');
+      if (errorEl) {
+        errorEl.classList.add('hidden');
+        errorEl.textContent = '';
+      }
+      submitButton.disabled = true;
+      submitButton.textContent = 'Run simulation';
+      resetFormFields();
+
+      try {
+        const defaults = await loadDefaults(context.accountId);
+        populateForm(defaults);
+        submitButton.disabled = false;
+        const firstField = fieldMap.years_back;
+        if (firstField instanceof HTMLElement) {
+          firstField.focus();
+          if (firstField instanceof HTMLInputElement && typeof firstField.select === 'function') {
+            firstField.select();
+          }
+        }
+      } catch (error) {
+        console.error('Unable to load simulation defaults', error);
+        if (errorEl) {
+          errorEl.textContent = 'Unable to load simulation defaults. Please try again later.';
+          errorEl.classList.remove('hidden');
+        }
+        submitButton.disabled = true;
+        const fallbackTarget = cancelButton || closeButton;
+        if (fallbackTarget instanceof HTMLElement) {
+          fallbackTarget.focus();
+        }
+      }
+    };
+
+    const collectOverrides = () => {
+      const readNumber = (field, toInt = false) => {
+        if (!(field instanceof HTMLInputElement)) {
+          return null;
+        }
+        const raw = field.value;
+        if (raw === '') {
+          return null;
+        }
+        const value = toInt ? Number.parseInt(raw, 10) : Number.parseFloat(raw);
+        return Number.isFinite(value) ? value : null;
+      };
+
+      const readText = (field) => {
+        if (!(field instanceof HTMLInputElement)) {
+          return null;
+        }
+        return field.value.trim();
+      };
+
+      const overrides = {
+        years_back: readNumber(fieldMap.years_back, true),
+        start_balance: readNumber(fieldMap.start_balance),
+        risk_level: readNumber(fieldMap.risk_level),
+        profit_target: readNumber(fieldMap.profit_target),
+        stop_loss: readNumber(fieldMap.stop_loss),
+        seed: readNumber(fieldMap.seed, true),
+        max_workers: readNumber(fieldMap.max_workers, true),
+        symbol_cache: readText(fieldMap.symbol_cache),
+        price_cache_dir: readText(fieldMap.price_cache_dir),
+        output_dir: readText(fieldMap.output_dir),
+        output_name: readText(fieldMap.output_name),
+        generate_only: Boolean(fieldMap.generate_only && fieldMap.generate_only.checked),
+      };
+
+      Object.keys(overrides).forEach((key) => {
+        const value = overrides[key];
+        if (value === null) {
+          delete overrides[key];
+        }
+      });
+
+      return overrides;
+    };
+
+    const runSimulation = async (context, overrides) => {
+      const { button, accountId, statusEl, originalLabel } = context;
+      let payload = null;
+
+      button.disabled = true;
+      button.textContent = 'Simulating…';
+      setStatus(statusEl, 'Running trade simulation…');
+
+      try {
+        const response = await fetch(`/api/accounts/${encodeURIComponent(accountId)}/simulate`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(overrides),
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          payload = await response.json();
+        }
+
+        if (!response.ok || !payload || payload.ok !== true) {
+          const message = (payload && payload.detail) ? payload.detail : 'Failed to simulate trades.';
+          setStatus(statusEl, message, 'error');
+          button.disabled = false;
+          button.textContent = originalLabel;
+          return;
+        }
+
+        if (payload.generate_only) {
+          const message = payload.message || 'Symbol and price caches have been updated.';
+          setStatus(statusEl, message, 'success');
+          button.disabled = false;
+          button.textContent = originalLabel;
+          return;
+        }
+
+        const tradesImported = typeof payload.trades_imported === 'number' ? payload.trades_imported : null;
+        const daysWithTrades = typeof payload.days_with_trades === 'number' ? payload.days_with_trades : null;
+        let successMessage = 'Simulation completed successfully.';
+        if (tradesImported !== null && daysWithTrades !== null) {
+          successMessage = `Imported ${tradesImported} simulated trades across ${daysWithTrades} day${daysWithTrades === 1 ? '' : 's'}.`;
+        }
+        setStatus(statusEl, `${successMessage} Reloading calendar…`, 'success');
+
+        const redirect = typeof payload.redirect === 'string' && payload.redirect ? payload.redirect : '/';
+        if (payload.reload) {
+          setTimeout(() => {
+            window.location.href = redirect;
+          }, 1200);
+        } else {
+          button.disabled = false;
+          button.textContent = originalLabel;
+        }
+      } catch (error) {
+        console.error('Failed to simulate trades', error);
+        setStatus(statusEl, 'Failed to simulate trades. Please try again.', 'error');
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    };
+
     buttons.forEach((button) => {
       button.addEventListener('click', async () => {
         const accountId = button.dataset.simulateTrades;
@@ -809,71 +1177,55 @@
           return;
         }
 
-        if (!window.confirm('This will clear existing data for this portfolio and replace it with simulated trades. Continue?')) {
-          return;
-        }
-
         const card = button.closest('[data-account-card]');
         const statusEl = card ? card.querySelector('[data-simulate-status]') : null;
+        const originalLabel = button.textContent || 'Simulate trades';
 
-        const originalLabel = button.textContent;
-        button.disabled = true;
-        button.textContent = 'Simulating…';
-        setStatus(statusEl, 'Running trade simulation…');
+        const context = {
+          button,
+          accountId,
+          statusEl,
+          originalLabel,
+        };
 
-        let payload = null;
-
-        try {
-          const response = await fetch(`/api/accounts/${encodeURIComponent(accountId)}/simulate`, {
-            method: 'POST',
-            headers: { 'Accept': 'application/json' },
-          });
-
-          const contentType = response.headers.get('content-type') || '';
-          if (contentType.includes('application/json')) {
-            payload = await response.json();
-          }
-
-          if (!response.ok || !payload || payload.ok !== true) {
-            const message = (payload && payload.detail) ? payload.detail : 'Failed to simulate trades.';
-            setStatus(statusEl, message, 'error');
-            button.disabled = false;
-            button.textContent = originalLabel;
-            return;
-          }
-
-          if (payload.generate_only) {
-            const message = payload.message || 'Symbol and price caches have been updated.';
-            setStatus(statusEl, message, 'success');
-            button.disabled = false;
-            button.textContent = originalLabel;
-            return;
-          }
-
-          const tradesImported = typeof payload.trades_imported === 'number' ? payload.trades_imported : null;
-          const daysWithTrades = typeof payload.days_with_trades === 'number' ? payload.days_with_trades : null;
-          let successMessage = 'Simulation completed successfully.';
-          if (tradesImported !== null && daysWithTrades !== null) {
-            successMessage = `Imported ${tradesImported} simulated trades across ${daysWithTrades} day${daysWithTrades === 1 ? '' : 's'}.`;
-          }
-          setStatus(statusEl, `${successMessage} Reloading calendar…`, 'success');
-
-          const redirect = typeof payload.redirect === 'string' && payload.redirect ? payload.redirect : '/';
-          if (payload.reload) {
-            setTimeout(() => {
-              window.location.href = redirect;
-            }, 1200);
-          } else {
-            button.disabled = false;
-            button.textContent = originalLabel;
-          }
-        } catch (error) {
-          console.error('Failed to simulate trades', error);
-          setStatus(statusEl, 'Failed to simulate trades. Please try again.', 'error');
-          button.disabled = false;
-          button.textContent = originalLabel;
-        }
+        await showDialog(context);
       });
+    });
+
+    const cancelHandler = () => {
+      hideDialog();
+      activeContext = null;
+    };
+
+    cancelButton?.addEventListener('click', cancelHandler);
+    closeButton?.addEventListener('click', cancelHandler);
+
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) {
+        cancelHandler();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !dialog.classList.contains('hidden')) {
+        cancelHandler();
+      }
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (!activeContext) {
+        hideDialog();
+        return;
+      }
+      if (typeof form.reportValidity === 'function' && !form.reportValidity()) {
+        return;
+      }
+
+      const overrides = collectOverrides();
+      hideDialog(false);
+      runSimulation(activeContext, overrides);
+      activeContext = null;
     });
   })();
 </script>
