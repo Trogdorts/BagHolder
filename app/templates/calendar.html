@@ -581,7 +581,7 @@
             <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
             </svg>
-            <div class="note-tooltip absolute bottom-7 right-0 z-20 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left text-sm text-neutral-100 shadow-xl ring-1 ring-black/40">
+            <div class="note-tooltip absolute bottom-7 right-0 z-20 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left text-sm text-neutral-100 shadow-xl ring-1 ring-black/40">
               <div class="flex flex-col gap-2">
                 <div>
                   <p class="text-[10px] uppercase tracking-wide text-neutral-500">Daily note</p>
@@ -660,7 +660,7 @@
         <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
         </svg>
-        <div class="note-tooltip absolute bottom-7 right-0 z-20 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left text-sm text-neutral-100 shadow-xl ring-1 ring-black/40">
+        <div class="note-tooltip absolute bottom-7 right-0 z-20 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left text-sm text-neutral-100 shadow-xl ring-1 ring-black/40">
           <div class="flex flex-col gap-2">
             <div>
               <p class="text-[10px] uppercase tracking-wide text-neutral-500">Weekly note</p>
@@ -715,7 +715,7 @@
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M19 3H5a2 2 0 0 0-2 2v14l4-4h12a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z" fill="currentColor" />
           </svg>
-          <div class="note-tooltip absolute bottom-7 right-0 z-20 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left text-sm text-neutral-100 shadow-xl ring-1 ring-black/40">
+          <div class="note-tooltip absolute bottom-7 right-0 z-20 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-neutral-800 bg-neutral-950 p-3 text-left text-sm text-neutral-100 shadow-xl ring-1 ring-black/40">
             <div class="flex flex-col gap-2">
               <div>
                 <p class="text-[10px] uppercase tracking-wide text-neutral-500">Monthly note</p>
@@ -2903,11 +2903,12 @@ function updateNoteTrigger(trigger, options = {}) {
 
   if (typeof emptyLabel === 'string' && typeof filledLabel === 'string') {
     trigger.setAttribute('aria-label', hasNote ? filledLabel : emptyLabel);
+  } else {
+    trigger.setAttribute('aria-label', hasNote ? 'Edit note' : 'Add note');
   }
 
   trigger.classList.toggle('has-note', hasNote);
   trigger.classList.toggle('icon-translucent', !hasNote);
-  trigger.setAttribute('aria-label', hasNote ? 'Edit weekly note' : 'Add weekly note');
   const tooltipBody = trigger.querySelector('.note-tooltip [data-note-tooltip-body]');
   if (tooltipBody) {
     tooltipBody.textContent = normalized;
@@ -2923,11 +2924,7 @@ function updateNoteTrigger(trigger, options = {}) {
     }
   }
 
-  if (hasNote) {
-    trigger.setAttribute('title', normalized);
-  } else {
-    trigger.removeAttribute('title');
-  }
+  trigger.removeAttribute('title');
 
   return hasNote;
 }
