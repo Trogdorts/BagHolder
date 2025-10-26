@@ -116,7 +116,7 @@ def test_average_fill_for_missing_unrealized(tmp_path, monkeypatch):
     db.dispose_engine()
 
 
-def test_market_value_reflects_invested_and_unrealized(tmp_path, monkeypatch):
+def test_market_value_reflects_held_positions(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
     app = create_app()
@@ -166,13 +166,13 @@ def test_market_value_reflects_invested_and_unrealized(tmp_path, monkeypatch):
         weeks = response.context["weeks"]
 
         march_first = _get_day(weeks, date(2024, 3, 1))
-        assert march_first["market_value"] == pytest.approx(135.0)
+        assert march_first["market_value"] == pytest.approx(100.0)
 
         march_second = _get_day(weeks, date(2024, 3, 2))
-        assert march_second["market_value"] == pytest.approx(175.0)
+        assert march_second["market_value"] == pytest.approx(125.0)
 
         march_fourth = _get_day(weeks, date(2024, 3, 4))
-        assert march_fourth["market_value"] == pytest.approx(210.0)
+        assert march_fourth["market_value"] == pytest.approx(220.0)
 
     db.dispose_engine()
 
