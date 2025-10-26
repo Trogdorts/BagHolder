@@ -8,6 +8,7 @@
 {% set default_view = cfg.view.get('default', 'latest') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
 {% set server_port = cfg.get('server', {}).get('port', 8012) %}
+{% set running_in_docker = running_in_docker | default(false) %}
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
   <header class="rounded-3xl border border-neutral-800/70 bg-gradient-to-br from-neutral-900/80 via-neutral-950/80 to-black/80 p-8 shadow-lg shadow-black/30">
     <div class="flex flex-col gap-2">
@@ -300,8 +301,39 @@
               <p class="mt-1 text-xs text-neutral-500">Choose the network port BagHolder binds to. A restart may be required for changes to take effect.</p>
             </div>
             <div class="flex flex-col gap-2">
-              <input type="number" id="listening_port" name="listening_port" min="1" max="65535" value="{{ server_port }}" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <div class="flex items-center justify-between gap-4">
+                <span class="text-xs font-medium uppercase tracking-wide text-neutral-500">Edit protection</span>
+                <label class="inline-flex cursor-pointer items-center gap-3">
+                  <span class="relative inline-flex h-6 w-11 items-center">
+                    <input type="checkbox" class="peer sr-only" @change="setPortEditing($event.target.checked)">
+                    <span aria-hidden="true" class="block h-6 w-11 rounded-full bg-neutral-700 transition peer-checked:bg-emerald-500"></span>
+                    <span aria-hidden="true" class="absolute left-1 top-1 h-4 w-4 rounded-full bg-neutral-200 transition peer-checked:translate-x-5 peer-checked:bg-white"></span>
+                  </span>
+                  <span class="text-xs text-neutral-300">Allow editing</span>
+                </label>
+              </div>
+              <input type="number"
+                     id="listening_port"
+                     name="listening_port"
+                     min="1"
+                     max="65535"
+                     value="{{ server_port }}"
+                     :readonly="!portEditingEnabled"
+                     :aria-disabled="(!portEditingEnabled).toString()"
+                     :aria-readonly="(!portEditingEnabled).toString()"
+                     :class="[
+                       'w-full rounded-lg border px-3 py-2 text-sm transition',
+                       portEditingEnabled
+                         ? 'border-neutral-700 bg-neutral-900 text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40'
+                         : 'border-neutral-800 bg-neutral-950 text-neutral-500 opacity-70 cursor-not-allowed'
+                     ]">
               <p class="text-[11px] uppercase tracking-wide text-neutral-600">Range: 1–65535</p>
+              <template x-if="runningInDocker">
+                <p class="text-xs text-amber-400">Docker environment detected. Adjusting the listening port can break container networking—only continue if you know exactly what you're doing.</p>
+              </template>
+              <template x-if="!runningInDocker">
+                <p class="text-xs text-neutral-500">Changing the listening port can interrupt connections. Restart BagHolder after saving.</p>
+              </template>
             </div>
           </div>
         </div>
@@ -628,6 +660,8 @@
       initialData: '',
       formEl: null,
       defaultColors: {{ color_defaults | default({}, true) | tojson | safe }},
+      portEditingEnabled: false,
+      runningInDocker: {{ 'true' if running_in_docker else 'false' }},
       init() {
         this.formEl = this.$el;
         this.initialData = this.serializeForm();
@@ -649,6 +683,16 @@
       resetChanges() {
         this.initialData = this.serializeForm();
         this.hasChanges = false;
+      },
+      setPortEditing(enabled) {
+        this.portEditingEnabled = Boolean(enabled);
+        if (!this.portEditingEnabled) {
+          const input = this.formEl?.querySelector('#listening_port');
+          if (input instanceof HTMLInputElement) {
+            input.blur();
+          }
+        }
+        this.$nextTick(() => this.evaluateChanges());
       },
       isColorDefault(field) {
         const defaultValue = this.defaultColors[field];
