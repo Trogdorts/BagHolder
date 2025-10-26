@@ -4,7 +4,7 @@ import logging
 import math
 import os
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Request, Form, Depends, Query, HTTPException
 from fastapi.responses import (
@@ -27,6 +27,7 @@ from app.core.models import (
     Trade,
 )
 from app.core.utils import coerce_bool, month_bounds
+from app.services.calculations import count_trade_win_losses
 from app.services.trade_summaries import recompute_daily_summaries
 from app.services.trade_simulator import SimulationError, SimulationOptions
 from app.services.simulation_runner import import_simulated_trades
@@ -183,7 +184,9 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     today = date.today()
 
     start, end, days = month_bounds(year, month)
-    month_end_date = date.fromisoformat(end)
+    start_date = date.fromisoformat(start)
+    end_date = date.fromisoformat(end)
+    month_end_date = end_date
     year_start = f"{year:04d}-01-01"
     year_end = f"{year:04d}-12-31"
     months_to_subtract = 11
@@ -211,21 +214,38 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
 
     trade_rows = (
         db.query(Trade)
-        .filter(Trade.date >= start, Trade.date <= end)
+        .filter(Trade.date <= year_end)
         .order_by(Trade.date.asc(), Trade.id.asc())
         .all()
     )
-    trades_by_day = {}
+    trades_by_day: Dict[str, List[Dict[str, Any]]] = {}
+    trade_events: List[Dict[str, Any]] = []
     for tr in trade_rows:
-        trades_by_day.setdefault(tr.date, []).append(
-            {
-                "id": tr.id,
-                "symbol": tr.symbol,
-                "action": tr.action,
-                "qty": float(tr.qty),
-                "price": float(tr.price),
-            }
-        )
+        trade_event = {
+            "id": tr.id,
+            "date": tr.date,
+            "symbol": tr.symbol,
+            "action": tr.action,
+            "qty": float(tr.qty),
+            "price": float(tr.price),
+        }
+        trade_events.append(trade_event)
+
+        try:
+            trade_day = date.fromisoformat(tr.date)
+        except (TypeError, ValueError):
+            continue
+
+        if start_date <= trade_day <= end_date:
+            trades_by_day.setdefault(tr.date, []).append(
+                {
+                    "id": tr.id,
+                    "symbol": tr.symbol,
+                    "action": tr.action,
+                    "qty": float(tr.qty),
+                    "price": float(tr.price),
+                }
+            )
 
     # Calculate weekly aggregates inline
     cal = calendar.Calendar(firstweekday=0)  # Monday=0 or Sunday=6; we'll keep 0
@@ -253,22 +273,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             if magnitude > max_value:
                 max_value = magnitude
         return max_value
-
-    def win_loss_counts(rows: List[DailySummary]) -> tuple[int, int]:
-        wins = 0
-        losses = 0
-        for row in rows:
-            try:
-                realized_value = float(row.realized)
-            except (TypeError, ValueError):
-                continue
-            if math.isclose(realized_value, 0.0, abs_tol=0.005):
-                continue
-            if realized_value > 0:
-                wins += 1
-            elif realized_value < 0:
-                losses += 1
-        return wins, losses
 
     def win_ratio_from_counts(wins: int, losses: int) -> Optional[float]:
         total = wins + losses
@@ -298,28 +302,16 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         [float(r.total_invested) for r in q],
     )
 
-    month_wins, month_losses = win_loss_counts(q)
+    month_wins, month_losses = count_trade_win_losses(
+        trade_events, start=start_date, end=end_date
+    )
     month_win_ratio = win_ratio_from_counts(month_wins, month_losses)
 
-    month_year_wins = 0
-    month_year_losses = 0
-    for row in q:
-        try:
-            row_date = date.fromisoformat(row.date)
-        except (TypeError, ValueError):
-            continue
-        if row_date.year != year:
-            continue
-        try:
-            realized_value = float(row.realized)
-        except (TypeError, ValueError):
-            continue
-        if math.isclose(realized_value, 0.0, abs_tol=0.005):
-            continue
-        if realized_value > 0:
-            month_year_wins += 1
-        elif realized_value < 0:
-            month_year_losses += 1
+    month_year_wins, month_year_losses = count_trade_win_losses(
+        trade_events,
+        start=start_date,
+        end=end_date,
+    )
 
     for week in month_days:
         iso_year, iso_week, _ = week[0].isocalendar()
@@ -451,7 +443,11 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         [float(r.total_invested) for r in year_rows],
     )
 
-    year_wins_total, year_losses_total = win_loss_counts(year_rows)
+    year_wins_total, year_losses_total = count_trade_win_losses(
+        trade_events,
+        start=date(year, 1, 1),
+        end=date(year, 12, 31),
+    )
     year_win_ratio = win_ratio_from_counts(year_wins_total, year_losses_total)
     year_other_wins = max(year_wins_total - month_year_wins, 0)
     year_other_losses = max(year_losses_total - month_year_losses, 0)
