@@ -1,52 +1,132 @@
-from collections import defaultdict, deque
+from collections import defaultdict
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, MutableMapping
+
+
+def _apply_trade_to_position(
+    position: MutableMapping[str, float], side: str, qty: float, price: float
+) -> float:
+    """Apply a trade to an in-memory position and return realized P/L."""
+
+    shares = float(position.get("shares", 0.0) or 0.0)
+    avg_cost = float(position.get("avg_cost", 0.0) or 0.0)
+    realized = 0.0
+
+    if side == "BUY":
+        remaining = qty
+
+        if shares < 0:
+            cover_qty = min(remaining, -shares)
+            realized += (avg_cost - price) * cover_qty
+            shares += cover_qty
+            remaining -= cover_qty
+            if shares == 0:
+                avg_cost = 0.0
+
+        if remaining > 0:
+            cost_basis = avg_cost * shares if shares > 0 else 0.0
+            cost_basis += price * remaining
+            shares += remaining
+            avg_cost = cost_basis / shares if shares else 0.0
+
+    elif side == "SELL":
+        remaining = qty
+
+        if shares > 0:
+            sell_qty = min(remaining, shares)
+            realized += (price - avg_cost) * sell_qty
+            shares -= sell_qty
+            remaining -= sell_qty
+            if shares == 0:
+                avg_cost = 0.0
+
+        if remaining > 0:
+            short_shares = -shares if shares < 0 else 0.0
+            total_proceeds = avg_cost * short_shares if short_shares else 0.0
+            total_proceeds += price * remaining
+            short_shares += remaining
+            if short_shares:
+                avg_cost = total_proceeds / short_shares
+                shares = -short_shares
+
+    position["shares"] = shares
+    position["avg_cost"] = avg_cost
+    position["last_price"] = price
+
+    return realized
+
+
+def _current_unrealized_total(positions: Dict[str, Dict[str, float]]) -> float:
+    total = 0.0
+    for position in positions.values():
+        shares = float(position.get("shares", 0.0) or 0.0)
+        if not shares:
+            continue
+
+        avg_cost = float(position.get("avg_cost", 0.0) or 0.0)
+        last_price = position.get("last_price")
+        last_price = float(last_price) if last_price is not None else avg_cost
+
+        if shares > 0:
+            total += (last_price - avg_cost) * shares
+        else:
+            total += (avg_cost - last_price) * (-shares)
+
+    return total
+
 
 class Ledger:
     def __init__(self):
-        self.pos = defaultdict(deque)  # symbol -> deque of (qty_remaining, unit_cost)
+        self.positions: Dict[str, Dict[str, float]] = defaultdict(
+            lambda: {"shares": 0.0, "avg_cost": 0.0, "last_price": None}
+        )
         self.realized_by_date = defaultdict(float)
         self.unrealized_by_date = defaultdict(float)
 
     def apply(self, trades: List[Dict[str, Any]]):
-        # trades sorted by datetime
-        last_date = None
-        for t in trades:
-            d = t["date"]
-            if isinstance(d, str):
-                day = d
+        """Process trades and compute realized/unrealized P/L per day."""
+
+        if not trades:
+            return self.realized_by_date, self.unrealized_by_date
+
+        # Trades are expected in chronological order; sort defensively by date.
+        sorted_trades = sorted(
+            trades,
+            key=lambda row: (
+                row.get("date"),
+                row.get("datetime"),
+            ),
+        )
+
+        for trade in sorted_trades:
+            raw_date = trade.get("date")
+            if isinstance(raw_date, datetime):
+                day = raw_date.date().strftime("%Y-%m-%d")
+            elif hasattr(raw_date, "strftime"):
+                day = raw_date.strftime("%Y-%m-%d")
             else:
-                day = d.strftime("%Y-%m-%d")
-            action = t["action"].upper()
-            symbol = t["symbol"].upper()
-            qty = float(t["qty"])
-            price = float(t["price"])
-            if action == "BUY":
-                self.pos[symbol].append([qty, price])
-            elif action == "SELL":
-                remaining = qty
-                cost_total = 0.0
-                proceeds = qty * price
-                while remaining > 1e-9 and self.pos[symbol]:
-                    lot_qty, lot_cost = self.pos[symbol][0]
-                    take = min(remaining, lot_qty)
-                    cost_total += take * lot_cost
-                    lot_qty -= take
-                    remaining -= take
-                    if lot_qty <= 1e-9:
-                        self.pos[symbol].popleft()
-                    else:
-                        self.pos[symbol][0][0] = lot_qty
-                # If short sell without position, treat cost as 0 (realized equals proceeds)
-                realized = proceeds - cost_total
+                day = str(raw_date)
+
+            symbol = (trade.get("symbol") or "").strip().upper()
+            side = (trade.get("action") or trade.get("side") or "").strip().upper()
+            try:
+                qty = float(trade.get("qty") or trade.get("quantity") or 0.0)
+                price = float(trade.get("price") or 0.0)
+            except (TypeError, ValueError):
+                continue
+
+            if not symbol or side not in {"BUY", "SELL"}:
+                continue
+
+            if qty <= 0 or price <= 0:
+                continue
+
+            position = self.positions[symbol]
+            realized = _apply_trade_to_position(position, side, qty, price)
+            if realized:
                 self.realized_by_date[day] += realized
 
-            # compute unrealized as carried cost at end of the day
-            # we will recompute per symbol after each trade within the day
-            last_date = day
-            self.unrealized_by_date[day] = sum(
-                qty * cost for lots in self.pos.values() for qty, cost in lots
-            )
+            unrealized_total = _current_unrealized_total(self.positions)
+            self.unrealized_by_date[day] = unrealized_total
 
-        # Carry forward unrealized for days without trades if needed handled at summarization
         return self.realized_by_date, self.unrealized_by_date
