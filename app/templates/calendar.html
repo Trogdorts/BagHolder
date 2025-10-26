@@ -180,14 +180,15 @@
   }
 
   .toolbar-quick-nav-stepper input {
-    flex: 0 0 auto;
-    width: 6ch;
-    padding: 0.5rem 0.75rem;
+    flex: 1 1 auto;
+    min-width: 8ch;
+    padding: 0.5rem 1rem;
     border: none;
     background: transparent;
     color: #fafafa;
     font-size: 0.95rem;
     text-align: center;
+    font-variant-numeric: tabular-nums;
   }
 
   .toolbar-quick-nav-stepper input:focus {
@@ -568,6 +569,7 @@
                     <input id="quick-year-input"
                            type="number"
                            inputmode="numeric"
+                           step="1"
                            min="1"
                            x-ref="yearInput"
                            x-model="year"
