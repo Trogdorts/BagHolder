@@ -127,55 +127,62 @@
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   }
 
-  .toolbar-toggle[data-tooltip] {
+  .toolbar-toggle {
     position: relative;
   }
 
-  .toolbar-toggle[data-tooltip]::after,
-  .toolbar-toggle[data-tooltip]::before {
-    position: absolute;
+  .toolbar-tooltip {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    width: min(24rem, calc(100vw - 3rem));
+    padding: 1.25rem 1.5rem;
+    border-radius: 0.75rem;
+    background: rgba(24, 24, 27, 0.96);
+    color: #f4f4f5;
+    text-align: left;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(82, 82, 91, 0.75);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.25s ease, transform 0.25s ease;
     transition-delay: 0s;
-    z-index: 20;
+    z-index: 60;
   }
 
-  .toolbar-toggle[data-tooltip]::after {
-    content: attr(data-tooltip);
-    left: 50%;
-    bottom: calc(100% + 0.75rem);
-    transform: translateX(-50%);
-    max-width: 16rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 0.5rem;
-    background: rgba(24, 24, 27, 0.95);
+  .toolbar-tooltip h3 {
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
     color: #fafafa;
-    font-size: 0.75rem;
-    line-height: 1.2;
-    text-align: center;
-    white-space: normal;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
   }
 
-  .toolbar-toggle[data-tooltip]::before {
-    content: '';
-    left: 50%;
-    bottom: calc(100% + 0.25rem);
-    transform: translateX(-50%);
-    border-width: 0.45rem 0.4rem 0 0.4rem;
-    border-style: solid;
-    border-color: rgba(24, 24, 27, 0.95) transparent transparent transparent;
+  .toolbar-tooltip p {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #d4d4d8;
   }
 
-  .toolbar-toggle[data-tooltip]:hover::after,
-  .toolbar-toggle[data-tooltip]:hover::before,
-  .toolbar-toggle[data-tooltip]:focus-visible::after,
-  .toolbar-toggle[data-tooltip]:focus-visible::before {
+  .toolbar-tooltip ul {
+    margin-top: 0.75rem;
+    padding-left: 1.1rem;
+    list-style: disc;
+    color: #c4c4cc;
+  }
+
+  .toolbar-tooltip li + li {
+    margin-top: 0.35rem;
+  }
+
+  .toolbar-toggle:hover .toolbar-tooltip,
+  .toolbar-toggle:focus-visible .toolbar-tooltip {
     opacity: 1;
     visibility: visible;
-    transition-delay: 2s;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+    transition-delay: 1s;
   }
 
   .toolbar-toggle:hover,
@@ -360,60 +367,105 @@
           <a href="/calendar/{{ next_year }}/{{ next_month }}" class="toolbar-nav-link">Next</a>
         </nav>
         <div class="toolbar-controls">
+          {% set market_value_tooltip_id = 'toolbar-tooltip-market-value' %}
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showMarketValue }"
                   @click="toggleMarketValue()"
-                  data-tooltip="Show or hide each day's total portfolio market value on the calendar."
                   aria-pressed="{{ 'true' if show_market_value_default else 'false' }}"
-                  :aria-pressed="showMarketValue.toString()">
+                  :aria-pressed="showMarketValue.toString()"
+                  aria-describedby="{{ market_value_tooltip_id }}">
             <span x-text="showMarketValue ? 'Hide market value' : 'Show market value'">
               {% if show_market_value_default %}Hide market value{% else %}Show market value{% endif %}
             </span>
+            <div id="{{ market_value_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
+              <h3>Market value totals</h3>
+              <p>Toggle the market value overlay to see how your portfolio balance moved alongside realized profit and loss for each day.</p>
+              <ul>
+                <li>Disable it when you want to focus strictly on trade outcomes without balance context.</li>
+                <li>Enable it to compare cash swings against the actual performance you booked.</li>
+              </ul>
+            </div>
           </button>
+          {% set exclude_controls_tooltip_id = 'toolbar-tooltip-exclude-controls' %}
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showExcludeControls }"
                   @click="toggleExcludeControls()"
-                  data-tooltip="Show or hide the exclude controls used to remove specific days from performance calculations."
                   aria-pressed="{{ 'true' if show_exclude_controls else 'false' }}"
-                  :aria-pressed="showExcludeControls.toString()">
+                  :aria-pressed="showExcludeControls.toString()"
+                  aria-describedby="{{ exclude_controls_tooltip_id }}">
             <span x-text="showExcludeControls ? 'Hide exclude' : 'Show exclude'">
               {% if show_exclude_controls %}Hide exclude{% else %}Show exclude{% endif %}
             </span>
+            <div id="{{ exclude_controls_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
+              <h3>Exclude day controls</h3>
+              <p>Use the exclude switches to temporarily remove specific trading days from your performance rollups when you want to run what-if scenarios.</p>
+              <ul>
+                <li>Keep them visible to quickly omit outliers or data errors.</li>
+                <li>Hide them once you are done tweaking so the calendar stays tidy.</li>
+              </ul>
+            </div>
           </button>
+          {% set percentages_tooltip_id = 'toolbar-tooltip-percentages' %}
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': !showPercentages }"
                   @click="togglePercentages()"
-                  data-tooltip="Show or hide percentage return metrics for each time frame displayed on the calendar."
                   aria-pressed="{{ 'true' if show_percentages_default else 'false' }}"
-                  :aria-pressed="showPercentages.toString()">
+                  :aria-pressed="showPercentages.toString()"
+                  aria-describedby="{{ percentages_tooltip_id }}">
             <span x-text="showPercentages ? 'Hide percent' : 'Show percent'">
               {% if show_percentages_default %}Hide percent{% else %}Show percent{% endif %}
             </span>
+            <div id="{{ percentages_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
+              <h3>Return percentages</h3>
+              <p>Percentage metrics reveal how each day, week, and month performed relative to your starting balance so you can compare periods of different sizes.</p>
+              <ul>
+                <li>Turn them off if you only care about raw currency gains.</li>
+                <li>Keep them on to normalize results across varying account sizes.</li>
+              </ul>
+            </div>
           </button>
+          {% set weekends_tooltip_id = 'toolbar-tooltip-weekends' %}
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': showWeekends }"
                   @click="toggleWeekends()"
-                  data-tooltip="Include or remove weekend columns so you can focus on trading days only."
                   aria-pressed="{{ 'true' if show_weekends else 'false' }}"
-                  :aria-pressed="showWeekends.toString()">
+                  :aria-pressed="showWeekends.toString()"
+                  aria-describedby="{{ weekends_tooltip_id }}">
             <span x-text="showWeekends ? 'Hide weekends' : 'Show weekends'">
               {% if show_weekends %}Hide weekends{% else %}Show weekends{% endif %}
             </span>
+            <div id="{{ weekends_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
+              <h3>Weekend columns</h3>
+              <p>Control whether Saturdays and Sundays appear in the calendar grid. Hiding them gives the trading week more room, while showing them keeps a continuous timeline.</p>
+              <ul>
+                <li>Hide weekends to tighten the focus on active market days.</li>
+                <li>Show them when you log trades or notes for the full week.</li>
+              </ul>
+            </div>
           </button>
+          {% set trade_counts_tooltip_id = 'toolbar-tooltip-trade-counts' %}
           <button type="button"
                   class="toolbar-toggle"
                   :class="{ 'is-active': showTradeCounts }"
                   @click="toggleTradeCounts()"
-                  data-tooltip="Show or hide the badges that display how many trades were recorded each day."
                   aria-pressed="{{ 'true' if show_trade_count_badges else 'false' }}"
-                  :aria-pressed="showTradeCounts.toString()">
+                  :aria-pressed="showTradeCounts.toString()"
+                  aria-describedby="{{ trade_counts_tooltip_id }}">
             <span x-text="showTradeCounts ? 'Hide trade count' : 'Show trade count'">
               {% if show_trade_count_badges %}Hide trade count{% else %}Show trade count{% endif %}
             </span>
+            <div id="{{ trade_counts_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
+              <h3>Daily trade badges</h3>
+              <p>Badges display how many trades you captured on each day so you can quickly spot busy sessions or days with no activity.</p>
+              <ul>
+                <li>Turn them off to reduce visual noise when you only need performance figures.</li>
+                <li>Leave them on to correlate profit streaks with trade frequency.</li>
+              </ul>
+            </div>
           </button>
         </div>
       </div>
@@ -490,11 +542,13 @@
             </div>
           </div>
           {% endif %}
+          {% if d.market_value %}
           <div class="calendar-metric-line"
                x-show="showMarketValue" x-cloak>
             <span class="calendar-metric-label">Market value:</span>
             <span class="calendar-metric-value {{ market_value_class }}" data-day-market-value>{{ d.market_value|money }}</span>
           </div>
+          {% endif %}
         </div>
         {% endif %}
 
