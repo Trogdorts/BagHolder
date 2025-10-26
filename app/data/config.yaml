@@ -11,9 +11,9 @@ server:
 ui:
   theme: dark
   show_text: true
-  show_market_value: true
+  show_market_value: false
   show_trade_count: false
-  show_percentages: true
+  show_percentages: false
   show_weekends: false
   show_exclude_controls: true
   highlight_weekends: true
@@ -39,11 +39,11 @@ notes:
   max_length: 4000
 import:
   sources:
-    - thinkorswim
+  - thinkorswim
   auto_recalculate: true
   backup_before_import: true
   accepted_formats:
-    - .csv
+  - .csv
   max_upload_bytes: 25000000
 view:
   default: latest

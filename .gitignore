@@ -215,3 +215,7 @@ testings/
 app/data/accounts/primary-2/profitloss.db
 
 app/data/accounts/ddd/profitloss.db
+
+app/data/simulator/output/
+
+app/data/simulator/price_cache/
