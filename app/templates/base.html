@@ -389,10 +389,12 @@
             <path fill="currentColor" d="M19 4h-2.18L16.6 2.8A1 1 0 0 0 15.64 2H8.36a1 1 0 0 0-.96.8L7.18 4H5a1 1 0 0 0 0 2h1.13l1.54 9.64A3.5 3.5 0 0 0 11.13 18h1.74a3.5 3.5 0 0 0 3.46-2.36L17.87 6H19a2 2 0 1 1 0 4h-1a1 1 0 0 0 0 2h1a4 4 0 0 0 0-8ZM9.13 4h5.74l.25 1.5H8.88Zm5.29 10.93a1.5 1.5 0 0 1-1.45 1.07h-1.74a1.5 1.5 0 0 1-1.45-1.07L8.45 8h7.1Z" />
           </svg>
         </a>
-        <a href="/" class="flex items-center gap-3 font-semibold text-lg text-neutral-100 transition hover:text-neutral-50">
+        <div class="flex items-center gap-3 font-semibold text-lg text-neutral-100">
           <img src="{{ url_for('static', path='icons/bagholder.svg') }}" alt="BagHolder icon" class="h-10 w-10">
-          <span>BagHolder</span>
-        </a>
+          <a href="/" class="transition hover:text-neutral-50">
+            <span>BagHolder</span>
+          </a>
+        </div>
       </div>
       <div class="flex-1 hidden justify-center sm:flex">
         <div class="pointer-events-none flex items-center justify-center px-6">
