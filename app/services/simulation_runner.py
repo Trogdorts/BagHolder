@@ -34,6 +34,7 @@ def build_default_simulation_options(account_dir: str) -> SimulationOptions:
 
     return SimulationOptions(
         years_back=2.0,
+        months_back=24,
         start_balance=10_000.0,
         risk_level=0.5,
         profit_target=0.05,

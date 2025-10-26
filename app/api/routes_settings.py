@@ -90,7 +90,12 @@ def _format_option_name(name: str) -> str:
     return name.replace("_", " ").capitalize()
 
 
-def _coerce_int_option(name: str, raw: Any, minimum: int | None = None) -> int:
+def _coerce_int_option(
+    name: str,
+    raw: Any,
+    minimum: int | None = None,
+    maximum: int | None = None,
+) -> int:
     try:
         value = int(raw)
     except (TypeError, ValueError) as exc:
@@ -98,6 +103,10 @@ def _coerce_int_option(name: str, raw: Any, minimum: int | None = None) -> int:
     if minimum is not None and value < minimum:
         raise ValueError(
             f"{_format_option_name(name)} must be at least {minimum}."
+        )
+    if maximum is not None and value > maximum:
+        raise ValueError(
+            f"{_format_option_name(name)} must be at most {maximum}."
         )
     return value
 
@@ -152,10 +161,18 @@ def _merge_simulation_options(
 
     updates: dict[str, Any] = {}
 
-    if "years_back" in overrides:
-        updates["years_back"] = _coerce_float_option(
-            "years_back", overrides["years_back"], minimum=0.25
+    if "months_back" in overrides:
+        months_back = _coerce_int_option(
+            "months_back", overrides["months_back"], minimum=1, maximum=240
         )
+        updates["months_back"] = months_back
+        updates["years_back"] = max(months_back / 12.0, 1 / 12)
+    elif "years_back" in overrides:
+        years_back = _coerce_float_option(
+            "years_back", overrides["years_back"], minimum=1 / 12
+        )
+        updates["years_back"] = years_back
+        updates["months_back"] = max(int(round(years_back * 12)), 1)
     if "start_balance" in overrides:
         updates["start_balance"] = _coerce_float_option("start_balance", overrides["start_balance"], minimum=0.01)
     if "risk_level" in overrides:

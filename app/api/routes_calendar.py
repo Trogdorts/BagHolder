@@ -84,7 +84,8 @@ class TradeUpdatePayload(BaseModel):
 
 
 class SimulationRequest(BaseModel):
-    years_back: float = Field(2.0, ge=0.25, le=20)
+    years_back: float = Field(2.0, ge=1 / 12, le=20)
+    months_back: int | None = Field(None, ge=1, le=240)
     start_balance: float = Field(10_000.0, gt=0)
     risk_level: float = Field(0.5, gt=0, le=1)
     profit_target: float = Field(0.05, gt=0)
@@ -129,8 +130,14 @@ class SimulationRequest(BaseModel):
         output_dir = _resolve(self.output_dir)
         output_name = os.path.basename(self.output_name) or "trades.csv"
 
+        months_back = self.months_back
+        years_back = self.years_back
+        if months_back is not None:
+            years_back = max(months_back / 12.0, 1 / 12)
+
         return SimulationOptions(
-            years_back=self.years_back,
+            years_back=years_back,
+            months_back=months_back,
             start_balance=self.start_balance,
             risk_level=self.risk_level,
             profit_target=self.profit_target,
