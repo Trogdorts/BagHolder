@@ -99,7 +99,7 @@
     </div>
     <input type="hidden" name="date" value="{{ conflict.date }}">
     <input type="hidden" name="new_realized_{{ conflict.date }}" value="{{ '%.2f'|format(conflict.new.realized) }}">
-    <input type="hidden" name="new_unrealized_{{ conflict.date }}" value="{{ '%.2f'|format(conflict.new.unrealized) }}">
+    <input type="hidden" name="new_invested_{{ conflict.date }}" value="{{ '%.2f'|format(conflict.new.invested) }}">
     <div class="grid gap-3 md:grid-cols-2">
       <label class="conflict-option flex cursor-pointer flex-col gap-1 rounded p-3"
              :class="{ 'is-active': choices['{{ conflict.date }}'] === 'existing' }">
@@ -107,7 +107,7 @@
         <span class="text-sm font-semibold">Keep existing</span>
         <div class="text-xs text-neutral-300">
           <div>Realized: {{ conflict.existing.realized|money }}</div>
-          <div>Unrealized: {{ conflict.existing.unrealized|money }}</div>
+          <div>Invested: {{ conflict.existing.invested|money }}</div>
         </div>
       </label>
       <label class="conflict-option flex cursor-pointer flex-col gap-1 rounded p-3"
@@ -116,7 +116,7 @@
         <span class="text-sm font-semibold">Use imported values</span>
         <div class="text-xs text-neutral-200">
           <div>Realized: {{ conflict.new.realized|money }}</div>
-          <div>Unrealized: {{ conflict.new.unrealized|money }}</div>
+          <div>Invested: {{ conflict.new.invested|money }}</div>
         </div>
       </label>
     </div>

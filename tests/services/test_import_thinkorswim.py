@@ -210,10 +210,9 @@ def test_compute_daily_pnl_records_basic_long_flow():
         {
             "date": date(2024, 2, 5),
             "realized_pl": 25.0,
-            "unrealized_pl": 25.0,
             "trade_value": 2275.0,
-            "total_pl": 50.0,
-            "cumulative_pl": 50.0,
+            "total_pl": 25.0,
+            "cumulative_pl": 25.0,
         }
     ]
 
@@ -242,7 +241,6 @@ def test_compute_daily_pnl_records_handles_full_close():
         {
             "date": date(2024, 2, 5),
             "realized_pl": 0.0,
-            "unrealized_pl": 0.0,
             "trade_value": 1000.0,
             "total_pl": 0.0,
             "cumulative_pl": 0.0,
@@ -250,7 +248,6 @@ def test_compute_daily_pnl_records_handles_full_close():
         {
             "date": date(2024, 2, 6),
             "realized_pl": 100.0,
-            "unrealized_pl": 0.0,
             "trade_value": 1100.0,
             "total_pl": 100.0,
             "cumulative_pl": 100.0,
@@ -282,7 +279,6 @@ def test_compute_daily_pnl_records_supports_short_positions():
         {
             "date": date(2024, 2, 5),
             "realized_pl": 0.0,
-            "unrealized_pl": 0.0,
             "trade_value": 2000.0,
             "total_pl": 0.0,
             "cumulative_pl": 0.0,
@@ -290,9 +286,8 @@ def test_compute_daily_pnl_records_supports_short_positions():
         {
             "date": date(2024, 2, 6),
             "realized_pl": 80.0,
-            "unrealized_pl": 120.0,
             "trade_value": 720.0,
-            "total_pl": 200.0,
-            "cumulative_pl": 200.0,
+            "total_pl": 80.0,
+            "cumulative_pl": 80.0,
         },
     ]

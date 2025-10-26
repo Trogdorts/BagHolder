@@ -246,7 +246,6 @@ def test_save_settings_updates_listening_port(tmp_path, monkeypatch):
         request,
         theme="dark",
         show_text="true",
-        show_unrealized="true",
         show_trade_count="true",
         show_percentages="true",
         show_weekends="false",
@@ -263,7 +262,6 @@ def test_save_settings_updates_listening_port(tmp_path, monkeypatch):
         trade_badge_color="#34d399",
         trade_badge_text_color="#111827",
         note_icon_color="#80cbc4",
-        unrealized_fill_strategy="carry_forward",
         export_empty_values="zero",
     )
 
@@ -289,7 +287,6 @@ def test_save_settings_invalid_port_preserves_existing_value(tmp_path, monkeypat
         request,
         theme="dark",
         show_text="true",
-        show_unrealized="true",
         show_trade_count="true",
         show_percentages="true",
         show_weekends="false",
@@ -306,7 +303,6 @@ def test_save_settings_invalid_port_preserves_existing_value(tmp_path, monkeypat
         trade_badge_color="#34d399",
         trade_badge_text_color="#111827",
         note_icon_color="#80cbc4",
-        unrealized_fill_strategy="carry_forward",
         export_empty_values="zero",
     )
 

@@ -1,7 +1,6 @@
 import csv
 import io
 import math
-from bisect import bisect_right
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
@@ -30,7 +29,6 @@ from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter()
 class UIPreferencesUpdate(BaseModel):
-    show_unrealized: Optional[bool] = None
     show_market_value: Optional[bool] = None
     show_total: Optional[bool] = None  # Legacy support
     show_percentages: Optional[bool] = None
@@ -102,9 +100,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
 
     cfg = request.app.state.config.raw
     ui_cfg = cfg.get("ui", {})
-    fill_strategy = ui_cfg.get("unrealized_fill_strategy", "carry_forward")
     show_trade_badges = coerce_bool(ui_cfg.get("show_trade_count", False), False)
-    show_unrealized_default = coerce_bool(ui_cfg.get("show_unrealized", True), True)
     show_market_value_default = coerce_bool(
         ui_cfg.get("show_market_value", ui_cfg.get("show_total", True)), True
     )
@@ -131,74 +127,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     # Pull daily summaries for month
     q = db.query(DailySummary).filter(DailySummary.date >= start, DailySummary.date <= end).all()
     by_day = {r.date: r for r in q}
-
-    # Determine the unrealized value to carry forward for days without trades.
-    prev_summary = (
-        db.query(DailySummary)
-        .filter(DailySummary.date < start)
-        .order_by(DailySummary.date.desc())
-        .first()
-    )
-    if prev_summary:
-        try:
-            running_unrealized = float(prev_summary.unrealized)
-        except (TypeError, ValueError):
-            running_unrealized = 0.0
-        has_running_unrealized = True
-        try:
-            running_invested = float(prev_summary.total_invested)
-        except (TypeError, ValueError):
-            running_invested = 0.0
-        has_running_invested = True
-    else:
-        running_unrealized = 0.0
-        has_running_unrealized = False
-        running_invested = 0.0
-        has_running_invested = False
-
-    actual_unrealized_map = {}
-    actual_unrealized_dates = []
-    next_summary = None
-    if fill_strategy == "average_neighbors":
-        for row in q:
-            actual_unrealized_map[date.fromisoformat(row.date)] = float(row.unrealized)
-        if prev_summary:
-            actual_unrealized_map[date.fromisoformat(prev_summary.date)] = float(prev_summary.unrealized)
-        next_summary = (
-            db.query(DailySummary)
-            .filter(DailySummary.date > end)
-            .order_by(DailySummary.date.asc())
-            .first()
-        )
-        if next_summary:
-            actual_unrealized_map[date.fromisoformat(next_summary.date)] = float(next_summary.unrealized)
-        actual_unrealized_dates = sorted(actual_unrealized_map.keys())
-
-        def get_prev_value(day: date):
-            if not actual_unrealized_dates:
-                return None
-            idx = bisect_right(actual_unrealized_dates, day) - 1
-            if idx >= 0:
-                prev_day = actual_unrealized_dates[idx]
-                if prev_day <= day:
-                    return actual_unrealized_map[prev_day]
-            return None
-
-        def get_next_value(day: date):
-            if not actual_unrealized_dates:
-                return None
-            idx = bisect_right(actual_unrealized_dates, day)
-            if idx < len(actual_unrealized_dates):
-                next_day = actual_unrealized_dates[idx]
-                if next_day >= day:
-                    return actual_unrealized_map[next_day]
-            return None
-    else:
-        def get_prev_value(day: date):
-            return None
-
-        def get_next_value(day: date):
-            return None
 
     note_rows = (
         db.query(NoteDaily)
@@ -263,7 +191,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         wk = []
         week_total_realized = 0.0
         week_invested_samples: List[float] = []
-        last_unrealized_value = None
         for d in week:
             day_key = d.strftime("%Y-%m-%d")
             ds = by_day.get(day_key)
@@ -274,37 +201,10 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             is_future_day = d > today
             invested_value = 0.0
             if ds:
-                running_unrealized = float(ds.unrealized)
-                has_running_unrealized = True
-                day_unrealized = running_unrealized
                 try:
                     invested_value = float(ds.total_invested)
                 except (TypeError, ValueError):
                     invested_value = 0.0
-                running_invested = invested_value
-                has_running_invested = True
-            elif d.month == month:
-                if is_future_day:
-                    day_unrealized = 0.0
-                elif fill_strategy == "average_neighbors":
-                    prev_val = get_prev_value(d)
-                    next_val = get_next_value(d)
-                    if prev_val is not None and next_val is not None:
-                        day_unrealized = (prev_val + next_val) / 2.0
-                    elif has_running_unrealized:
-                        day_unrealized = running_unrealized
-                    else:
-                        day_unrealized = 0.0
-                elif has_running_unrealized:
-                    day_unrealized = running_unrealized
-                else:
-                    day_unrealized = 0.0
-                if has_running_invested and not is_future_day:
-                    invested_value = running_invested
-            else:
-                day_unrealized = 0.0
-                if has_running_invested and not is_future_day:
-                    invested_value = running_invested
             day_trades = trades_by_day.get(day_key, [])
             has_trades = bool(day_trades)
             has_sell_trade = any(
@@ -326,7 +226,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "date": d,
                 "in_month": (d.month == month),
                 "realized": realized_value,
-                "unrealized": day_unrealized,
                 "has_values": bool(ds),
                 "invested": invested_value,
                 "show_realized": show_realized,
@@ -344,16 +243,10 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             if d.month == month and ds:
                 week_total_realized += float(ds.realized)
                 week_invested_samples.append(invested_value)
-            if d.month == month:
-                if ds:
-                    last_unrealized_value = float(ds.unrealized)
-                elif has_running_unrealized:
-                    last_unrealized_value = day_unrealized
         week_percent = calculate_percentage(week_total_realized, week_invested_samples)
         weeks.append({
             "days": wk,
             "week_realized": week_total_realized,
-            "week_unrealized": last_unrealized_value if last_unrealized_value is not None else 0.0,
             "week_index": len(weeks) + 1,
             "week_year": iso_year,
             "week_number": iso_week,
@@ -398,7 +291,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
 
     # Monthly totals
     month_realized = sum(float(r.realized) for r in q)
-    month_unrealized = sum(float(r.unrealized) for r in q)
     month_percent = calculate_percentage(
         month_realized,
         [float(r.total_invested) for r in q],
@@ -411,7 +303,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         .all()
     )
     year_realized = sum(float(r.realized) for r in year_rows)
-    year_unrealized = sum(float(r.unrealized) for r in year_rows)
     year_trading_days = sum(1 for r in year_rows if r)
     year_percent = calculate_percentage(
         year_realized,
@@ -425,7 +316,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         .all()
     )
     rolling_realized = sum(float(r.realized) for r in rolling_rows)
-    rolling_unrealized = sum(float(r.unrealized) for r in rolling_rows)
     rolling_trading_days = sum(1 for r in rolling_rows if r)
     rolling_year_percent = calculate_percentage(
         rolling_realized,
@@ -452,21 +342,17 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "weeks": weeks,
         "month_note": month_note,
         "month_realized": month_realized,
-        "month_unrealized": month_unrealized,
         "month_percent": month_percent,
         "year_realized": year_realized,
-        "year_unrealized": year_unrealized,
         "year_trading_days": year_trading_days,
         "year_percent": year_percent,
         "rolling_year_realized": rolling_realized,
-        "rolling_year_unrealized": rolling_unrealized,
         "rolling_year_trading_days": rolling_trading_days,
         "rolling_year_percent": rolling_year_percent,
         "year_other_invested_max": year_other_invested_max,
         "rolling_year_other_invested_max": rolling_other_invested_max,
         "cfg": request.app.state.config.raw,
         "show_trade_badges": show_trade_badges,
-        "show_unrealized_flag": show_unrealized_default,
         "show_market_value_flag": show_market_value_default,
         "show_text_flag": show_text_default,
         "show_percentages_flag": show_percentages_default,
@@ -490,7 +376,6 @@ def update_ui_preferences(payload: UIPreferencesUpdate, request: Request):
 
     updates: Dict[str, bool] = {}
     for field, key in (
-        ("show_unrealized", "show_unrealized"),
         ("show_market_value", "show_market_value"),
         ("show_percentages", "show_percentages"),
         ("show_weekends", "show_weekends"),
@@ -665,17 +550,28 @@ def clear_trades_for_day(date_str: str, db: Session = Depends(get_session)):
 
 
 @router.post("/api/daily/{date_str}")
-def overwrite_daily(date_str: str, realized: float = Form(...), unrealized: float = Form(...), db: Session = Depends(get_session)):
+def overwrite_daily(
+    date_str: str,
+    realized: float = Form(...),
+    invested: float = Form(...),
+    db: Session = Depends(get_session),
+):
     from app.core.models import DailySummary
     now = datetime.utcnow().isoformat()
     ds = db.get(DailySummary, date_str)
     if ds:
         ds.realized = realized
-        ds.unrealized = unrealized
-        ds.total_invested = unrealized
+        ds.total_invested = invested
         ds.updated_at = now
     else:
-        db.add(DailySummary(date=date_str, realized=realized, unrealized=unrealized, total_invested=unrealized, updated_at=now))
+        db.add(
+            DailySummary(
+                date=date_str,
+                realized=realized,
+                total_invested=invested,
+                updated_at=now,
+            )
+        )
     db.commit()
     return {"ok": True}
 
@@ -733,7 +629,7 @@ def export_data(
 
         buffer = io.StringIO()
         writer = csv.writer(buffer)
-        writer.writerow(["date", "realized", "unrealized"])
+        writer.writerow(["date", "realized", "total_invested"])
 
         def format_value(value: Optional[float]) -> str:
             if value is None:
@@ -758,7 +654,7 @@ def export_data(
                 [
                     summary.date,
                     format_value(summary.realized),
-                    format_value(summary.unrealized),
+                    format_value(summary.total_invested),
                 ]
             )
 

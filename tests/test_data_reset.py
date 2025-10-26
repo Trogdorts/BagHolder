@@ -31,7 +31,6 @@ def test_clear_all_data_resets_database(tmp_path):
             DailySummary(
                 date="2024-01-01",
                 realized=10.0,
-                unrealized=5.0,
                 total_invested=5.0,
                 updated_at="now",
             )
