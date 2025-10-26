@@ -3,6 +3,7 @@
 {% set ui_cfg = cfg.get('ui', {}) %}
 {% set notes_cfg = cfg.get('notes', {}) %}
 {% set show_unrealized_default = show_unrealized_flag if show_unrealized_flag is defined else ui_cfg.get('show_unrealized', True) %}
+{% set show_total_default = show_total_flag if show_total_flag is defined else ui_cfg.get('show_total', True) %}
 {% set show_trade_count_badges = show_trade_badges if show_trade_badges is defined else ui_cfg.get('show_trade_count', False) %}
 {% set show_text_default = show_text_flag if show_text_flag is defined else ui_cfg.get('show_text', True) %}
 {% set show_percentages_default = show_percentages_flag if show_percentages_flag is defined else ui_cfg.get('show_percentages', True) %}
@@ -11,6 +12,7 @@
 {% set notes_enabled = notes_enabled_flag if notes_enabled_flag is defined else notes_cfg.get('enabled', True) %}
 <div x-data="calendarToolbar({
         showUnrealized: {{ 'true' if show_unrealized_default else 'false' }},
+        showTotal: {{ 'true' if show_total_default else 'false' }},
         showExcludeControls: {{ 'true' if show_exclude_controls else 'false' }},
         showPercentages: {{ 'true' if show_percentages_default else 'false' }},
         showWeekends: {{ 'true' if show_weekends else 'false' }},
@@ -234,6 +236,16 @@
           </button>
           <button type="button"
                   class="toolbar-toggle"
+                  :class="{ 'is-active': !showTotal }"
+                  @click="toggleTotal()"
+                  aria-pressed="{{ 'true' if show_total_default else 'false' }}"
+                  :aria-pressed="showTotal.toString()">
+            <span x-text="showTotal ? 'Hide total' : 'Show total'">
+              {% if show_total_default %}Hide total{% else %}Show total{% endif %}
+            </span>
+          </button>
+          <button type="button"
+                  class="toolbar-toggle"
                   :class="{ 'is-active': !showExcludeControls }"
                   @click="toggleExcludeControls()"
                   aria-pressed="{{ 'true' if show_exclude_controls else 'false' }}"
@@ -298,6 +310,7 @@
            data-day-cell="{{ day_identifier }}"
            data-day-realized="{{ '%.10g'|format(d.realized) }}"
            data-day-unrealized="{{ '%.10g'|format(d.unrealized) }}"
+           data-day-total="{{ '%.10g'|format(d.total) }}"
            data-day-invested="{{ '%.10g'|format(d.invested) }}"
            data-day-has-values="{{ 'true' if d.has_values else 'false' }}"
            data-day-in-month="{{ 'true' if d.in_month else 'false' }}"
@@ -352,6 +365,10 @@
           <div class="{{ 'text-profit' if d.unrealized > 0 else ('text-loss' if d.unrealized < 0 else 'text-neutral-200') }}"
                x-show="showUnrealized" x-cloak>
             Unrealized: {{ d.unrealized|money }}
+          </div>
+          <div class="text-neutral-200"
+               x-show="showTotal" x-cloak>
+            Total: {{ d.total|money }}
           </div>
         </div>
         {% endif %}
@@ -744,6 +761,10 @@ async function updateUiPreferences(payload) {
 function calendarToolbar(initialState = {}) {
   return {
     showUnrealized: !!initialState.showUnrealized,
+    showTotal:
+      initialState.showTotal === undefined
+        ? true
+        : !!initialState.showTotal,
     showExcludeControls:
       initialState.showExcludeControls === undefined
         ? true
@@ -764,6 +785,15 @@ function calendarToolbar(initialState = {}) {
       const saved = await updateUiPreferences({ show_unrealized: next });
       if (!saved) {
         this.showUnrealized = previous;
+      }
+    },
+    async toggleTotal() {
+      const previous = this.showTotal;
+      const next = !previous;
+      this.showTotal = next;
+      const saved = await updateUiPreferences({ show_total: next });
+      if (!saved) {
+        this.showTotal = previous;
       }
     },
     async toggleExcludeControls() {
@@ -963,6 +993,7 @@ const dayImpactSimulator = (() => {
       cell,
       realized: parseNumber(cell.dataset.dayRealized),
       unrealized: parseNumber(cell.dataset.dayUnrealized),
+      total: parseNumber(cell.dataset.dayTotal),
       invested: parseNumber(cell.dataset.dayInvested),
       hasValues: cell.dataset.dayHasValues === 'true',
       inMonth: cell.dataset.dayInMonth === 'true',

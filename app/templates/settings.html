@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 {% set show_unrealized = cfg.ui.get('show_unrealized', True) %}
+{% set show_total = cfg.ui.get('show_total', True) %}
 {% set show_trade_count = cfg.ui.get('show_trade_count', False) %}
 {% set show_text = cfg.ui.get('show_text', True) %}
 {% set show_weekends = cfg.ui.get('show_weekends', False) %}
@@ -243,6 +244,26 @@
                       :aria-pressed="showUnrealizedSetting.toString()">
                 <span x-text="showUnrealizedSetting ? 'Hide by default' : 'Show by default'">
                   {% if show_unrealized %}Hide by default{% else %}Show by default{% endif %}
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <p class="block text-sm font-medium text-neutral-200">Total values</p>
+              <p class="mt-1 text-xs text-neutral-500" x-show="!showTotalSetting" x-cloak>
+                Hide or show the daily account total by default on the calendar.
+              </p>
+            </div>
+            <div>
+              <input type="hidden" name="show_total" value="{{ 'true' if show_total else 'false' }}" :value="showTotalSetting ? 'true' : 'false'">
+              <button type="button" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-100 transition"
+                      :class="{ 'bg-neutral-800 text-neutral-50 border-neutral-600': !showTotalSetting }"
+                      @click="showTotalSetting = !showTotalSetting"
+                      aria-pressed="{{ 'true' if show_total else 'false' }}"
+                      :aria-pressed="showTotalSetting.toString()">
+                <span x-text="showTotalSetting ? 'Hide by default' : 'Show by default'">
+                  {% if show_total %}Hide by default{% else %}Show by default{% endif %}
                 </span>
               </button>
             </div>
@@ -630,6 +651,7 @@
   document.addEventListener('alpine:init', () => {
     Alpine.data('settingsForm', () => ({
       showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }},
+      showTotalSetting: {{ 'true' if show_total else 'false' }},
       hasChanges: false,
       initialData: '',
       formEl: null,
@@ -638,6 +660,7 @@
         this.formEl = this.$el;
         this.initialData = this.serializeForm();
         this.$watch('showUnrealizedSetting', () => this.evaluateChanges());
+        this.$watch('showTotalSetting', () => this.evaluateChanges());
         this.formEl.addEventListener('input', () => this.evaluateChanges());
         this.formEl.addEventListener('change', () => this.evaluateChanges());
       },
@@ -647,6 +670,7 @@
         }
         const formData = new FormData(this.formEl);
         formData.set('show_unrealized', this.showUnrealizedSetting ? 'true' : 'false');
+        formData.set('show_total', this.showTotalSetting ? 'true' : 'false');
         return new URLSearchParams(formData).toString();
       },
       evaluateChanges() {
