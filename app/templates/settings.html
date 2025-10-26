@@ -794,6 +794,20 @@
             </div>
           </div>
         </div>
+        <div class="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100" data-simulate-warning>
+          <div class="space-y-1">
+            <p class="text-xs font-semibold uppercase tracking-wide text-amber-300">Critical warning</p>
+            <p>Running a simulation will delete all existing trades and data in this portfolio before importing the new simulated results.</p>
+            <p class="text-amber-100/80">Export or back up your portfolio data before continuing.</p>
+          </div>
+          <button type="button"
+                  class="inline-flex w-full items-center justify-center rounded-lg border border-amber-400/70 bg-amber-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-amber-100 transition hover:bg-amber-500/20 focus:outline-none focus:ring-2 focus:ring-amber-400/60 disabled:cursor-default disabled:opacity-60"
+                  data-simulate-acknowledge
+                  aria-pressed="false">
+            I understand — delete existing data
+          </button>
+          <p class="text-xs text-amber-200/70" data-simulate-warning-helper>Acknowledge this warning to enable the simulation.</p>
+        </div>
         <div class="flex flex-col gap-3 border-t border-neutral-800/60 pt-4 sm:flex-row sm:justify-end">
           <button type="button" class="rounded-lg border border-neutral-700 bg-neutral-900 px-4 py-2 text-sm font-medium text-neutral-200 transition hover:border-neutral-500 hover:text-neutral-50 focus:outline-none focus:ring-2 focus:ring-blue-500/40" data-simulate-cancel>
             Cancel
@@ -952,6 +966,36 @@
     const closeButton = dialog ? dialog.querySelector('[data-simulate-close]') : null;
     const errorEl = dialog ? dialog.querySelector('[data-simulate-error]') : null;
     const accountInput = form ? form.querySelector('[data-simulate-account]') : null;
+    const acknowledgeButton = form ? form.querySelector('[data-simulate-acknowledge]') : null;
+    const warningHelper = form ? form.querySelector('[data-simulate-warning-helper]') : null;
+
+    const ACK_DEFAULT_LABEL = 'I understand — delete existing data';
+    const ACK_CONFIRMED_LABEL = 'Warning acknowledged';
+
+    let hasAcknowledged = false;
+    let loadingDefaults = false;
+
+    const updateSubmitState = () => {
+      if (!submitButton) {
+        return;
+      }
+      submitButton.disabled = loadingDefaults || !hasAcknowledged;
+    };
+
+    const setAcknowledged = (value) => {
+      hasAcknowledged = value;
+      if (acknowledgeButton instanceof HTMLButtonElement) {
+        acknowledgeButton.disabled = value;
+        acknowledgeButton.setAttribute('aria-pressed', value ? 'true' : 'false');
+        acknowledgeButton.textContent = value ? ACK_CONFIRMED_LABEL : ACK_DEFAULT_LABEL;
+      }
+      if (warningHelper instanceof HTMLElement) {
+        warningHelper.textContent = value
+          ? 'Warning acknowledged. You can run the simulation now.'
+          : 'Acknowledge this warning to enable the simulation.';
+      }
+      updateSubmitState();
+    };
 
     if (!dialog || !form || !submitButton || !accountInput) {
       console.warn('Simulation dialog is not available.');
@@ -1118,14 +1162,16 @@
         errorEl.classList.add('hidden');
         errorEl.textContent = '';
       }
-      submitButton.disabled = true;
+      loadingDefaults = true;
+      setAcknowledged(false);
       submitButton.textContent = 'Run simulation';
       resetFormFields();
 
       try {
         const defaults = await loadDefaults(context.accountId);
         populateForm(defaults);
-        submitButton.disabled = false;
+        loadingDefaults = false;
+        updateSubmitState();
         const firstField = fieldMap.months_back;
         if (firstField instanceof HTMLElement) {
           firstField.focus();
@@ -1139,7 +1185,8 @@
           errorEl.textContent = 'Unable to load simulation defaults. Please try again later.';
           errorEl.classList.remove('hidden');
         }
-        submitButton.disabled = true;
+        loadingDefaults = false;
+        updateSubmitState();
         const fallbackTarget = cancelButton || closeButton;
         if (fallbackTarget instanceof HTMLElement) {
           fallbackTarget.focus();
@@ -1300,6 +1347,13 @@
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !dialog.classList.contains('hidden')) {
         cancelHandler();
+      }
+    });
+
+    acknowledgeButton?.addEventListener('click', () => {
+      setAcknowledged(true);
+      if (!loadingDefaults && submitButton instanceof HTMLButtonElement) {
+        submitButton.focus();
       }
     });
 
