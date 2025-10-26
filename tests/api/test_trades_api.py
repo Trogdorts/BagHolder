@@ -239,7 +239,10 @@ def test_import_trades_overwrites_existing_rows(tmp_path, monkeypatch):
 
             note = session.get(NoteDaily, "2025-10-16")
             assert note is not None
-            assert note.note == "Trimmed position"
+            assert note.note == (
+                "[ SELL - 100 x $320.17 ] Trimmed position\n\n"
+                "[ BUY - 100 x $10.00 ] Added to watchlist"
+            )
     finally:
         db.dispose_engine()
 
@@ -284,7 +287,11 @@ def test_import_trades_accumulates_notes_per_day(tmp_path, monkeypatch):
         with db.SessionLocal() as session:
             note = session.get(NoteDaily, "2025-11-01")
             assert note is not None
-            assert note.note == "Opened starter position\nTrimmed after pop\nAdded back"
+            assert note.note == (
+                "[ BUY - 10 x $150.00 ] Opened starter position\n\n"
+                "[ SELL - 5 x $155.00 ] Trimmed after pop\n\n"
+                "[ BUY - 2 x $152.00 ] Added back"
+            )
     finally:
         db.dispose_engine()
 

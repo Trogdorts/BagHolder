@@ -154,7 +154,22 @@ def _persist_trade_rows(db: Session, rows):
             date_str = row["date"]
             raw_note = row.get("note", "") or ""
             if raw_note.strip():
-                note_lines_by_date.setdefault(date_str, []).append(raw_note)
+                action_label = str(row.get("action", "")).upper() or "BUY"
+                qty_value = float(row.get("qty", 0) or 0)
+                price_value = float(row.get("price", 0) or 0)
+                qty_text = (
+                    str(int(qty_value))
+                    if qty_value.is_integer()
+                    else f"{qty_value:.2f}".rstrip("0").rstrip(".")
+                )
+                price_text = f"{price_value:.2f}"
+                note_prefix = f"[ {action_label} - {qty_text} x ${price_text} ]"
+                cleaned_note = raw_note.replace("\r\n", "\n").strip()
+                if cleaned_note:
+                    formatted_note = f"{note_prefix} {cleaned_note}"
+                else:
+                    formatted_note = note_prefix
+                note_lines_by_date.setdefault(date_str, []).append(formatted_note)
                 if date_str in empty_note_dates:
                     empty_note_dates.discard(date_str)
             elif date_str not in note_lines_by_date:
@@ -209,12 +224,16 @@ def _persist_trade_rows(db: Session, rows):
         timestamp = datetime.utcnow().isoformat()
         for date_str in sorted(set(note_lines_by_date) | empty_note_dates):
             if date_str in note_lines_by_date:
-                note_text = "\n".join(note_lines_by_date[date_str])
+                note_text = "\n\n".join(note_lines_by_date[date_str])
             else:
                 note_text = ""
             record = db.get(NoteDaily, date_str)
             if record:
-                record.note = note_text
+                if note_text:
+                    existing = (record.note or "").rstrip()
+                    record.note = f"{existing}\n\n{note_text}".strip() if existing else note_text
+                else:
+                    record.note = ""
                 record.is_markdown = False
                 record.updated_at = timestamp
             else:
