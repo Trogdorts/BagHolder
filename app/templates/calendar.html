@@ -587,7 +587,7 @@
                   <p class="text-[10px] uppercase tracking-wide text-neutral-500">Daily note</p>
                   <p class="text-[11px] text-neutral-400" data-note-tooltip-updated>Not saved yet</p>
                 </div>
-                <div class="max-h-48 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed" data-note-tooltip-body>{{ d.note | e }}</div>
+                <div class="overflow-visible whitespace-pre-wrap break-words leading-relaxed" data-note-tooltip-body>{{ d.note | e }}</div>
               </div>
             </div>
           </a>
@@ -666,7 +666,7 @@
               <p class="text-[10px] uppercase tracking-wide text-neutral-500">Weekly note</p>
               <p class="text-[11px] text-neutral-400" data-note-tooltip-updated>Not saved yet</p>
             </div>
-            <div class="max-h-48 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed" data-note-tooltip-body>{{ week.note | default('', true) | e }}</div>
+            <div class="overflow-visible whitespace-pre-wrap break-words leading-relaxed" data-note-tooltip-body>{{ week.note | default('', true) | e }}</div>
           </div>
         </div>
       </a>
@@ -721,7 +721,7 @@
                 <p class="text-[10px] uppercase tracking-wide text-neutral-500">Monthly note</p>
                 <p class="text-[11px] text-neutral-400" data-note-tooltip-updated>Not saved yet</p>
               </div>
-              <div class="max-h-48 overflow-y-auto whitespace-pre-wrap break-words leading-relaxed" data-note-tooltip-body>{{ month_note_text | e }}</div>
+              <div class="overflow-visible whitespace-pre-wrap break-words leading-relaxed" data-note-tooltip-body>{{ month_note_text | e }}</div>
             </div>
           </div>
         </a>
