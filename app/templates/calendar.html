@@ -380,10 +380,10 @@
             </span>
             <div id="{{ market_value_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
               <h3>Market value totals</h3>
-              <p>Toggle the market value overlay to see how your portfolio balance moved alongside realized profit and loss for each day.</p>
+              <p>Shows the estimated worth of the shares you still held at the end of each day. This number does not include any cash in your brokerage account.</p>
               <ul>
-                <li>Disable it when you want to focus strictly on trade outcomes without balance context.</li>
-                <li>Enable it to compare cash swings against the actual performance you booked.</li>
+                <li>Turn it off if you only want to track profit or loss from the trades you closed.</li>
+                <li>Turn it on to see how your open positions changed in value alongside your closed trades.</li>
               </ul>
             </div>
           </button>
@@ -400,10 +400,10 @@
             </span>
             <div id="{{ exclude_controls_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
               <h3>Exclude day controls</h3>
-              <p>Use the exclude switches to temporarily remove specific trading days from your performance rollups when you want to run what-if scenarios.</p>
+              <p>Adds a simple switch on each day so you can temporarily ignore that day in the totals. Helpful if you want to see "what if" results without deleting data.</p>
               <ul>
-                <li>Keep them visible to quickly omit outliers or data errors.</li>
-                <li>Hide them once you are done tweaking so the calendar stays tidy.</li>
+                <li>Show the switches when you need to hide a day that feels unusual or incorrect.</li>
+                <li>Hide the switches when you are done so the calendar stays clean.</li>
               </ul>
             </div>
           </button>
@@ -420,10 +420,10 @@
             </span>
             <div id="{{ percentages_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
               <h3>Return percentages</h3>
-              <p>Percentage metrics reveal how each day, week, and month performed relative to your starting balance so you can compare periods of different sizes.</p>
+              <p>Shows how much you made or lost in percent instead of dollars. It uses the trading results shown here and does not describe the cash sitting in your account.</p>
               <ul>
-                <li>Turn them off if you only care about raw currency gains.</li>
-                <li>Keep them on to normalize results across varying account sizes.</li>
+                <li>Turn it off when you only care about dollar gains and losses.</li>
+                <li>Leave it on to see which days were strong or weak regardless of account size.</li>
               </ul>
             </div>
           </button>
@@ -440,10 +440,10 @@
             </span>
             <div id="{{ weekends_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
               <h3>Weekend columns</h3>
-              <p>Control whether Saturdays and Sundays appear in the calendar grid. Hiding them gives the trading week more room, while showing them keeps a continuous timeline.</p>
+              <p>Choose if Saturdays and Sundays appear in the calendar. Hiding them gives more space to weekdays when the market is open.</p>
               <ul>
-                <li>Hide weekends to tighten the focus on active market days.</li>
-                <li>Show them when you log trades or notes for the full week.</li>
+                <li>Hide weekends for a tighter view of only the trading days.</li>
+                <li>Show weekends if you log notes or activity outside normal market hours.</li>
               </ul>
             </div>
           </button>
@@ -460,10 +460,10 @@
             </span>
             <div id="{{ trade_counts_tooltip_id }}" class="toolbar-tooltip" role="tooltip">
               <h3>Daily trade badges</h3>
-              <p>Badges display how many trades you captured on each day so you can quickly spot busy sessions or days with no activity.</p>
+              <p>Shows a small badge with the number of trades you made that day. A quick way to spot busy or quiet sessions.</p>
               <ul>
-                <li>Turn them off to reduce visual noise when you only need performance figures.</li>
-                <li>Leave them on to correlate profit streaks with trade frequency.</li>
+                <li>Hide the badges if you find the extra numbers distracting.</li>
+                <li>Show them to connect big profit or loss days with how many trades you placed.</li>
               </ul>
             </div>
           </button>
