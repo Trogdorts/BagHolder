@@ -2011,11 +2011,34 @@ function openTradeNoteEditor(dateStr, actionSelect, qtyInput, priceInput) {
   const tradeState = captureTradeEditorStateForRestore();
 
   const prepareNote = (existingNote) => {
-    const base = typeof existingNote === 'string' ? existingNote.trimEnd() : '';
-    if (base) {
-      return `${base}\n\n${prefix} `;
+    const normalized = typeof existingNote === 'string' ? existingNote.replace(/\r\n/g, '\n') : '';
+    const entry = `${prefix} `;
+    if (!normalized) {
+      return {
+        text: entry,
+        selectionStart: entry.length,
+        selectionEnd: entry.length,
+      };
     }
-    return `${prefix} `;
+
+    const existingIndex = normalized.indexOf(entry);
+    if (existingIndex !== -1) {
+      const caret = existingIndex + entry.length;
+      return {
+        text: normalized,
+        selectionStart: caret,
+        selectionEnd: caret,
+      };
+    }
+
+    const trimmed = normalized.trimEnd();
+    const base = trimmed ? `${trimmed}\n\n` : '';
+    const text = `${base}${entry}`;
+    return {
+      text,
+      selectionStart: text.length,
+      selectionEnd: text.length,
+    };
   };
 
   openDailyNote(dateStr, {
@@ -2749,10 +2772,25 @@ function openNoteEditor(config) {
     .then((payload) => {
       const noteText = payload && typeof payload.note === 'string' ? payload.note : '';
       const updatedAt = payload && typeof payload.updated_at === 'string' ? payload.updated_at : '';
-      const preparedNote = typeof prepareNote === 'function' ? prepareNote(noteText) : noteText;
+      const prepareResult = typeof prepareNote === 'function' ? prepareNote(noteText) : noteText;
+      let preparedText;
+      let selectionRange = null;
+      if (prepareResult && typeof prepareResult === 'object') {
+        preparedText = typeof prepareResult.text === 'string' ? prepareResult.text : '';
+        const start = Number.isFinite(prepareResult.selectionStart) ? prepareResult.selectionStart : null;
+        const end = Number.isFinite(prepareResult.selectionEnd) ? prepareResult.selectionEnd : null;
+        if (start !== null) {
+          const safeEnd = end !== null ? end : start;
+          selectionRange = { start, end: safeEnd };
+        }
+      } else {
+        preparedText = typeof prepareResult === 'string' ? prepareResult : '';
+      }
+
       renderNoteEditor(modal, {
         subtitle,
-        noteText: preparedNote,
+        noteText: preparedText,
+        selectionRange,
         updatedAt,
         placeholder,
         saveUrl,
@@ -2774,6 +2812,7 @@ function renderNoteEditor(modal, config) {
   const {
     subtitle,
     noteText,
+    selectionRange,
     updatedAt,
     placeholder,
     saveUrl,
@@ -2815,6 +2854,7 @@ function renderNoteEditor(modal, config) {
     initializeNoteEditor({
       modal,
       noteText,
+      selectionRange,
       updatedAt,
       saveUrl,
       onSave,
@@ -2823,7 +2863,7 @@ function renderNoteEditor(modal, config) {
 }
 
 function initializeNoteEditor(options) {
-  const { modal, noteText, updatedAt, saveUrl, onSave } = options;
+  const { modal, noteText, selectionRange, updatedAt, saveUrl, onSave } = options;
   const root = document.querySelector('[data-note-editor-root]');
   if (!root) {
     return;
@@ -2869,18 +2909,59 @@ function initializeNoteEditor(options) {
   };
 
   if (field) {
-    field.value = noteText;
+    const value = typeof noteText === 'string' ? noteText : '';
+    field.value = value;
+    initialValue = value;
     try {
       field.focus({ preventScroll: true });
     } catch (error) {
       field.focus();
     }
-    const length = noteText.length;
+    const length = value.length;
+    const clampIndex = (input) => {
+      if (!Number.isFinite(input)) {
+        return null;
+      }
+      if (input < 0) {
+        return 0;
+      }
+      if (input > length) {
+        return length;
+      }
+      return input;
+    };
+    let start = length;
+    let end = length;
+    if (selectionRange && typeof selectionRange === 'object') {
+      const rawStart = Number.isFinite(selectionRange.start)
+        ? selectionRange.start
+        : Number.isFinite(selectionRange.selectionStart)
+          ? selectionRange.selectionStart
+          : null;
+      const rawEnd = Number.isFinite(selectionRange.end)
+        ? selectionRange.end
+        : Number.isFinite(selectionRange.selectionEnd)
+          ? selectionRange.selectionEnd
+          : null;
+      const safeStart = clampIndex(rawStart);
+      if (safeStart !== null) {
+        start = safeStart;
+        const safeEnd = clampIndex(rawEnd !== null ? rawEnd : safeStart);
+        end = safeEnd !== null ? safeEnd : safeStart;
+      }
+    }
     if (typeof field.setSelectionRange === 'function') {
       try {
-        field.setSelectionRange(length, length);
+        field.setSelectionRange(start, end);
       } catch (error) {
         // ignore selection issues for unsupported inputs
+      }
+    } else {
+      try {
+        field.selectionStart = start;
+        field.selectionEnd = end;
+      } catch (error) {
+        // ignore assignment issues for unsupported inputs
       }
     }
     field.addEventListener('input', () => {
