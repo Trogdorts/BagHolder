@@ -320,7 +320,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             if is_future_day and not ds:
                 market_value = 0.0
             else:
-                market_value = invested_value + day_unrealized
+                market_value = invested_value
 
             wk.append({
                 "date": d,
