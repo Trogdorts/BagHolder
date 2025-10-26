@@ -41,11 +41,11 @@ notes:
   max_length: 4000
 import:
   sources:
-  - thinkorswim
+    - thinkorswim
   auto_recalculate: true
   backup_before_import: true
   accepted_formats:
-  - .csv
+    - .csv
   max_upload_bytes: 25000000
 view:
   default: latest
