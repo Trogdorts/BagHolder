@@ -160,12 +160,12 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.125rem 0.5rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 9999px;
     border: 1px solid #3f3f46;
     background-color: #171717;
     color: #a3a3a3;
-    font-size: 10px;
+    font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
@@ -292,21 +292,21 @@
   {% set day_labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
   {% set visible_day_labels = day_labels if show_weekends else day_labels[:5] %}
   {% set grid_columns = visible_day_labels|length + 1 %}
-  <div class="grid gap-2" style="grid-template-columns: repeat({{ grid_columns }}, minmax(0, 1fr));">
+  <div class="grid gap-3" style="grid-template-columns: repeat({{ grid_columns }}, minmax(0, 1fr));">
     {% for label in visible_day_labels %}
-    <div class="text-xs text-neutral-400">{{ label }}</div>
+    <div class="text-sm font-medium text-neutral-300 tracking-wide">{{ label }}</div>
     {% endfor %}
-    <div class="text-xs text-neutral-400 text-right">Week</div>
+    <div class="text-sm font-medium text-neutral-300 text-right tracking-wide">Week</div>
   </div>
 
-  <div class="grid gap-2 mt-2" style="grid-template-columns: repeat({{ grid_columns }}, minmax(0, 1fr));">
+  <div class="grid gap-3 mt-3" style="grid-template-columns: repeat({{ grid_columns }}, minmax(0, 1fr));">
   {% for week in weeks %}
     {% for d in week.days %}
       {% if show_weekends or not d.is_weekend %}
       {% set cls = (d.realized > 0) and 'cell-bg-pos' or (d.realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
       {% set day_identifier = d.date.strftime('%Y-%m-%d') %}
       {% set week_key = week.week_year ~ '-' ~ week.week_number %}
-      <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }} flex flex-col gap-2"
+      <div class="relative min-h-[10rem] rounded-xl border border-neutral-800 p-4 {{ 'opacity-100' if d.in_month else 'opacity-30' }} {{ cls }} flex flex-col gap-3"
            data-day-cell="{{ day_identifier }}"
            data-day-realized="{{ '%.10g'|format(d.realized) }}"
            data-day-unrealized="{{ '%.10g'|format(d.unrealized) }}"
@@ -318,10 +318,10 @@
            data-day-belongs-year="{{ 'true' if d.belongs_to_year else 'false' }}"
            data-week-key="{{ week_key }}"
            data-week-position="{{ loop.index0 }}">
-        <div class="flex items-center gap-1 text-xs text-neutral-400">
-          <span>{{ d.date.day }}</span>
+        <div class="flex items-center gap-2 text-sm font-semibold text-neutral-200">
+          <span class="text-lg leading-none">{{ d.date.day }}</span>
           {% set trade_button_classes = [
-            'relative inline-flex items-center justify-center rounded-full p-1 trade-button focus:outline-none focus-ring-success transition'
+            'relative inline-flex items-center justify-center rounded-full p-1.5 trade-button focus:outline-none focus-ring-success transition'
           ] %}
           {% if not d.has_trades %}
             {% set trade_button_classes = trade_button_classes + ['icon-translucent'] %}
@@ -330,7 +330,7 @@
                   class="{{ trade_button_classes|join(' ') }}"
                   onclick="openTrades('{{ d.date.strftime('%Y-%m-%d') }}'); return false;"
                   aria-label="View trades">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
               <circle cx="12" cy="12" r="9" />
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h-1.125a1.875 1.875 0 000 3.75h2.25a1.875 1.875 0 010 3.75H12m0-10.5v10.5" />
             </svg>
@@ -346,7 +346,7 @@
         </div>
 
         {% if show_text_default %}
-        <div class="text-sm space-y-1">
+        <div class="text-[15px] leading-relaxed space-y-2">
           {% set realized_class = 'text-profit' if d.realized > 0 else ('text-loss' if d.realized < 0 else 'text-neutral-200') %}
             {% if d.show_realized %}
           {% set day_percent_class = 'text-neutral-200' %}
@@ -359,7 +359,7 @@
           {% endif %}
           <div class="{{ realized_class }} space-y-1">
             <span class="{{ realized_class }}" data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">Realized: {{ d.realized|money }}</span>
-            <span data-day-percent class="text-[11px] text-neutral-200{% if d.percent is none %} hidden{% endif %} mt-0.5">Realized: <span data-day-percent-value class="{{ day_percent_class }}">{{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span></span>
+            <span data-day-percent class="text-xs text-neutral-200{% if d.percent is none %} hidden{% endif %} mt-1">Realized: <span data-day-percent-value class="{{ day_percent_class }}">{{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span></span>
           </div>
           {% endif %}
           <div class="{{ 'text-profit' if d.unrealized > 0 else ('text-loss' if d.unrealized < 0 else 'text-neutral-200') }}"
@@ -374,7 +374,7 @@
         {% endif %}
 
         <!-- Gear icon for manual entry -->
-        <a class="absolute top-1 right-1 icon-translucent z-10" href="#"
+        <a class="absolute top-2 right-2 icon-translucent z-10" href="#"
            aria-label="Edit daily values"
            onclick="openManual('{{ d.date.strftime('%Y-%m-%d') }}', {{ d.realized }}, {{ d.unrealized }}); return false;">
           <svg class="w-4 h-4 action-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -419,11 +419,11 @@
   {% endfor %}
   {% set week_key = week.week_year ~ '-' ~ week.week_number %}
   {% set week_cls = (week.week_realized > 0) and 'cell-bg-pos' or (week.week_realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
-  <div class="relative min-h-[7rem] rounded border border-neutral-800 p-2 flex flex-col justify-between {{ week_cls }}"
+  <div class="relative min-h-[10rem] rounded-xl border border-neutral-800 p-4 flex flex-col justify-between {{ week_cls }}"
        data-week-summary="{{ week_key }}">
     <div>
-      <div class="text-xs text-neutral-400">Week {{ week.week_index }}</div>
-      <div class="mt-2 text-sm space-y-1 text-right">
+      <div class="text-sm font-medium text-neutral-300 tracking-wide">Week {{ week.week_index }}</div>
+      <div class="mt-3 text-[15px] space-y-2 text-right leading-relaxed">
         <div data-week-realized
              class="{{ 'text-profit' if week.week_realized > 0 else ('text-loss' if week.week_realized < 0 else 'text-neutral-200') }}{% if not week.show_week_realized %} hidden{% endif %}">
           <div>Realized: <span data-week-realized-value>{{ week.week_realized|money }}</span></div>
