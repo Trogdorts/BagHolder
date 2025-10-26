@@ -39,6 +39,7 @@ class SimulationOptions:
     """Normalized options for a simulation run."""
 
     years_back: float = 2.0
+    months_back: int | None = None
     start_balance: float = 10_000.0
     risk_level: float = 0.5
     profit_target: float = 0.05
@@ -51,9 +52,30 @@ class SimulationOptions:
     generate_only: bool = False
     max_workers: int = _DEFAULT_WORKERS
 
+    def effective_years(self) -> float:
+        """Return the lookback window expressed in years."""
+
+        if self.months_back is not None:
+            if self.months_back < 1:
+                raise ValueError("months_back must be at least 1")
+            return self.months_back / 12.0
+        return self.years_back
+
+    def effective_months(self) -> int:
+        """Return the lookback window expressed in whole months."""
+
+        if self.months_back is not None:
+            if self.months_back < 1:
+                raise ValueError("months_back must be at least 1")
+            return self.months_back
+        # Round to the nearest month while enforcing a minimum of one month.
+        months = int(round(self.years_back * 12))
+        return max(months, 1)
+
     def as_dict(self) -> Dict[str, object]:
         return {
-            "years_back": self.years_back,
+            "years_back": self.effective_years(),
+            "months_back": self.effective_months(),
             "start_balance": self.start_balance,
             "risk_level": self.risk_level,
             "profit_target": self.profit_target,
@@ -350,8 +372,13 @@ def simulate_trades(price_map: Mapping[str, pd.DataFrame], options: SimulationOp
 
 
 def run_trade_simulation(options: SimulationOptions) -> SimulationResult:
-    if options.years_back < 0.25:
-        raise SimulationError("years_back must be at least 0.25 years")
+    try:
+        lookback_years = options.effective_years()
+    except ValueError as exc:
+        raise SimulationError(str(exc)) from exc
+
+    if lookback_years < (1 / 12):
+        raise SimulationError("Lookback period must be at least 1 month")
     if not 0 < options.risk_level <= 1:
         raise SimulationError("risk_level must be between 0 and 1")
     if options.start_balance <= 0:
@@ -365,7 +392,7 @@ def run_trade_simulation(options: SimulationOptions) -> SimulationResult:
     random.Random(options.seed).shuffle(shuffled)
     cached = update_price_cache(
         shuffled,
-        options.years_back,
+        lookback_years,
         options.price_cache_dir,
         max_workers=options.max_workers,
     )
@@ -376,6 +403,7 @@ def run_trade_simulation(options: SimulationOptions) -> SimulationResult:
         "symbols_cached": len(cached),
         "price_cache_dir": options.price_cache_dir,
         "symbol_cache": options.symbol_cache,
+        "months_requested": options.effective_months(),
     }
 
     if options.generate_only:

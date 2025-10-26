@@ -714,9 +714,9 @@
         <p class="hidden rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-200" data-simulate-error></p>
         <div class="grid gap-5 sm:grid-cols-2">
           <div class="space-y-1">
-            <label for="simulate-years-back" class="text-sm font-medium text-neutral-200">Years of history</label>
-            <input id="simulate-years-back" name="years_back" type="number" min="0.25" step="0.25" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
-            <p class="text-xs text-neutral-500">How many years of market data to include (supports quarter-year increments).</p>
+            <label for="simulate-months-back" class="text-sm font-medium text-neutral-200">Months of history</label>
+            <input id="simulate-months-back" name="months_back" type="number" min="1" max="240" step="1" required class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:ring-2 focus:ring-blue-500/40">
+            <p class="text-xs text-neutral-500">How many months of market data to include (supports single-month increments). That is roughly <span data-months-equivalent>0</span> years of history.</p>
           </div>
           <div class="space-y-1">
             <label for="simulate-start-balance" class="text-sm font-medium text-neutral-200">Starting balance</label>
@@ -959,7 +959,7 @@
     }
 
     const fieldMap = {
-      years_back: form.querySelector('[name="years_back"]'),
+      months_back: form.querySelector('[name="months_back"]'),
       start_balance: form.querySelector('[name="start_balance"]'),
       risk_level: form.querySelector('[name="risk_level"]'),
       profit_target: form.querySelector('[name="profit_target"]'),
@@ -972,6 +972,27 @@
       output_name: form.querySelector('[name="output_name"]'),
       generate_only: form.querySelector('[name="generate_only"]'),
     };
+
+    const monthsEquivalent = form.querySelector('[data-months-equivalent]');
+    const updateMonthsEquivalent = (months) => {
+      if (!(monthsEquivalent instanceof HTMLElement)) {
+        return;
+      }
+      if (!Number.isFinite(months) || months <= 0) {
+        monthsEquivalent.textContent = '0';
+        return;
+      }
+      const years = months / 12;
+      const formatted = years.toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+      monthsEquivalent.textContent = formatted;
+    };
+
+    if (fieldMap.months_back instanceof HTMLInputElement) {
+      fieldMap.months_back.addEventListener('input', () => {
+        const value = Number.parseInt(fieldMap.months_back.value, 10);
+        updateMonthsEquivalent(Number.isFinite(value) ? value : null);
+      });
+    }
 
     const defaultCache = new Map();
     let activeContext = null;
@@ -1010,22 +1031,24 @@
           }
         }
       });
+      updateMonthsEquivalent(null);
     };
 
     const populateForm = (options) => {
       const assignNumeric = (field, value, toInt = false) => {
         if (!(field instanceof HTMLInputElement)) {
-          return;
+          return null;
         }
         let normalized = typeof value === 'number' ? value : Number.parseFloat(String(value));
         if (!Number.isFinite(normalized)) {
           field.value = '';
-          return;
+          return null;
         }
         if (toInt) {
           normalized = Math.trunc(normalized);
         }
         field.value = String(normalized);
+        return normalized;
       };
 
       const assignText = (field, value) => {
@@ -1043,7 +1066,22 @@
         field.value = '';
       };
 
-      assignNumeric(fieldMap.years_back, options.years_back);
+      let resolvedMonths = null;
+      if (options.months_back !== undefined && options.months_back !== null) {
+        const parsed = Number.parseInt(String(options.months_back), 10);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          resolvedMonths = parsed;
+        }
+      }
+      if (resolvedMonths === null && options.years_back !== undefined && options.years_back !== null) {
+        const parsedYears = Number.parseFloat(String(options.years_back));
+        if (Number.isFinite(parsedYears)) {
+          resolvedMonths = Math.max(Math.round(parsedYears * 12), 1);
+        }
+      }
+      const assignedMonths = assignNumeric(fieldMap.months_back, resolvedMonths, true);
+      const monthsForHint = typeof assignedMonths === 'number' ? assignedMonths : resolvedMonths;
+      updateMonthsEquivalent(monthsForHint ?? null);
       assignNumeric(fieldMap.start_balance, options.start_balance);
       assignNumeric(fieldMap.risk_level, options.risk_level);
       assignNumeric(fieldMap.profit_target, options.profit_target);
@@ -1088,7 +1126,7 @@
         const defaults = await loadDefaults(context.accountId);
         populateForm(defaults);
         submitButton.disabled = false;
-        const firstField = fieldMap.years_back;
+        const firstField = fieldMap.months_back;
         if (firstField instanceof HTMLElement) {
           firstField.focus();
           if (firstField instanceof HTMLInputElement && typeof firstField.select === 'function') {
@@ -1129,8 +1167,9 @@
         return field.value.trim();
       };
 
+      const monthsBack = readNumber(fieldMap.months_back, true);
       const overrides = {
-        years_back: readNumber(fieldMap.years_back),
+        months_back: monthsBack,
         start_balance: readNumber(fieldMap.start_balance),
         risk_level: readNumber(fieldMap.risk_level),
         profit_target: readNumber(fieldMap.profit_target),
@@ -1143,6 +1182,10 @@
         output_name: readText(fieldMap.output_name),
         generate_only: Boolean(fieldMap.generate_only && fieldMap.generate_only.checked),
       };
+
+      if (monthsBack !== null) {
+        overrides.years_back = Math.max(monthsBack / 12, 1 / 12);
+      }
 
       Object.keys(overrides).forEach((key) => {
         const value = overrides[key];
