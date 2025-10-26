@@ -169,6 +169,36 @@
     transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
   }
 
+  .week-include-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.85rem;
+    border-radius: 9999px;
+    border: 1px solid #3f3f46;
+    background-color: #171717;
+    color: #a3a3a3;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+  }
+
+  .week-include-toggle.toggle-excluded {
+    border-color: rgba(239, 68, 68, 0.35);
+    background-color: rgba(127, 29, 29, 0.4);
+    color: #fecaca;
+  }
+
+  .week-include-toggle:focus-visible {
+    outline: 2px solid rgba(129, 140, 248, 0.5);
+    outline-offset: 2px;
+  }
+
+  .week-excluded {
+    opacity: 0.5;
+  }
+
   .calendar-card-heading {
     font-size: 1rem;
     line-height: 1.5rem;
@@ -457,6 +487,16 @@
         </div>
       </div>
     </div>
+    {% if show_exclude_controls %}
+    <div class="flex justify-end mt-2">
+      <button type="button"
+              class="week-include-toggle"
+              data-week-toggle="{{ week_key }}"
+              aria-pressed="true">
+        Include week
+      </button>
+    </div>
+    {% endif %}
     {% if notes_enabled %}
     <div class="flex justify-end">
       <a class="note-trigger weekly-note-trigger z-10{% if week.has_note %} has-note{% else %} icon-translucent{% endif %}" href="#"
@@ -964,6 +1004,7 @@ const dayImpactSimulator = (() => {
 
   const dayMap = new Map();
   const weekStructure = new Map();
+  const weekStates = new Map();
 
   const setDayToggleState = (toggle, included) => {
     if (!toggle) {
@@ -973,6 +1014,15 @@ const dayImpactSimulator = (() => {
     toggle.setAttribute('aria-pressed', included ? 'true' : 'false');
     toggle.dataset.state = included ? 'included' : 'excluded';
     toggle.textContent = included ? 'Include' : 'Excluded';
+  };
+
+  const setWeekToggleState = (toggle, included) => {
+    if (!toggle) {
+      return;
+    }
+    toggle.classList.toggle('toggle-excluded', !included);
+    toggle.setAttribute('aria-pressed', included ? 'true' : 'false');
+    toggle.textContent = included ? 'Include week' : 'Excluded week';
   };
 
   cells.forEach((cell) => {
@@ -1079,14 +1129,37 @@ const dayImpactSimulator = (() => {
     if (!key) {
       return;
     }
+    if (!weekStates.has(key)) {
+      weekStates.set(key, { included: true });
+    }
+    const toggle = weekEl.querySelector('[data-week-toggle]');
+    if (toggle) {
+      toggle.addEventListener('click', () => {
+        const state = weekStates.get(key);
+        state.included = !state.included;
+        updateSummaries();
+      });
+    }
     weekSummaries.set(key, {
       element: weekEl,
       realizedContainer: weekEl.querySelector('[data-week-realized]'),
       realizedValue: weekEl.querySelector('[data-week-realized-value]'),
       percent: weekEl.querySelector('[data-week-percent]'),
       percentValue: weekEl.querySelector('[data-week-percent-value]'),
+      toggle,
     });
   });
+
+  const isWeekIncluded = (key) => {
+    if (!key) {
+      return true;
+    }
+    const state = weekStates.get(key);
+    if (!state) {
+      return true;
+    }
+    return state.included !== false;
+  };
 
   const yearBaseRealized = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseRealized);
   const yearBaseTradingDays = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseTradingDays);
@@ -1152,9 +1225,17 @@ const dayImpactSimulator = (() => {
       return;
     }
 
-    const realizedValue = state.hasIncluded ? state.realized : 0;
+    const isIncluded = state.included !== false;
+    if (dom.element) {
+      dom.element.classList.toggle('week-excluded', !isIncluded);
+    }
+    if (dom.toggle) {
+      setWeekToggleState(dom.toggle, isIncluded);
+    }
+
+    const realizedValue = state.hasIncluded && isIncluded ? state.realized : 0;
     if (dom.realizedContainer) {
-      const shouldShow = state.hasIncluded && !isApproximatelyZero(realizedValue);
+      const shouldShow = state.hasIncluded && isIncluded && !isApproximatelyZero(realizedValue);
       dom.realizedContainer.classList.toggle('hidden', !shouldShow);
       if (dom.realizedValue) {
         dom.realizedValue.textContent = formatMoney(realizedValue);
@@ -1193,6 +1274,9 @@ const dayImpactSimulator = (() => {
 
     dayMap.forEach((day) => {
       if (!day.included) {
+        return;
+      }
+      if (!isWeekIncluded(day.weekKey)) {
         return;
       }
       if (day.inMonth && day.hasValues) {
@@ -1299,23 +1383,27 @@ const dayImpactSimulator = (() => {
     }
 
     weekStructure.forEach((entries, key) => {
+      const weekIncluded = isWeekIncluded(key);
       const state = {
         realized: 0,
         investedSamples: [],
         hasIncluded: false,
+        included: weekIncluded,
       };
 
-      entries.forEach((entry) => {
-        const day = dayMap.get(entry.date);
-        if (!day || !day.inMonth || !day.included) {
-          return;
-        }
-        if (day.hasValues) {
-          state.realized += day.realized;
-          collectInvestedSample(state.investedSamples, day.invested);
-        }
-        state.hasIncluded = true;
-      });
+      if (weekIncluded) {
+        entries.forEach((entry) => {
+          const day = dayMap.get(entry.date);
+          if (!day || !day.inMonth || !day.included) {
+            return;
+          }
+          if (day.hasValues) {
+            state.realized += day.realized;
+            collectInvestedSample(state.investedSamples, day.invested);
+          }
+          state.hasIncluded = true;
+        });
+      }
 
       updateWeekSummary(key, state);
     });
