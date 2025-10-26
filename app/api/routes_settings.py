@@ -44,6 +44,24 @@ router = APIRouter()
 log = logging.getLogger(__name__)
 
 
+def _is_running_in_docker() -> bool:
+    """Best-effort detection to determine if the app is running inside Docker."""
+    dockerenv_path = "/.dockerenv"
+    if os.path.exists(dockerenv_path):
+        return True
+
+    try:
+        with open("/proc/1/cgroup", "r", encoding="utf-8") as handle:
+            contents = handle.read()
+        if "docker" in contents or "containerd" in contents:
+            return True
+    except OSError:
+        pass
+
+    hint = os.environ.get("BAGHOLDER_DOCKER", "")
+    return hint.lower() in {"1", "true", "yes", "on"}
+
+
 def _resolve_data_directory(cfg: AppConfig) -> str:
     if cfg.path:
         return os.path.dirname(cfg.path)
@@ -502,6 +520,7 @@ def settings_page(request: Request, db: Session = Depends(get_session)):
         "user_error_message": user_error_message,
         "self_error_message": self_error_message,
         "managed_users": managed_users,
+        "running_in_docker": _is_running_in_docker(),
     }
     return request.app.state.templates.TemplateResponse(
         request,
