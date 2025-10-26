@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Set, Tuple
@@ -16,6 +17,9 @@ from app.services.trade_summaries import calculate_daily_trade_map, upsert_daily
 
 router = APIRouter()
 log = get_logger(__name__)
+
+
+_NOTE_PREFIX_PATTERN = re.compile(r"^\[\s*(BUY|SELL)\b", re.IGNORECASE)
 
 
 def _is_close(a: float, b: float, tol: float = 0.01) -> bool:
@@ -166,7 +170,10 @@ def _persist_trade_rows(db: Session, rows):
                 note_prefix = f"[ {action_label} - {qty_text} x ${price_text} ]"
                 cleaned_note = raw_note.replace("\r\n", "\n").strip()
                 if cleaned_note:
-                    formatted_note = f"{note_prefix} {cleaned_note}"
+                    if _NOTE_PREFIX_PATTERN.match(cleaned_note):
+                        formatted_note = cleaned_note
+                    else:
+                        formatted_note = f"{note_prefix} {cleaned_note}"
                 else:
                     formatted_note = note_prefix
                 note_lines_by_date.setdefault(date_str, []).append(formatted_note)

@@ -296,6 +296,33 @@ def test_import_trades_accumulates_notes_per_day(tmp_path, monkeypatch):
         db.dispose_engine()
 
 
+def test_import_trades_preserves_prefixed_notes(tmp_path, monkeypatch):
+    _init_app(tmp_path, monkeypatch)
+    try:
+        rows = [
+            {
+                "date": "2025-12-24",
+                "symbol": "TSLA",
+                "action": "BUY",
+                "qty": 196.0,
+                "price": 4.03,
+                "amount": -789.88,
+                "note": "[ BUY - 196 x $4.03 ] Already annotated",
+            }
+        ]
+
+        with db.SessionLocal() as session:
+            inserted = _persist_trade_rows(session, rows)
+            assert inserted == 1
+
+        with db.SessionLocal() as session:
+            note = session.get(NoteDaily, "2025-12-24")
+            assert note is not None
+            assert note.note == "[ BUY - 196 x $4.03 ] Already annotated"
+    finally:
+        db.dispose_engine()
+
+
 def test_import_trades_auto_resolves_missing_summaries(tmp_path, monkeypatch):
     app = _init_app(tmp_path, monkeypatch)
     try:
