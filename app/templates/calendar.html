@@ -490,11 +490,13 @@
             </div>
           </div>
           {% endif %}
+          {% if d.market_value %}
           <div class="calendar-metric-line"
                x-show="showMarketValue" x-cloak>
             <span class="calendar-metric-label">Market value:</span>
             <span class="calendar-metric-value {{ market_value_class }}" data-day-market-value>{{ d.market_value|money }}</span>
           </div>
+          {% endif %}
         </div>
         {% endif %}
 
