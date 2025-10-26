@@ -630,7 +630,7 @@
             {% endif %}
           </div>
           <div data-week-average class="calendar-metric-line hidden">
-            <span class="calendar-metric-label">Avg realized per day (<span data-week-average-count>0</span> days):</span>
+            <span class="calendar-metric-label">Avg Daily P&amp;L (<span data-week-average-count>0</span> days):</span>
             <span class="calendar-metric-value text-neutral-200" data-week-average-value></span>
           </div>
         </div>
@@ -698,7 +698,7 @@
         </div>
       </div>
       <div class="calendar-secondary-metric hidden mt-2" data-month-average>
-        <span class="text-neutral-300">Avg realized per day (<span data-month-average-count>0</span> days):</span>
+        <span class="text-neutral-300">Avg Daily P&amp;L (<span data-month-average-count>0</span> days):</span>
         <span data-month-average-value class="text-neutral-200"></span>
       </div>
         {% set month_note_text = month_note.note | default('', true) %}
@@ -749,7 +749,7 @@
             {% if show_percentages_default and rolling_year_percent is not none %}Realized: <span data-rolling-percent-value class="{{ rolling_percent_class }}">{{ '{:+.2f}%'.format(rolling_year_percent) }}</span>{% endif %}
           </div>
           <div class="calendar-secondary-metric hidden" data-rolling-average>
-            <span class="text-neutral-300">Avg realized per day (<span data-rolling-average-count>0</span> days):</span>
+            <span class="text-neutral-300">Avg Daily P&amp;L (<span data-rolling-average-count>0</span> days):</span>
             <span data-rolling-average-value class="text-neutral-200"></span>
           </div>
 
@@ -773,7 +773,7 @@
             {% if show_percentages_default and year_percent is not none %}Realized: <span data-year-percent-value class="{{ year_percent_class }}">{{ '{:+.2f}%'.format(year_percent) }}</span>{% endif %}
           </div>
           <div class="calendar-secondary-metric hidden" data-year-average>
-            <span class="text-neutral-300">Avg realized per day (<span data-year-average-count>0</span> days):</span>
+            <span class="text-neutral-300">Avg Daily P&amp;L (<span data-year-average-count>0</span> days):</span>
             <span data-year-average-value class="text-neutral-200"></span>
           </div>
           
