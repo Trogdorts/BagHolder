@@ -349,17 +349,9 @@
         <div class="text-[15px] leading-relaxed space-y-2">
           {% set realized_class = 'text-profit' if d.realized > 0 else ('text-loss' if d.realized < 0 else 'text-neutral-200') %}
             {% if d.show_realized %}
-          {% set day_percent_class = 'text-neutral-200' %}
-          {% if d.percent is not none %}
-            {% if d.percent > 0 %}
-              {% set day_percent_class = 'text-profit' %}
-            {% elif d.percent < 0 %}
-              {% set day_percent_class = 'text-loss' %}
-            {% endif %}
-          {% endif %}
           <div class="{{ realized_class }} space-y-1">
             <span class="{{ realized_class }}" data-day-realized-amount data-has-percent="{{ 'true' if d.percent is not none else 'false' }}">Realized: {{ d.realized|money }}</span>
-            <span data-day-percent class="text-xs text-neutral-200{% if d.percent is none %} hidden{% endif %} mt-1">Realized: <span data-day-percent-value class="{{ day_percent_class }}">{{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span></span>
+            <span data-day-percent class="{% if d.percent is none %}hidden{% else %}block{% endif %} mt-1">Realized: <span data-day-percent-value class="{{ realized_class }}">{{ '{:+.2f}%'.format(d.percent) if d.percent is not none else '' }}</span></span>
           </div>
           {% endif %}
           <div class="{{ 'text-profit' if d.unrealized > 0 else ('text-loss' if d.unrealized < 0 else 'text-neutral-200') }}"
