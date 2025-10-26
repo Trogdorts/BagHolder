@@ -18,7 +18,6 @@ import calendar
 from app.core import database
 from app.core.config import AppConfig
 from app.core.database import get_session
-from app.core.lifecycle import reload_application_state
 from app.core.models import (
     DailySummary,
     Meta,
@@ -29,12 +28,8 @@ from app.core.models import (
 )
 from app.core.utils import coerce_bool, month_bounds
 from app.services.trade_summaries import recompute_daily_summaries
-from app.services.data_reset import clear_all_data
-from app.services.trade_simulator import (
-    SimulationError,
-    SimulationOptions,
-    run_trade_simulation,
-)
+from app.services.trade_simulator import SimulationError, SimulationOptions
+from app.services.simulation_runner import import_simulated_trades
 from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter()
@@ -623,9 +618,18 @@ def generate_simulated_trades(request: Request, payload: SimulationRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
-        result = run_trade_simulation(options)
+        cfg: AppConfig = request.app.state.config
+        data_dir = os.path.dirname(cfg.path) if cfg.path else None
+        result = import_simulated_trades(
+            request.app,
+            account_dir,
+            data_dir,
+            options,
+        )
     except SimulationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:  # pragma: no cover - defensive guard
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - defensive logging
         log.exception("Unexpected error while generating simulated trades")
         raise HTTPException(
@@ -633,110 +637,7 @@ def generate_simulated_trades(request: Request, payload: SimulationRequest):
             detail="Failed to generate simulated trades.",
         ) from exc
 
-    metadata = dict(result.metadata)
-
-    if options.generate_only:
-        return {
-            "ok": True,
-            "generate_only": True,
-            "metadata": metadata,
-            "message": "Symbol and price caches have been updated.",
-            "reload": False,
-        }
-
-    if result.trades.empty:
-        raise HTTPException(
-            status_code=400,
-            detail="The simulator did not return any trades to import.",
-        )
-
-    records = result.trades.to_dict("records")
-    prepared: List[Dict[str, object]] = []
-    for row in records:
-        raw_date = str(row.get("date", "")).strip()
-        try:
-            iso_date = datetime.strptime(raw_date, "%m/%d/%Y").strftime("%Y-%m-%d")
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Simulator returned an invalid date: {raw_date}",
-            ) from exc
-
-        symbol = str(row.get("symbol", "")).strip().upper()
-        action = str(row.get("action", "")).strip().upper()
-        qty = float(row.get("qty", 0.0))
-        price = float(row.get("price", 0.0))
-        amount = float(row.get("amount", 0.0))
-
-        if not symbol or action not in {"BUY", "SELL"} or qty <= 0 or price <= 0:
-            raise HTTPException(
-                status_code=500,
-                detail="Simulator produced an invalid trade record.",
-            )
-
-        prepared.append(
-            {
-                "date": iso_date,
-                "symbol": symbol,
-                "action": action,
-                "qty": qty,
-                "price": price,
-                "amount": amount,
-            }
-        )
-
-    try:
-        clear_all_data(account_dir)
-    except Exception as exc:  # pragma: no cover - defensive logging
-        log.exception("Unable to reset portfolio prior to import")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to reset the existing portfolio before import.",
-        ) from exc
-
-    if database.SessionLocal is None:
-        raise HTTPException(
-            status_code=500,
-            detail="Database session factory is unavailable after reset.",
-        )
-
-    with database.SessionLocal() as session:
-        for trade in prepared:
-            session.add(
-                Trade(
-                    date=trade["date"],
-                    symbol=trade["symbol"],
-                    action=trade["action"],
-                    qty=trade["qty"],
-                    price=trade["price"],
-                    amount=trade["amount"],
-                )
-            )
-        session.flush()
-        daily_map = recompute_daily_summaries(session)
-        session.commit()
-
-    cfg: AppConfig = request.app.state.config
-    data_dir = os.path.dirname(cfg.path) if cfg.path else None
-    reload_application_state(request.app, data_dir=data_dir)
-
-    unique_days = {trade["date"] for trade in prepared}
-    metadata.update(
-        {
-            "status": "trades_imported",
-            "trades_imported": len(prepared),
-            "days_with_trades": len(unique_days),
-        }
-    )
-
-    return {
-        "ok": True,
-        "generate_only": False,
-        "metadata": metadata,
-        "trades_imported": len(prepared),
-        "days_with_trades": len(unique_days),
-        "reload": True,
-    }
+    return result
 
 
 @router.delete("/api/trades/{date_str}")
