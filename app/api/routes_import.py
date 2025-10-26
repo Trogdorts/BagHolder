@@ -1,6 +1,6 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Iterable, Set, Tuple
+from typing import Dict, Iterable, List, Set, Tuple
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -145,23 +145,20 @@ def _persist_trade_rows(db: Session, rows):
         return 0
 
     notes_present = any("note" in row for row in rows)
-    notes_by_date: Dict[str, str] = {}
-    notes_has_content: Dict[str, bool] = {}
+    note_lines_by_date: Dict[str, List[str]] = {}
+    empty_note_dates: Set[str] = set()
     if notes_present:
         for row in rows:
             if "note" not in row:
                 continue
             date_str = row["date"]
-            note_text = row.get("note", "") or ""
-            if date_str not in notes_by_date:
-                notes_by_date[date_str] = note_text
-                notes_has_content[date_str] = bool(note_text)
-                continue
-            if note_text and not notes_has_content.get(date_str, False):
-                notes_by_date[date_str] = note_text
-                notes_has_content[date_str] = True
-            elif not note_text and not notes_has_content.get(date_str, False):
-                notes_by_date[date_str] = ""
+            raw_note = row.get("note", "") or ""
+            if raw_note.strip():
+                note_lines_by_date.setdefault(date_str, []).append(raw_note)
+                if date_str in empty_note_dates:
+                    empty_note_dates.discard(date_str)
+            elif date_str not in note_lines_by_date:
+                empty_note_dates.add(date_str)
 
     deduped_rows = []
     seen = set()
@@ -208,9 +205,13 @@ def _persist_trade_rows(db: Session, rows):
         db.add(Trade(**row))
         inserted += 1
 
-    if notes_by_date:
+    if note_lines_by_date or empty_note_dates:
         timestamp = datetime.utcnow().isoformat()
-        for date_str, note_text in notes_by_date.items():
+        for date_str in sorted(set(note_lines_by_date) | empty_note_dates):
+            if date_str in note_lines_by_date:
+                note_text = "\n".join(note_lines_by_date[date_str])
+            else:
+                note_text = ""
             record = db.get(NoteDaily, date_str)
             if record:
                 record.note = note_text
