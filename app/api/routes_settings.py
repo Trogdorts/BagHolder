@@ -153,7 +153,9 @@ def _merge_simulation_options(
     updates: dict[str, Any] = {}
 
     if "years_back" in overrides:
-        updates["years_back"] = _coerce_int_option("years_back", overrides["years_back"], minimum=1)
+        updates["years_back"] = _coerce_float_option(
+            "years_back", overrides["years_back"], minimum=0.25
+        )
     if "start_balance" in overrides:
         updates["start_balance"] = _coerce_float_option("start_balance", overrides["start_balance"], minimum=0.01)
     if "risk_level" in overrides:

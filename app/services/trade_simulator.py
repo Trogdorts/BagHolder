@@ -38,7 +38,7 @@ class SimulationError(RuntimeError):
 class SimulationOptions:
     """Normalized options for a simulation run."""
 
-    years_back: int = 2
+    years_back: float = 2.0
     start_balance: float = 10_000.0
     risk_level: float = 0.5
     profit_target: float = 0.05
@@ -150,7 +150,7 @@ def get_us_symbols(path: str) -> List[str]:
 
 def update_price_cache(
     symbols: Sequence[str],
-    years_back: int,
+    years_back: float,
     cache_dir: str,
     max_workers: int = _DEFAULT_WORKERS,
 ) -> List[str]:
@@ -350,8 +350,8 @@ def simulate_trades(price_map: Mapping[str, pd.DataFrame], options: SimulationOp
 
 
 def run_trade_simulation(options: SimulationOptions) -> SimulationResult:
-    if options.years_back < 1:
-        raise SimulationError("years_back must be at least 1")
+    if options.years_back < 0.25:
+        raise SimulationError("years_back must be at least 0.25 years")
     if not 0 < options.risk_level <= 1:
         raise SimulationError("risk_level must be between 0 and 1")
     if options.start_balance <= 0:
