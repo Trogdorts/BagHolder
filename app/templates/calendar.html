@@ -115,7 +115,7 @@
     top: calc(100% + 0.6rem);
     left: 50%;
     transform: translateX(-50%);
-    width: max(16rem, 100%);
+    width: max(20rem, 100%);
     padding: 0.85rem 1rem 1rem;
     border-radius: 0.75rem;
     background: rgba(24, 24, 27, 0.96);
@@ -166,6 +166,7 @@
     display: flex;
     align-items: stretch;
     width: 100%;
+    min-width: 8.5rem;
     border-radius: 0.5rem;
     border: 1px solid rgba(82, 82, 91, 0.75);
     background: rgba(15, 15, 15, 0.9);
@@ -179,8 +180,8 @@
   }
 
   .toolbar-quick-nav-stepper input {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: 0 0 auto;
+    width: 6ch;
     padding: 0.5rem 0.75rem;
     border: none;
     background: transparent;
