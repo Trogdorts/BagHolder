@@ -1644,6 +1644,7 @@ function createTradeEditorHTML() {
               <th class="px-2 py-1 border border-neutral-800">Symbol</th>
               <th class="px-2 py-1 border border-neutral-800 text-right">Quantity</th>
               <th class="px-2 py-1 border border-neutral-800 text-right">Price</th>
+              <th class="px-2 py-1 border border-neutral-800 text-center">Note</th>
               <th class="px-2 py-1 border border-neutral-800 text-right">Actions</th>
             </tr>
           </thead>
@@ -1740,21 +1741,21 @@ function focusTradeEditorFirstField() {
   }
 }
 
-function setupTradeEditor(trades, dateStr) {
+function setupTradeEditor(trades, dateStr, options = {}) {
   clearTradeEditorMessages();
   const tbody = document.getElementById('trade-table-body');
   if (!tbody) return;
 
   tbody.innerHTML = '';
   (trades || []).forEach(trade => {
-    tbody.appendChild(createTradeRow(trade));
+    tbody.appendChild(createTradeRow(trade, dateStr));
   });
 
   const addButton = document.getElementById('add-trade-row');
   if (addButton) {
     addButton.onclick = () => {
       hideTradeEditorSuccess();
-      tbody.appendChild(createTradeRow({ action: 'BUY', symbol: '', qty: '', price: '' }));
+      tbody.appendChild(createTradeRow({ action: 'BUY', symbol: '', qty: '', price: '' }, dateStr));
       updateTradeEmptyState();
       refreshTradeEditorDirtyState();
     };
@@ -1788,7 +1789,12 @@ function setupTradeEditor(trades, dateStr) {
 
   tradeEditorState.unsavedWarning = document.getElementById('trade-unsaved');
   tradeEditorState.currentDate = dateStr;
-  resetTradeEditorInitialSnapshot();
+  if (options && typeof options.initialSnapshotOverride === 'string') {
+    tradeEditorState.initialSnapshot = options.initialSnapshotOverride;
+    refreshTradeEditorDirtyState();
+  } else {
+    resetTradeEditorInitialSnapshot();
+  }
 
   const modal = getModalController();
   if (modal) {
@@ -1807,7 +1813,7 @@ function setupTradeEditor(trades, dateStr) {
   }
 }
 
-function createTradeRow(trade) {
+function createTradeRow(trade, dateStr) {
   const row = document.createElement('tr');
   row.className = 'border-b border-neutral-800';
   if (trade && trade.id !== undefined && trade.id !== null) {
@@ -1873,6 +1879,22 @@ function createTradeRow(trade) {
   priceCell.appendChild(priceInput);
   row.appendChild(priceCell);
 
+  const noteCell = document.createElement('td');
+  noteCell.className = 'px-2 py-1 border border-neutral-800 text-center';
+  const noteButton = document.createElement('button');
+  noteButton.type = 'button';
+  noteButton.className = 'btn btn-outline-primary px-2 py-1 text-xs';
+  noteButton.textContent = 'Note';
+  noteButton.addEventListener('click', () => {
+    const targetDate = dateStr || tradeEditorState.currentDate;
+    if (!targetDate) {
+      return;
+    }
+    openTradeNoteEditor(targetDate, actionSelect, qtyInput, priceInput);
+  });
+  noteCell.appendChild(noteButton);
+  row.appendChild(noteCell);
+
   const actionsCell = document.createElement('td');
   actionsCell.className = 'px-2 py-1 border border-neutral-800 text-right';
   const removeButton = document.createElement('button');
@@ -1889,6 +1911,123 @@ function createTradeRow(trade) {
   row.appendChild(actionsCell);
 
   return row;
+}
+
+function formatTradeNotePrefix(action, qty, price) {
+  const normalizedAction = (action || 'BUY').toString().trim().toUpperCase() || 'BUY';
+  const qtyNumber = Number(qty);
+  let qtyText;
+  if (Number.isFinite(qtyNumber)) {
+    qtyText = Math.abs(qtyNumber - Math.round(qtyNumber)) < 1e-9
+      ? String(Math.round(qtyNumber))
+      : qtyNumber.toString();
+  } else {
+    const rawQty = typeof qty === 'string' ? qty.trim() : '';
+    qtyText = rawQty || '?';
+  }
+
+  const priceNumber = Number(price);
+  let priceText;
+  if (Number.isFinite(priceNumber)) {
+    priceText = priceNumber.toFixed(2);
+  } else {
+    const rawPrice = typeof price === 'string' ? price.trim() : '';
+    priceText = rawPrice && /\d/.test(rawPrice) ? rawPrice : '0.00';
+  }
+
+  return `[ ${normalizedAction} - ${qtyText} x $${priceText} ]`;
+}
+
+function captureTradeEditorStateForRestore() {
+  const dateStr = tradeEditorState.currentDate;
+  if (!dateStr) {
+    return null;
+  }
+  const snapshot = captureTradeEditorSnapshot();
+  let rows = [];
+  try {
+    const parsed = JSON.parse(snapshot);
+    if (Array.isArray(parsed)) {
+      rows = parsed;
+    }
+  } catch (error) {
+    rows = [];
+  }
+  const scrollContainer = document.querySelector('#trade-editor .overflow-x-auto');
+  return {
+    dateStr,
+    rows,
+    initialSnapshot: typeof tradeEditorState.initialSnapshot === 'string'
+      ? tradeEditorState.initialSnapshot
+      : null,
+    scrollTop: scrollContainer ? scrollContainer.scrollTop : 0,
+  };
+}
+
+function restoreTradeEditorState(state) {
+  if (!state || !state.dateStr) {
+    return;
+  }
+
+  const modal = getModalController();
+  if (!modal) {
+    return;
+  }
+
+  modal.title = 'Trades ' + state.dateStr;
+  modal.body = createTradeEditorHTML();
+  modal.save = () => saveTrades(state.dateStr);
+  modal.open = true;
+
+  const rows = Array.isArray(state.rows) ? state.rows : [];
+  const normalizedRows = rows.map((row) => ({
+    id: row && row.id !== undefined && row.id !== null ? row.id : undefined,
+    action: row && row.action ? row.action : 'BUY',
+    symbol: row && row.symbol ? row.symbol : '',
+    qty: row && row.qty !== undefined ? row.qty : '',
+    price: row && row.price !== undefined ? row.price : '',
+  }));
+
+  const overrideSnapshot = typeof state.initialSnapshot === 'string' ? state.initialSnapshot : undefined;
+
+  window.setTimeout(() => {
+    setupTradeEditor(normalizedRows, state.dateStr, {
+      initialSnapshotOverride: overrideSnapshot,
+    });
+    if (typeof state.scrollTop === 'number') {
+      const container = document.querySelector('#trade-editor .overflow-x-auto');
+      if (container) {
+        container.scrollTop = state.scrollTop;
+      }
+    }
+  }, 0);
+}
+
+function openTradeNoteEditor(dateStr, actionSelect, qtyInput, priceInput) {
+  const actionValue = actionSelect && actionSelect.value ? actionSelect.value : 'BUY';
+  const qtyValue = qtyInput && qtyInput.value !== undefined ? qtyInput.value : '';
+  const priceValue = priceInput && priceInput.value !== undefined ? priceInput.value : '';
+  const prefix = formatTradeNotePrefix(actionValue, qtyValue, priceValue);
+  const tradeState = captureTradeEditorStateForRestore();
+
+  const prepareNote = (existingNote) => {
+    const base = typeof existingNote === 'string' ? existingNote.trimEnd() : '';
+    if (base) {
+      return `${base}\n\n${prefix} `;
+    }
+    return `${prefix} `;
+  };
+
+  openDailyNote(dateStr, {
+    prepareNote,
+    onSave: () => {
+      if (tradeState) {
+        window.setTimeout(() => restoreTradeEditorState(tradeState), 0);
+      } else {
+        window.setTimeout(() => openTrades(dateStr), 0);
+      }
+    },
+  });
 }
 
 function updateTradeEmptyState() {
@@ -2118,7 +2257,7 @@ function parseTradeCsv(text) {
   return trades;
 }
 
-function applyImportedTrades(trades) {
+function applyImportedTrades(trades, dateStr) {
   const tbody = document.getElementById('trade-table-body');
   if (!tbody) {
     return;
@@ -2132,7 +2271,7 @@ function applyImportedTrades(trades) {
         symbol: trade.symbol,
         qty: trade.qty,
         price: trade.price,
-      })
+      }, dateStr)
     );
   });
 
@@ -2157,7 +2296,7 @@ function handleTradeCsvImport(event, dateStr) {
     try {
       const text = typeof reader.result === 'string' ? reader.result : '';
       const trades = parseTradeCsv(text);
-      applyImportedTrades(trades);
+      applyImportedTrades(trades, dateStr);
       const dateLabel = dateStr || 'this date';
       showTradeEditorSuccess(
         `${trades.length} trade${trades.length === 1 ? '' : 's'} imported. Save to overwrite existing trades for ${dateLabel}.`,
@@ -2581,6 +2720,7 @@ function openNoteEditor(config) {
     saveUrl,
     placeholder,
     onSave,
+    prepareNote = null,
     closeLabel = 'Cancel',
     saveLabel = 'Save note',
   } = config;
@@ -2609,9 +2749,10 @@ function openNoteEditor(config) {
     .then((payload) => {
       const noteText = payload && typeof payload.note === 'string' ? payload.note : '';
       const updatedAt = payload && typeof payload.updated_at === 'string' ? payload.updated_at : '';
+      const preparedNote = typeof prepareNote === 'function' ? prepareNote(noteText) : noteText;
       renderNoteEditor(modal, {
         subtitle,
-        noteText,
+        noteText: preparedNote,
         updatedAt,
         placeholder,
         saveUrl,
@@ -2839,15 +2980,21 @@ function initializeNoteEditor(options) {
   };
 }
 
-function openDailyNote(dateStr) {
+function openDailyNote(dateStr, options = {}) {
+  const prepareNote = options && typeof options.prepareNote === 'function' ? options.prepareNote : null;
+  const extraOnSave = options && typeof options.onSave === 'function' ? options.onSave : null;
   openNoteEditor({
     title: 'Daily note',
     subtitle: formatDailySubtitle(dateStr),
     fetchUrl: '/api/notes/daily/' + dateStr,
     saveUrl: '/api/notes/daily/' + dateStr,
     placeholder: 'Capture highlights from this trading day…',
+    prepareNote,
     onSave: (noteValue, meta) => {
       updateDailyNoteIndicator(dateStr, noteValue, meta && meta.updatedAt);
+      if (extraOnSave) {
+        extraOnSave(noteValue, meta);
+      }
     },
   });
 }
