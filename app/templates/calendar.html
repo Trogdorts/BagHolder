@@ -1853,7 +1853,58 @@ const dayImpactSimulator = (() => {
     entries.sort((a, b) => a.position - b.position);
   });
 
-  const winRatioController = createWinRatioController(document.querySelector('[data-win-ratio-panel]'));
+  const winRatioPanelEl = document.querySelector('[data-win-ratio-panel]');
+  const winRatioController = createWinRatioController(winRatioPanelEl);
+
+  const applyWinRatioCountUpdates = (() => {
+    if (!winRatioPanelEl) {
+      return () => {};
+    }
+
+    const normalizeCountValue = (value) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) {
+        return 0;
+      }
+      return Math.round(numeric);
+    };
+
+    const monthDialEl = winRatioPanelEl.querySelector('[data-win-ratio-dial="month"]');
+    const yearDialEl = winRatioPanelEl.querySelector('[data-win-ratio-dial="year"]');
+
+    const monthWinsEl = monthDialEl ? monthDialEl.querySelector('[data-win-ratio-wins]') : null;
+    const monthLossesEl = monthDialEl ? monthDialEl.querySelector('[data-win-ratio-losses]') : null;
+    const yearWinsEl = yearDialEl ? yearDialEl.querySelector('[data-win-ratio-wins]') : null;
+    const yearLossesEl = yearDialEl ? yearDialEl.querySelector('[data-win-ratio-losses]') : null;
+
+    const baseYearOtherWins = normalizeCountValue(winRatioPanelEl.dataset.yearOtherWins);
+    const baseYearOtherLosses = normalizeCountValue(winRatioPanelEl.dataset.yearOtherLosses);
+
+    return (monthWins, monthLosses, yearMonthWins, yearMonthLosses) => {
+      const normalizedMonthWins = normalizeCountValue(monthWins);
+      const normalizedMonthLosses = normalizeCountValue(monthLosses);
+      const normalizedYearMonthWins = normalizeCountValue(yearMonthWins);
+      const normalizedYearMonthLosses = normalizeCountValue(yearMonthLosses);
+
+      if (monthWinsEl) {
+        monthWinsEl.textContent = String(normalizedMonthWins);
+      }
+      if (monthLossesEl) {
+        monthLossesEl.textContent = String(normalizedMonthLosses);
+      }
+      if (yearWinsEl) {
+        yearWinsEl.textContent = String(baseYearOtherWins + normalizedYearMonthWins);
+      }
+      if (yearLossesEl) {
+        yearLossesEl.textContent = String(baseYearOtherLosses + normalizedYearMonthLosses);
+      }
+
+      winRatioPanelEl.dataset.monthWins = String(normalizedMonthWins);
+      winRatioPanelEl.dataset.monthLosses = String(normalizedMonthLosses);
+      winRatioPanelEl.dataset.yearMonthWins = String(normalizedYearMonthWins);
+      winRatioPanelEl.dataset.yearMonthLosses = String(normalizedYearMonthLosses);
+    };
+  })();
   const monthSummaryEl = document.querySelector('[data-month-summary]');
   const monthRealizedEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-realized-value]') : null;
   const monthPercentContainer = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-percent]') : null;
@@ -2191,6 +2242,7 @@ const dayImpactSimulator = (() => {
     if (winRatioController) {
       winRatioController.updateFromCounts(monthWins, monthLosses, yearMonthWins, yearMonthLosses);
     }
+    applyWinRatioCountUpdates(monthWins, monthLosses, yearMonthWins, yearMonthLosses);
 
     weekStructure.forEach((entries, key) => {
       const weekIncluded = isWeekIncluded(key);
