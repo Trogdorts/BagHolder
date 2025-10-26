@@ -514,7 +514,6 @@ def save_settings(
     request: Request,
     theme: str = Form(...),
     show_text: str = Form("true"),
-    show_unrealized: str = Form("true"),
     show_market_value: Optional[str] = Form(None),
     show_total: Optional[str] = Form(None),
     show_trade_count: str = Form("false"),
@@ -533,7 +532,6 @@ def save_settings(
     trade_badge_color: str = Form("#34d399"),
     trade_badge_text_color: str = Form("#111827"),
     note_icon_color: str = Form("#80cbc4"),
-    unrealized_fill_strategy: str = Form("carry_forward"),
     export_empty_values: str = Form("zero"),
 ):
     cfg: AppConfig = request.app.state.config
@@ -546,7 +544,6 @@ def save_settings(
     server_section["port"] = _coerce_port(listening_port, current_port)
     ui_section["theme"] = theme
     ui_section["show_text"] = coerce_bool(show_text, True)
-    ui_section["show_unrealized"] = coerce_bool(show_unrealized, True)
     resolved_market_value = show_market_value
     if resolved_market_value is None:
         resolved_market_value = show_total if show_total is not None else "true"
@@ -574,10 +571,6 @@ def save_settings(
             field["default"],
             target_section.get(option_key),
         )
-    fill_options = {"carry_forward", "average_neighbors"}
-    if unrealized_fill_strategy not in fill_options:
-        unrealized_fill_strategy = "carry_forward"
-    ui_section["unrealized_fill_strategy"] = unrealized_fill_strategy
     export_preference = export_empty_values.lower()
     cfg.raw.setdefault("export", {})
     cfg.raw["export"]["fill_empty_with_zero"] = export_preference != "empty"

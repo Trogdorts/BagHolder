@@ -21,7 +21,6 @@ DEFAULT_CONFIG = {
     "ui": {
         "theme": "dark",
         "show_text": True,
-        "show_unrealized": True,
         "show_market_value": True,
         "show_trade_count": False,
         "show_percentages": True,
@@ -41,7 +40,6 @@ DEFAULT_CONFIG = {
         "danger_hover_color": "#b91c1c",
         "trade_badge_color": "#34d399",
         "trade_badge_text_color": "#111827",
-        "unrealized_fill_strategy": "carry_forward",
     },
     "notes": {
         "enabled": True,

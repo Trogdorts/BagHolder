@@ -73,7 +73,7 @@ def test_save_trades_updates_existing_and_removes_missing(tmp_path, monkeypatch)
             assert result["ok"] is True
             assert isinstance(result.get("summary"), dict)
             assert result["summary"]["realized"] == pytest.approx(0.0)
-            assert result["summary"]["unrealized"] == pytest.approx(0.0)
+            assert result["summary"]["total_invested"] == pytest.approx(705.0)
             returned_symbols = [trade["symbol"] for trade in result["trades"]]
             assert returned_symbols == ["AAPL", "TSLA"]
             returned_qty = {trade["symbol"]: trade["qty"] for trade in result["trades"]}
@@ -100,7 +100,7 @@ def test_save_trades_updates_existing_and_removes_missing(tmp_path, monkeypatch)
             summary_row = session.get(DailySummary, "2024-05-01")
             assert summary_row is not None
             assert summary_row.realized == pytest.approx(0.0)
-            assert summary_row.unrealized == pytest.approx(0.0)
+            assert summary_row.total_invested == pytest.approx(705.0)
     finally:
         db.dispose_engine()
 
@@ -140,17 +140,17 @@ def test_save_trades_recomputes_following_day_summary(tmp_path, monkeypatch):
             result = save_trades_for_day("2024-01-02", payload=payload, db=session)
             assert result["ok"] is True
             assert result["summary"]["realized"] == pytest.approx(0.0)
-            assert result["summary"]["unrealized"] == pytest.approx(0.0)
+            assert result["summary"]["total_invested"] == pytest.approx(110.0)
 
         with db.SessionLocal() as session:
             day1 = session.get(DailySummary, "2024-01-02")
             day2 = session.get(DailySummary, "2024-01-03")
             assert day1 is not None
             assert day1.realized == pytest.approx(0.0)
-            assert day1.unrealized == pytest.approx(0.0)
+            assert day1.total_invested == pytest.approx(110.0)
             assert day2 is not None
             assert day2.realized == pytest.approx(10.0)
-            assert day2.unrealized == pytest.approx(0.0)
+            assert day2.total_invested == pytest.approx(120.0)
     finally:
         db.dispose_engine()
 
@@ -183,7 +183,7 @@ def test_clear_trades_for_day_removes_summary(tmp_path, monkeypatch):
             day2 = session.get(DailySummary, "2024-03-06")
             assert day2 is not None
             assert day2.realized == pytest.approx(0.0)
-            assert day2.unrealized == pytest.approx(0.0)
+            assert day2.total_invested == pytest.approx(240.0)
     finally:
         db.dispose_engine()
 
@@ -252,7 +252,6 @@ def test_import_trades_auto_resolves_missing_summaries(tmp_path, monkeypatch):
                 DailySummary(
                     date="2024-01-02",
                     realized=0.0,
-                    unrealized=0.0,
                     total_invested=0.0,
                     updated_at="",
                 )
@@ -290,7 +289,6 @@ def test_import_trades_auto_resolves_missing_summaries(tmp_path, monkeypatch):
             assert summary is not None
             assert summary.updated_at.strip() != ""
             assert summary.realized == pytest.approx(30.0)
-            assert summary.unrealized == pytest.approx(0.0)
             assert summary.total_invested == pytest.approx(230.0)
     finally:
         db.dispose_engine()

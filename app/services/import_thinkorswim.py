@@ -828,33 +828,11 @@ def _apply_trade_to_position(
     return realized
 
 
-def _current_invested_total(positions: Dict[str, Dict[str, float]]) -> float:
-    """Calculate unrealized P/L for the current open positions."""
-
-    total = 0.0
-    for position in positions.values():
-        shares = float(position.get("shares", 0.0) or 0.0)
-        if not shares:
-            continue
-
-        avg_cost = float(position.get("avg_cost", 0.0) or 0.0)
-        last_price = position.get("last_price")
-        last_price = float(last_price) if last_price is not None else avg_cost
-
-        if shares > 0:
-            total += (last_price - avg_cost) * shares
-        else:
-            total += (avg_cost - last_price) * (-shares)
-
-    return total
-
-
 def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
     empty_df = pd.DataFrame(
         columns=[
             "date",
             "realized_pl",
-            "unrealized_pl",
             "trade_value",
             "total_pl",
             "cumulative_pl",
@@ -907,14 +885,12 @@ def compute_daily_pnl_records(records: List[Dict[str, Any]]) -> pd.DataFrame:
             realized_total += _apply_trade_to_position(position, side, qty, price)
             trade_value_total += qty * price
 
-        invested_total = _current_invested_total(positions)
-        total_value = realized_total + invested_total
+        total_value = realized_total
 
         daily_records.append(
             {
                 "date": date_value,
                 "realized_pl": round(realized_total, 2),
-                "unrealized_pl": round(invested_total, 2),
                 "trade_value": round(trade_value_total, 2),
                 "total_pl": round(total_value, 2),
             }

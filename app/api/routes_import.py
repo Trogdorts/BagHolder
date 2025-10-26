@@ -33,13 +33,8 @@ def _is_missing_summary(summary: DailySummary) -> bool:
         return False
 
     realized = float(summary.realized or 0.0)
-    unrealized = float(summary.unrealized or 0.0)
     invested = float(summary.total_invested or 0.0)
-    return (
-        _is_close(realized, 0.0)
-        and _is_close(unrealized, 0.0)
-        and _is_close(invested, 0.0)
-    )
+    return _is_close(realized, 0.0) and _is_close(invested, 0.0)
 
 
 def _import_config(request: Request) -> Tuple[int, Set[str]]:
@@ -245,13 +240,13 @@ def _finalize_trade_import(request: Request, db: Session, inserted: int):
     resolved: Dict[str, Dict[str, float]] = {}
     for day, values in daily_map.items():
         realized = values["realized"]
-        unrealized = values["unrealized"]
+        invested = values.get("total_invested", 0.0)
         ds = db.get(DailySummary, day)
         if _is_missing_summary(ds):
             resolved[day] = values
             continue
 
-        if _is_close(ds.realized, realized) and _is_close(ds.unrealized, unrealized):
+        if _is_close(ds.realized, realized) and _is_close(ds.total_invested, invested):
             resolved[day] = values
         else:
             conflicts.append(
@@ -259,12 +254,12 @@ def _finalize_trade_import(request: Request, db: Session, inserted: int):
                     "date": day,
                     "existing": {
                         "realized": float(ds.realized),
-                        "unrealized": float(ds.unrealized),
+                        "invested": float(ds.total_invested),
                         "updated_at": ds.updated_at,
                     },
                     "new": {
                         "realized": realized,
-                        "unrealized": unrealized,
+                        "invested": invested,
                     },
                 }
             )
@@ -391,20 +386,18 @@ async def resolve_conflicts(
             continue
 
         realized = float(form.get(f"new_realized_{day}", 0.0))
-        unrealized = float(form.get(f"new_unrealized_{day}", 0.0))
+        invested = float(form.get(f"new_invested_{day}", 0.0))
         ds = db.get(DailySummary, day)
         if ds:
             ds.realized = realized
-            ds.unrealized = unrealized
-            ds.total_invested = unrealized
+            ds.total_invested = invested
             ds.updated_at = now
         else:
             db.add(
                 DailySummary(
                     date=day,
                     realized=realized,
-                    unrealized=unrealized,
-                    total_invested=unrealized,
+                    total_invested=invested,
                     updated_at=now,
                 )
             )

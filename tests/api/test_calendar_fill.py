@@ -79,63 +79,16 @@ def test_realized_hidden_for_buy_only_days(tmp_path, monkeypatch):
     db.dispose_engine()
 
 
-def test_average_fill_for_missing_unrealized(tmp_path, monkeypatch):
-    data_dir = tmp_path / "data"
-    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
-    app = create_app()
-    app.state.config.raw["ui"]["unrealized_fill_strategy"] = "average_neighbors"
-
-    with db.SessionLocal() as session:
-        session.add(
-            DailySummary(
-                date="2024-01-01",
-                realized=0.0,
-                unrealized=100.0,
-                total_invested=100.0,
-                updated_at="now",
-            )
-        )
-        session.add(
-            DailySummary(
-                date="2024-01-05",
-                realized=0.0,
-                unrealized=200.0,
-                total_invested=200.0,
-                updated_at="now",
-            )
-        )
-        session.commit()
-
-    with db.SessionLocal() as session:
-        request = _build_request(app)
-        response = calendar_view(2024, 1, request, db=session)
-        weeks = response.context["weeks"]
-        day = _get_day(weeks, date(2024, 1, 2))
-        assert day["unrealized"] == pytest.approx(150.0)
-
-    db.dispose_engine()
-
-
-def test_market_value_reflects_invested_and_unrealized(tmp_path, monkeypatch):
+def test_market_value_matches_invested_total(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
     app = create_app()
 
     with db.SessionLocal() as session:
-        session.add(
-            DailySummary(
-                date="2024-02-29",
-                realized=25.0,
-                unrealized=0.0,
-                total_invested=0.0,
-                updated_at="now",
-            )
-        )
         session.add(
             DailySummary(
                 date="2024-03-01",
                 realized=10.0,
-                unrealized=35.0,
                 total_invested=100.0,
                 updated_at="now",
             )
@@ -144,17 +97,7 @@ def test_market_value_reflects_invested_and_unrealized(tmp_path, monkeypatch):
             DailySummary(
                 date="2024-03-02",
                 realized=90.0,
-                unrealized=50.0,
                 total_invested=125.0,
-                updated_at="now",
-            )
-        )
-        session.add(
-            DailySummary(
-                date="2024-03-04",
-                realized=-20.0,
-                unrealized=-10.0,
-                total_invested=220.0,
                 updated_at="now",
             )
         )
@@ -166,13 +109,10 @@ def test_market_value_reflects_invested_and_unrealized(tmp_path, monkeypatch):
         weeks = response.context["weeks"]
 
         march_first = _get_day(weeks, date(2024, 3, 1))
-        assert march_first["market_value"] == pytest.approx(135.0)
+        assert march_first["market_value"] == pytest.approx(march_first["invested"])
 
         march_second = _get_day(weeks, date(2024, 3, 2))
-        assert march_second["market_value"] == pytest.approx(175.0)
-
-        march_fourth = _get_day(weeks, date(2024, 3, 4))
-        assert march_fourth["market_value"] == pytest.approx(210.0)
+        assert march_second["market_value"] == pytest.approx(march_second["invested"])
 
     db.dispose_engine()
 
@@ -211,107 +151,6 @@ def test_weekly_notes_follow_iso_week(tmp_path, monkeypatch):
         assert feb_first_week["week_number"] == 5
         assert feb_first_week["note"] == ""
         assert feb_first_week["has_note"] is False
-
-    db.dispose_engine()
-
-
-def test_average_fill_falls_back_without_future_value(tmp_path, monkeypatch):
-    data_dir = tmp_path / "data"
-    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
-    app = create_app()
-    app.state.config.raw["ui"]["unrealized_fill_strategy"] = "average_neighbors"
-
-    with db.SessionLocal() as session:
-        session.add(
-            DailySummary(
-                date="2024-02-01",
-                realized=0.0,
-                unrealized=75.0,
-                total_invested=75.0,
-                updated_at="now",
-            )
-        )
-        session.commit()
-
-    with db.SessionLocal() as session:
-        request = _build_request(app)
-        response = calendar_view(2024, 2, request, db=session)
-        weeks = response.context["weeks"]
-        day = _get_day(weeks, date(2024, 2, 2))
-        assert day["unrealized"] == pytest.approx(75.0)
-
-    db.dispose_engine()
-
-
-def test_average_fill_uses_next_month_value(tmp_path, monkeypatch):
-    data_dir = tmp_path / "data"
-    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
-    app = create_app()
-    app.state.config.raw["ui"]["unrealized_fill_strategy"] = "average_neighbors"
-
-    with db.SessionLocal() as session:
-        session.add(
-            DailySummary(
-                date="2024-01-10",
-                realized=0.0,
-                unrealized=40.0,
-                total_invested=40.0,
-                updated_at="now",
-            )
-        )
-        session.add(
-            DailySummary(
-                date="2024-02-05",
-                realized=0.0,
-                unrealized=80.0,
-                total_invested=80.0,
-                updated_at="now",
-            )
-        )
-        session.commit()
-
-    with db.SessionLocal() as session:
-        request = _build_request(app)
-        response = calendar_view(2024, 1, request, db=session)
-        weeks = response.context["weeks"]
-        day = _get_day(weeks, date(2024, 1, 15))
-        assert day["unrealized"] == pytest.approx(60.0)
-
-    db.dispose_engine()
-
-
-def test_unrealized_not_extended_past_today(tmp_path, monkeypatch):
-    data_dir = tmp_path / "data"
-    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
-    app = create_app()
-
-    with db.SessionLocal() as session:
-        session.add(
-            DailySummary(
-                date="2024-01-01",
-                realized=0.0,
-                unrealized=100.0,
-                total_invested=100.0,
-                updated_at="now",
-            )
-        )
-        session.commit()
-
-    class FrozenDate(date):
-        @classmethod
-        def today(cls):
-            return cls(2024, 1, 3)
-
-    monkeypatch.setattr("app.api.routes_calendar.date", FrozenDate)
-
-    with db.SessionLocal() as session:
-        request = _build_request(app)
-        response = calendar_view(2024, 1, request, db=session)
-        weeks = response.context["weeks"]
-        jan_second = _get_day(weeks, date(2024, 1, 2))
-        assert jan_second["unrealized"] == pytest.approx(100.0)
-        jan_fourth = _get_day(weeks, date(2024, 1, 4))
-        assert jan_fourth["unrealized"] == 0.0
 
     db.dispose_engine()
 
