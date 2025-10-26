@@ -566,7 +566,7 @@
                   data-day-toggle="{{ day_identifier }}"
                   {% if not d.in_month %}disabled{% endif %}
                   aria-pressed="true">
-            Include
+            Include Day
           </button>
           {% if notes_enabled %}
           <!-- Note icon -->
@@ -643,7 +643,7 @@
               class="week-include-toggle"
               data-week-toggle="{{ week_key }}"
               aria-pressed="true">
-        Include week
+        Include Week
       </button>
       {% endif %}
       {% if notes_enabled %}
@@ -1163,7 +1163,7 @@ const dayImpactSimulator = (() => {
     toggle.classList.toggle('toggle-excluded', !included);
     toggle.setAttribute('aria-pressed', included ? 'true' : 'false');
     toggle.dataset.state = included ? 'included' : 'excluded';
-    toggle.textContent = included ? 'Include' : 'Excluded';
+    toggle.textContent = included ? 'Include Day' : 'Exclude Day';
   };
 
   const setWeekToggleState = (toggle, included) => {
@@ -1172,7 +1172,7 @@ const dayImpactSimulator = (() => {
     }
     toggle.classList.toggle('toggle-excluded', !included);
     toggle.setAttribute('aria-pressed', included ? 'true' : 'false');
-    toggle.textContent = included ? 'Include week' : 'Excluded week';
+    toggle.textContent = included ? 'Include Week' : 'Exclude Week';
   };
 
   cells.forEach((cell) => {
