@@ -434,6 +434,11 @@
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-neutral-50">Import trade history</h2>
           <p class="mt-1 text-sm text-neutral-400">Upload CSV trade summaries or ThinkOrSwim statements.</p>
+          <p class="mt-3 text-xs text-neutral-400">
+            Imports are applied to <span class="font-semibold text-neutral-100">{{ active_account.name }}</span>
+            (<span class="text-neutral-300">{{ active_account.storage }}</span>)
+            portfolio.
+          </p>
         </header>
         <div class="space-y-5">
           <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/50 p-4 shadow-inner shadow-black/30">
