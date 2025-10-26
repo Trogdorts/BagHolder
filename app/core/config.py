@@ -22,7 +22,7 @@ DEFAULT_CONFIG = {
         "theme": "dark",
         "show_text": True,
         "show_unrealized": True,
-        "show_total": True,
+        "show_market_value": True,
         "show_trade_count": False,
         "show_percentages": True,
         "show_weekends": False,
