@@ -3,5 +3,8 @@ uvicorn[standard]
 jinja2
 sqlalchemy>=2.0
 pandas
+numpy
+yfinance
+requests
 python-multipart
 pyyaml

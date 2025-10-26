@@ -19,6 +19,8 @@
      data-calendar-root="true"
      data-calendar-year="{{ year }}"
      data-calendar-month="{{ '%02d'|format(month) }}"
+     data-simulator-defaults='{{ simulation_defaults|tojson }}'
+     data-simulator-account-path="{{ simulation_account_path|e }}"
      class="space-y-4{% if not show_exclude_controls %} hide-exclude-controls{% endif %}{% if not show_percentages_default %} hide-percentages{% endif %}"
      :class="{ 'hide-exclude-controls': !showExcludeControls, 'hide-percentages': !showPercentages }">
 <style>
@@ -368,6 +370,13 @@
           <a href="/calendar/{{ next_year }}/{{ next_month }}" class="toolbar-nav-link">Next</a>
         </nav>
         <div class="toolbar-controls">
+          <button
+            type="button"
+            id="open-simulator"
+            class="btn btn-outline-primary px-3 py-2 text-xs font-semibold uppercase tracking-wide"
+          >
+            Simulate trades
+          </button>
           {% set market_value_tooltip_id = 'toolbar-tooltip-market-value' %}
           <button type="button"
                   class="toolbar-toggle"
@@ -1017,6 +1026,341 @@ function calendarToolbar(initialState = {}) {
       }
     },
   };
+}
+
+function sanitizeSimulatorDefaults(raw) {
+  const base = {
+    years_back: 2,
+    start_balance: 10000,
+    risk_level: 0.5,
+    profit_target: 0.05,
+    stop_loss: 0.03,
+    symbol_cache: 'simulator/us_symbols.csv',
+    price_cache_dir: 'simulator/price_cache',
+    output_dir: 'simulator/output',
+    output_name: 'trades.csv',
+    seed: 42,
+    generate_only: false,
+  };
+  if (!raw || typeof raw !== 'object') {
+    return base;
+  }
+  const result = { ...base };
+  const toNumber = (value) => {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : undefined;
+  };
+  const assignNumber = (key, clamp) => {
+    const candidate = toNumber(raw[key]);
+    if (candidate === undefined) {
+      return;
+    }
+    result[key] = clamp ? clamp(candidate) : candidate;
+  };
+  assignNumber('years_back', (value) => Math.max(1, Math.round(value)));
+  assignNumber('start_balance', (value) => Math.max(1, value));
+  assignNumber('risk_level', (value) => Math.min(1, Math.max(0.01, value)));
+  assignNumber('profit_target', (value) => Math.max(0.0001, value));
+  assignNumber('stop_loss', (value) => Math.max(0.0001, value));
+  assignNumber('seed', (value) => Math.round(value));
+
+  const assignText = (key) => {
+    if (typeof raw[key] === 'string' && raw[key].trim() !== '') {
+      result[key] = raw[key].trim();
+    }
+  };
+  assignText('symbol_cache');
+  assignText('price_cache_dir');
+  assignText('output_dir');
+  assignText('output_name');
+
+  if (typeof raw.generate_only === 'boolean') {
+    result.generate_only = raw.generate_only;
+  }
+  return result;
+}
+
+const simulatorState = (() => {
+  const root = document.querySelector('[data-calendar-root]');
+  if (!root) {
+    return {
+      root: null,
+      defaults: sanitizeSimulatorDefaults({}),
+      accountPath: '',
+    };
+  }
+  let parsedDefaults = {};
+  const rawDefaults = root.dataset.simulatorDefaults;
+  if (rawDefaults) {
+    try {
+      parsedDefaults = JSON.parse(rawDefaults) || {};
+    } catch (error) {
+      console.warn('Unable to parse simulator defaults', error);
+    }
+  }
+  return {
+    root,
+    defaults: sanitizeSimulatorDefaults(parsedDefaults),
+    accountPath: root.dataset.simulatorAccountPath || '',
+  };
+})();
+
+function createSimulatorFormHTML(defaults, accountPath) {
+  const warning =
+    'Generating simulated trades will delete all existing trades, summaries, and notes in this portfolio and replace them with simulated data.';
+  const cacheNotice = accountPath
+    ? `Files are stored relative to <code>${escapeHtml(accountPath)}</code>.`
+    : 'Files are stored inside the active portfolio directory.';
+  return `
+    <form id="simulator-form" class="space-y-4">
+      <div class="rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200" data-simulator-warning>
+        ${escapeHtml(warning)}
+      </div>
+      <p class="hidden text-sm text-danger" data-simulator-error></p>
+      <div class="grid gap-3 md:grid-cols-2">
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Years of price history</span>
+          <input type="number" min="1" step="1" name="years_back" value="${defaults.years_back}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" data-autofocus>
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Starting balance</span>
+          <input type="number" min="1" step="100" name="start_balance" value="${defaults.start_balance}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Risk level (0-1)</span>
+          <input type="number" min="0" max="1" step="0.05" name="risk_level" value="${defaults.risk_level}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Profit target</span>
+          <input type="number" min="0.001" step="0.01" name="profit_target" value="${defaults.profit_target}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Stop loss</span>
+          <input type="number" min="0.001" step="0.01" name="stop_loss" value="${defaults.stop_loss}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Random seed</span>
+          <input type="number" step="1" name="seed" value="${defaults.seed}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+        </label>
+      </div>
+      <div class="grid gap-3 md:grid-cols-2">
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Symbol cache file</span>
+          <input type="text" name="symbol_cache" value="${escapeHtml(defaults.symbol_cache)}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" autocomplete="off">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Price cache directory</span>
+          <input type="text" name="price_cache_dir" value="${escapeHtml(defaults.price_cache_dir)}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" autocomplete="off">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Output directory</span>
+          <input type="text" name="output_dir" value="${escapeHtml(defaults.output_dir)}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" autocomplete="off">
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-neutral-200">
+          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Output filename</span>
+          <input type="text" name="output_name" value="${escapeHtml(defaults.output_name)}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" autocomplete="off">
+        </label>
+      </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" id="simulator-generate-only" name="generate_only" class="h-4 w-4 rounded border-neutral-700 bg-neutral-900" ${defaults.generate_only ? 'checked' : ''}>
+        <label for="simulator-generate-only" class="text-sm text-neutral-200">Download price data only (do not import trades)</label>
+      </div>
+      <p class="text-xs text-neutral-500" data-simulator-import-note>${cacheNotice}</p>
+    </form>
+  `;
+}
+
+function updateSimulatorWarning(generateOnly, element) {
+  if (!element) {
+    return;
+  }
+  if (generateOnly) {
+    element.textContent =
+      'Symbol lists and historical prices will be refreshed. Existing trades in this portfolio will remain unchanged.';
+    element.classList.remove('text-amber-200');
+    element.classList.add('text-neutral-200');
+  } else {
+    element.textContent =
+      'Generating simulated trades will delete all existing trades, summaries, and notes in this portfolio and replace them with simulated data.';
+    element.classList.remove('text-neutral-200');
+    element.classList.add('text-amber-200');
+  }
+}
+
+function setupSimulatorForm(modal, defaults, accountPath) {
+  const form = document.getElementById('simulator-form');
+  if (!form) {
+    return;
+  }
+  form.dataset.accountPath = accountPath || '';
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    submitSimulatorForm(modal);
+  });
+  const warning = form.querySelector('[data-simulator-warning]');
+  const generateOnlyInput = form.querySelector('#simulator-generate-only');
+  if (generateOnlyInput) {
+    updateSimulatorWarning(generateOnlyInput.checked, warning);
+    generateOnlyInput.addEventListener('change', () => {
+      updateSimulatorWarning(generateOnlyInput.checked, warning);
+    });
+  }
+}
+
+function readSimulatorFormValues(form, defaults) {
+  const fallback = defaults || sanitizeSimulatorDefaults({});
+  const getNumber = (name, clamp) => {
+    const field = form.elements[name];
+    if (!field) {
+      return clamp ? clamp(fallback[name]) : fallback[name];
+    }
+    const parsed = Number(field.value);
+    const candidate = Number.isFinite(parsed) ? parsed : fallback[name];
+    return clamp ? clamp(candidate) : candidate;
+  };
+  const clampRisk = (value) => Math.min(1, Math.max(0.01, value));
+  const clampPositive = (value) => Math.max(0.0001, value);
+  const clampYears = (value) => Math.max(1, Math.round(value));
+  const clampBalance = (value) => Math.max(1, value);
+  const clampSeed = (value) => Math.round(value);
+  const values = {
+    years_back: getNumber('years_back', clampYears),
+    start_balance: getNumber('start_balance', clampBalance),
+    risk_level: getNumber('risk_level', clampRisk),
+    profit_target: getNumber('profit_target', clampPositive),
+    stop_loss: getNumber('stop_loss', clampPositive),
+    seed: getNumber('seed', clampSeed),
+    symbol_cache:
+      (form.elements.symbol_cache && form.elements.symbol_cache.value.trim()) || fallback.symbol_cache,
+    price_cache_dir:
+      (form.elements.price_cache_dir && form.elements.price_cache_dir.value.trim()) || fallback.price_cache_dir,
+    output_dir:
+      (form.elements.output_dir && form.elements.output_dir.value.trim()) || fallback.output_dir,
+    output_name:
+      (form.elements.output_name && form.elements.output_name.value.trim()) || fallback.output_name,
+    generate_only: !!(form.elements.generate_only && form.elements.generate_only.checked),
+  };
+  if (!values.output_name) {
+    values.output_name = 'trades.csv';
+  }
+  return values;
+}
+
+async function submitSimulatorForm(modal) {
+  const form = document.getElementById('simulator-form');
+  if (!form || !modal) {
+    return;
+  }
+  const errorEl = form.querySelector('[data-simulator-error]');
+  if (errorEl) {
+    errorEl.textContent = '';
+    errorEl.classList.add('hidden');
+  }
+  const payload = readSimulatorFormValues(form, simulatorState.defaults);
+  if (!payload.generate_only) {
+    const confirmed = window.confirm(
+      'This will delete all existing trades, summaries, and notes for the active portfolio. Continue?'
+    );
+    if (!confirmed) {
+      return;
+    }
+  }
+  modal.saving = true;
+  let data = null;
+  try {
+    const response = await fetch('/api/simulated-trades', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    try {
+      data = await response.json();
+    } catch (error) {
+      data = null;
+    }
+    if (!response.ok) {
+      const message = data && data.detail ? data.detail : 'Failed to generate simulated trades.';
+      throw new Error(message);
+    }
+  } catch (error) {
+    console.error('Failed to generate simulated trades', error);
+    modal.saving = false;
+    if (errorEl) {
+      const message = error instanceof Error && error.message ? error.message : 'Failed to generate simulated trades.';
+      errorEl.textContent = message;
+      errorEl.classList.remove('hidden');
+    } else {
+      window.alert('Failed to generate simulated trades.');
+    }
+    return;
+  }
+
+  modal.saving = false;
+  simulatorState.defaults = sanitizeSimulatorDefaults({ ...simulatorState.defaults, ...payload });
+
+  if (data && data.generate_only) {
+    modal.body = `
+      <div class="space-y-3">
+        <div class="rounded-lg border border-blue-500/50 bg-blue-500/10 px-4 py-3 text-sm text-neutral-200">
+          Symbol and price caches were updated successfully. Existing trades were not modified.
+        </div>
+        <p class="text-sm text-neutral-300">You can now generate trades using the refreshed market data.</p>
+      </div>
+    `;
+    modal.save = null;
+    modal.closeLabel = 'Close';
+    modal.saveLabel = 'Close';
+    modal.shouldReloadOnClose = false;
+    return;
+  }
+
+  const tradesImported = (data && data.trades_imported) || (data && data.metadata && data.metadata.trades_imported) || 0;
+  const daysAffected = (data && data.days_with_trades) || (data && data.metadata && data.metadata.days_with_trades) || 0;
+  const summaryParts = [];
+  if (tradesImported) {
+    summaryParts.push(`${tradesImported} trade${tradesImported === 1 ? '' : 's'} imported`);
+  }
+  if (daysAffected) {
+    summaryParts.push(`${daysAffected} trading day${daysAffected === 1 ? '' : 's'} updated`);
+  }
+  const summary = summaryParts.length ? summaryParts.join(' across ') : 'Simulated trades imported successfully.';
+
+  modal.body = `
+    <div class="space-y-3">
+      <div class="rounded-lg border border-green-500/50 bg-green-500/10 px-4 py-3 text-sm text-success">
+        Simulated trades were generated and imported successfully.
+      </div>
+      <p class="text-sm text-neutral-200">${escapeHtml(summary)}</p>
+      <p class="text-xs text-neutral-500">Close this dialog to reload the calendar with the new portfolio data.</p>
+    </div>
+  `;
+  modal.save = null;
+  modal.closeLabel = 'Close';
+  modal.saveLabel = 'Close';
+  modal.shouldReloadOnClose = !!(data && data.reload);
+}
+
+function openSimulatorModal(defaults = simulatorState.defaults, accountPath = simulatorState.accountPath) {
+  const modal = getModalController();
+  if (!modal) {
+    return;
+  }
+  modal.title = 'Generate simulated trades';
+  modal.body = createSimulatorFormHTML(defaults, accountPath);
+  modal.closeLabel = 'Cancel';
+  modal.saveLabel = 'Generate';
+  modal.saving = false;
+  modal.shouldReloadOnClose = false;
+  modal.save = () => submitSimulatorForm(modal);
+  modal.open = true;
+  window.setTimeout(() => setupSimulatorForm(modal, defaults, accountPath), 0);
+}
+
+const simulatorButton = document.getElementById('open-simulator');
+if (simulatorButton) {
+  simulatorButton.addEventListener('click', () => openSimulatorModal());
 }
 
 const dayImpactSimulator = (() => {

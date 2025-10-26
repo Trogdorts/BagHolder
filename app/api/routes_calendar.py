@@ -1,6 +1,8 @@
 import csv
 import io
+import logging
 import math
+import os
 from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
@@ -13,8 +15,10 @@ from fastapi.responses import (
 from sqlalchemy import tuple_
 from sqlalchemy.orm import Session
 import calendar
+from app.core import database
 from app.core.config import AppConfig
 from app.core.database import get_session
+from app.core.lifecycle import reload_application_state
 from app.core.models import (
     DailySummary,
     Meta,
@@ -25,9 +29,17 @@ from app.core.models import (
 )
 from app.core.utils import coerce_bool, month_bounds
 from app.services.trade_summaries import recompute_daily_summaries
+from app.services.data_reset import clear_all_data
+from app.services.trade_simulator import (
+    SimulationError,
+    SimulationOptions,
+    run_trade_simulation,
+)
 from pydantic import BaseModel, Field, field_validator
 
 router = APIRouter()
+
+log = logging.getLogger(__name__)
 class UIPreferencesUpdate(BaseModel):
     show_market_value: Optional[bool] = None
     show_total: Optional[bool] = None  # Legacy support
@@ -74,6 +86,67 @@ class TradeUpdate(BaseModel):
 
 class TradeUpdatePayload(BaseModel):
     trades: List[TradeUpdate] = Field(default_factory=list)
+
+
+class SimulationRequest(BaseModel):
+    years_back: int = Field(2, ge=1, le=20)
+    start_balance: float = Field(10_000.0, gt=0)
+    risk_level: float = Field(0.5, gt=0, le=1)
+    profit_target: float = Field(0.05, gt=0)
+    stop_loss: float = Field(0.03, gt=0)
+    symbol_cache: str = Field("simulator/us_symbols.csv", min_length=1)
+    price_cache_dir: str = Field("simulator/price_cache", min_length=1)
+    output_dir: str = Field("simulator/output", min_length=1)
+    output_name: str = Field("trades.csv", min_length=1)
+    seed: int = Field(42)
+    generate_only: bool = False
+
+    @field_validator("symbol_cache", "price_cache_dir", "output_dir", "output_name")
+    @classmethod
+    def normalize_path(cls, value: str) -> str:
+        return value.strip()
+
+    def resolve(self, base_dir: str) -> SimulationOptions:
+        def _resolve(path: str, is_file: bool = False) -> str:
+            candidate = path or ""
+            if not candidate:
+                return ""
+            joined = (
+                candidate
+                if os.path.isabs(candidate)
+                else os.path.join(base_dir, candidate)
+            )
+            normalized = os.path.abspath(joined)
+            base = os.path.abspath(base_dir)
+            if not normalized.startswith(base):
+                raise ValueError(
+                    "Paths must stay within the active portfolio directory."
+                )
+            if is_file:
+                directory = os.path.dirname(normalized)
+                os.makedirs(directory, exist_ok=True)
+            else:
+                os.makedirs(normalized, exist_ok=True)
+            return normalized
+
+        symbol_cache = _resolve(self.symbol_cache, is_file=True)
+        price_cache_dir = _resolve(self.price_cache_dir)
+        output_dir = _resolve(self.output_dir)
+        output_name = os.path.basename(self.output_name) or "trades.csv"
+
+        return SimulationOptions(
+            years_back=self.years_back,
+            start_balance=self.start_balance,
+            risk_level=self.risk_level,
+            profit_target=self.profit_target,
+            stop_loss=self.stop_loss,
+            symbol_cache=symbol_cache,
+            price_cache_dir=price_cache_dir,
+            output_dir=output_dir,
+            output_name=output_name,
+            seed=self.seed,
+            generate_only=self.generate_only,
+        )
 
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_session)):
@@ -336,6 +409,21 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     year_other_invested_max = invested_max(year_other_rows)
     rolling_other_invested_max = invested_max(rolling_other_rows)
 
+    account_dir = getattr(request.app.state, "account_data_dir", "")
+    simulation_defaults = {
+        "years_back": 2,
+        "start_balance": 10_000.0,
+        "risk_level": 0.5,
+        "profit_target": 0.05,
+        "stop_loss": 0.03,
+        "symbol_cache": "simulator/us_symbols.csv",
+        "price_cache_dir": "simulator/price_cache",
+        "output_dir": "simulator/output",
+        "output_name": "trades.csv",
+        "seed": 42,
+        "generate_only": False,
+    }
+
     ctx = {
         "request": request,
         "year": year, "month": month,
@@ -361,6 +449,8 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "notes_enabled_flag": notes_enabled,
         "current_year": today.year,
         "current_month": today.month,
+        "simulation_defaults": simulation_defaults,
+        "simulation_account_path": account_dir,
     }
     return request.app.state.templates.TemplateResponse(
         request,
@@ -515,6 +605,137 @@ def save_trades_for_day(
         "ok": True,
         "trades": response_trades,
         "summary": daily_map.get(date_str),
+    }
+
+
+@router.post("/api/simulated-trades")
+def generate_simulated_trades(request: Request, payload: SimulationRequest):
+    account_dir = getattr(request.app.state, "account_data_dir", None)
+    if not account_dir:
+        raise HTTPException(
+            status_code=500,
+            detail="The active portfolio directory could not be determined.",
+        )
+
+    try:
+        options = payload.resolve(account_dir)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        result = run_trade_simulation(options)
+    except SimulationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive logging
+        log.exception("Unexpected error while generating simulated trades")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to generate simulated trades.",
+        ) from exc
+
+    metadata = dict(result.metadata)
+
+    if options.generate_only:
+        return {
+            "ok": True,
+            "generate_only": True,
+            "metadata": metadata,
+            "message": "Symbol and price caches have been updated.",
+            "reload": False,
+        }
+
+    if result.trades.empty:
+        raise HTTPException(
+            status_code=400,
+            detail="The simulator did not return any trades to import.",
+        )
+
+    records = result.trades.to_dict("records")
+    prepared: List[Dict[str, object]] = []
+    for row in records:
+        raw_date = str(row.get("date", "")).strip()
+        try:
+            iso_date = datetime.strptime(raw_date, "%m/%d/%Y").strftime("%Y-%m-%d")
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Simulator returned an invalid date: {raw_date}",
+            ) from exc
+
+        symbol = str(row.get("symbol", "")).strip().upper()
+        action = str(row.get("action", "")).strip().upper()
+        qty = float(row.get("qty", 0.0))
+        price = float(row.get("price", 0.0))
+        amount = float(row.get("amount", 0.0))
+
+        if not symbol or action not in {"BUY", "SELL"} or qty <= 0 or price <= 0:
+            raise HTTPException(
+                status_code=500,
+                detail="Simulator produced an invalid trade record.",
+            )
+
+        prepared.append(
+            {
+                "date": iso_date,
+                "symbol": symbol,
+                "action": action,
+                "qty": qty,
+                "price": price,
+                "amount": amount,
+            }
+        )
+
+    try:
+        clear_all_data(account_dir)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        log.exception("Unable to reset portfolio prior to import")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to reset the existing portfolio before import.",
+        ) from exc
+
+    if database.SessionLocal is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Database session factory is unavailable after reset.",
+        )
+
+    with database.SessionLocal() as session:
+        for trade in prepared:
+            session.add(
+                Trade(
+                    date=trade["date"],
+                    symbol=trade["symbol"],
+                    action=trade["action"],
+                    qty=trade["qty"],
+                    price=trade["price"],
+                    amount=trade["amount"],
+                )
+            )
+        session.flush()
+        daily_map = recompute_daily_summaries(session)
+        session.commit()
+
+    cfg: AppConfig = request.app.state.config
+    data_dir = os.path.dirname(cfg.path) if cfg.path else None
+    reload_application_state(request.app, data_dir=data_dir)
+
+    unique_days = {trade["date"] for trade in prepared}
+    metadata.update(
+        {
+            "status": "trades_imported",
+            "trades_imported": len(prepared),
+            "days_with_trades": len(unique_days),
+        }
+    )
+
+    return {
+        "ok": True,
+        "generate_only": False,
+        "metadata": metadata,
+        "trades_imported": len(prepared),
+        "days_with_trades": len(unique_days),
+        "reload": True,
     }
 
 
