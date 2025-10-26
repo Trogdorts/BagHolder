@@ -265,6 +265,89 @@
     color: #f4f4f5;
   }
 
+  .calendar-summary-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    font-family: var(--font-sans, 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif);
+  }
+
+  .calendar-summary-card .calendar-card-heading {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #a1a1aa;
+  }
+
+  .calendar-summary-card .calendar-summary-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .calendar-summary-card .calendar-summary-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .calendar-summary-card .calendar-summary-primary,
+  .calendar-summary-card .calendar-summary-secondary {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+  }
+
+  .calendar-summary-card .calendar-summary-primary {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+    color: #f4f4f5;
+  }
+
+  .calendar-summary-card .calendar-summary-secondary {
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    color: #a1a1aa;
+  }
+
+  .calendar-summary-card .calendar-summary-label {
+    color: #a1a1aa;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .calendar-summary-card .calendar-summary-primary .calendar-summary-label {
+    color: #d4d4d8;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .calendar-summary-card .calendar-summary-secondary .calendar-summary-label {
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.8125rem;
+    font-weight: 500;
+  }
+
+  .calendar-summary-card .calendar-summary-value {
+    color: inherit;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  .calendar-summary-card .calendar-summary-secondary .calendar-summary-value {
+    color: #d4d4d8;
+    font-weight: 500;
+  }
+
   .calendar-day-number {
     font-size: 1.125rem;
     line-height: 1.25rem;
@@ -679,12 +762,15 @@
 
 <div class="mt-6 max-w-3xl">
   <div class="grid gap-4 sm:grid-cols-2">
-    <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative"
+    <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative calendar-summary-card"
          data-month-summary
          data-base-realized="{{ '%.10g'|format(month_realized) }}">
       <h2 class="calendar-card-heading">Monthly summary</h2>
-      <div class="calendar-metric-group space-y-1">
-        <div class="calendar-primary-metric">Realized: <span data-month-realized-value class="{{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span></div>
+      <div class="calendar-summary-group">
+        <div class="calendar-summary-primary">
+          <span class="calendar-summary-label">Realized</span>
+          <span data-month-realized-value class="calendar-summary-value {{ 'text-profit' if month_realized > 0 else ('text-loss' if month_realized < 0 else 'text-neutral-200') }}">{{ month_realized|money }}</span>
+        </div>
         {% set month_percent_class = 'text-neutral-200' %}
         {% if month_percent is not none %}
           {% if month_percent > 0 %}
@@ -693,13 +779,16 @@
             {% set month_percent_class = 'text-loss' %}
           {% endif %}
         {% endif %}
-        <div data-month-percent class="calendar-secondary-metric{% if not (show_percentages_default and month_percent is not none) %} hidden{% endif %}">
-          {% if show_percentages_default and month_percent is not none %}Realized: <span data-month-percent-value class="{{ month_percent_class }}">{{ '{:+.2f}%'.format(month_percent) }}</span>{% endif %}
+        <div data-month-percent class="calendar-summary-secondary{% if not (show_percentages_default and month_percent is not none) %} hidden{% endif %}">
+          {% if show_percentages_default and month_percent is not none %}
+          <span class="calendar-summary-label">Realized</span>
+          <span data-month-percent-value class="calendar-summary-value {{ month_percent_class }}">{{ '{:+.2f}%'.format(month_percent) }}</span>
+          {% endif %}
         </div>
       </div>
-      <div class="calendar-secondary-metric hidden mt-2" data-month-average>
-        <span class="text-neutral-300">Avg realized per day (<span data-month-average-count>0</span> days):</span>
-        <span data-month-average-value class="text-neutral-200"></span>
+      <div class="calendar-summary-secondary hidden" data-month-average>
+        <span class="calendar-summary-label">Avg realized per day (<span data-month-average-count>0</span> days)</span>
+        <span data-month-average-value class="calendar-summary-value text-neutral-200"></span>
       </div>
         {% set month_note_text = month_note.note | default('', true) %}
         {% set month_note_has = month_note_text.strip() %}
@@ -727,16 +816,19 @@
         </a>
         {% endif %}
     </div>
-    <div class="rounded border border-neutral-800 p-3 bg-neutral-950">
+    <div class="rounded border border-neutral-800 p-3 bg-neutral-950 calendar-summary-card">
       <h2 class="calendar-card-heading">Yearly summary</h2>
-      <div class="mt-2 space-y-4">
-        <div class="calendar-metric-group space-y-1"
+      <div class="calendar-summary-group">
+        <div class="calendar-summary-section"
              data-rolling-summary
              data-base-realized="{{ '%.10g'|format(rolling_year_realized) }}"
              data-base-trading-days="{{ rolling_year_trading_days }}"
              data-other-invested-max="{{ '%.10g'|format(rolling_year_other_invested_max) }}">
           <p class="calendar-section-label">Last 12 months</p>
-          <div class="calendar-primary-metric">Realized: <span data-rolling-realized-value class="{{ 'text-profit' if rolling_year_realized > 0 else ('text-loss' if rolling_year_realized < 0 else 'text-neutral-200') }}">{{ rolling_year_realized|money }}</span></div>
+          <div class="calendar-summary-primary">
+            <span class="calendar-summary-label">Realized</span>
+            <span data-rolling-realized-value class="calendar-summary-value {{ 'text-profit' if rolling_year_realized > 0 else ('text-loss' if rolling_year_realized < 0 else 'text-neutral-200') }}">{{ rolling_year_realized|money }}</span>
+          </div>
           {% set rolling_percent_class = 'text-neutral-200' %}
           {% if rolling_year_percent is not none %}
             {% if rolling_year_percent > 0 %}
@@ -745,22 +837,28 @@
               {% set rolling_percent_class = 'text-loss' %}
             {% endif %}
           {% endif %}
-          <div data-rolling-percent class="calendar-secondary-metric{% if not (show_percentages_default and rolling_year_percent is not none) %} hidden{% endif %}">
-            {% if show_percentages_default and rolling_year_percent is not none %}Realized: <span data-rolling-percent-value class="{{ rolling_percent_class }}">{{ '{:+.2f}%'.format(rolling_year_percent) }}</span>{% endif %}
+          <div data-rolling-percent class="calendar-summary-secondary{% if not (show_percentages_default and rolling_year_percent is not none) %} hidden{% endif %}">
+            {% if show_percentages_default and rolling_year_percent is not none %}
+            <span class="calendar-summary-label">Realized</span>
+            <span data-rolling-percent-value class="calendar-summary-value {{ rolling_percent_class }}">{{ '{:+.2f}%'.format(rolling_year_percent) }}</span>
+            {% endif %}
           </div>
-          <div class="calendar-secondary-metric hidden" data-rolling-average>
-            <span class="text-neutral-300">Avg realized per day (<span data-rolling-average-count>0</span> days):</span>
-            <span data-rolling-average-value class="text-neutral-200"></span>
+          <div class="calendar-summary-secondary hidden" data-rolling-average>
+            <span class="calendar-summary-label">Avg realized per day (<span data-rolling-average-count>0</span> days)</span>
+            <span data-rolling-average-value class="calendar-summary-value text-neutral-200"></span>
           </div>
 
         </div>
-        <div class="calendar-metric-group space-y-1"
+        <div class="calendar-summary-section"
              data-year-summary
              data-base-realized="{{ '%.10g'|format(year_realized) }}"
              data-base-trading-days="{{ year_trading_days }}"
              data-other-invested-max="{{ '%.10g'|format(year_other_invested_max) }}">
           <p class="calendar-section-label">Since Jan 1</p>
-          <div class="calendar-primary-metric">Realized: <span data-year-realized-value class="{{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span></div>
+          <div class="calendar-summary-primary">
+            <span class="calendar-summary-label">Realized</span>
+            <span data-year-realized-value class="calendar-summary-value {{ 'text-profit' if year_realized > 0 else ('text-loss' if year_realized < 0 else 'text-neutral-200') }}">{{ year_realized|money }}</span>
+          </div>
           {% set year_percent_class = 'text-neutral-200' %}
           {% if year_percent is not none %}
             {% if year_percent > 0 %}
@@ -769,14 +867,17 @@
               {% set year_percent_class = 'text-loss' %}
             {% endif %}
           {% endif %}
-          <div data-year-percent class="calendar-secondary-metric{% if not (show_percentages_default and year_percent is not none) %} hidden{% endif %}">
-            {% if show_percentages_default and year_percent is not none %}Realized: <span data-year-percent-value class="{{ year_percent_class }}">{{ '{:+.2f}%'.format(year_percent) }}</span>{% endif %}
+          <div data-year-percent class="calendar-summary-secondary{% if not (show_percentages_default and year_percent is not none) %} hidden{% endif %}">
+            {% if show_percentages_default and year_percent is not none %}
+            <span class="calendar-summary-label">Realized</span>
+            <span data-year-percent-value class="calendar-summary-value {{ year_percent_class }}">{{ '{:+.2f}%'.format(year_percent) }}</span>
+            {% endif %}
           </div>
-          <div class="calendar-secondary-metric hidden" data-year-average>
-            <span class="text-neutral-300">Avg realized per day (<span data-year-average-count>0</span> days):</span>
-            <span data-year-average-value class="text-neutral-200"></span>
+          <div class="calendar-summary-secondary hidden" data-year-average>
+            <span class="calendar-summary-label">Avg realized per day (<span data-year-average-count>0</span> days)</span>
+            <span data-year-average-value class="calendar-summary-value text-neutral-200"></span>
           </div>
-          
+
         </div>
       </div>
     </div>
