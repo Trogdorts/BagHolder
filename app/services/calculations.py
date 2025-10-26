@@ -168,19 +168,19 @@ def count_trade_win_losses(
     start: Optional[date] = None,
     end: Optional[date] = None,
 ) -> tuple[int, int]:
-    """Count winning and losing trade events within an optional window.
+    """Count winning and losing days within an optional window.
 
     Trades are processed chronologically so that prior activity can establish
-    position context for the target window. A "win" or "loss" is recorded each
-    time a trade closes part of an existing position with realized profit or
-    loss respectively.
+    position context for the target window. Realized profit and loss from
+    trades that fall within the window are aggregated per day; a day with net
+    positive realized value is a win while a day with net negative value is a
+    loss.
     """
 
     positions: Dict[str, Dict[str, float]] = defaultdict(
         lambda: {"shares": 0.0, "avg_cost": 0.0, "last_price": None}
     )
-    wins = 0
-    losses = 0
+    daily_realized: Dict[date, float] = defaultdict(float)
 
     sorted_trades = sorted(trades, key=_trade_sort_key)
 
@@ -218,9 +218,16 @@ def count_trade_win_losses(
         if math.isclose(realized, 0.0, abs_tol=0.005):
             continue
 
-        if realized > 0:
+        daily_realized[day] += realized
+
+    wins = 0
+    losses = 0
+    for realized_total in daily_realized.values():
+        if math.isclose(realized_total, 0.0, abs_tol=0.005):
+            continue
+        if realized_total > 0:
             wins += 1
-        elif realized < 0:
+        elif realized_total < 0:
             losses += 1
 
     return wins, losses

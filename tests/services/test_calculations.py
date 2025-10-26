@@ -7,7 +7,9 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from app.services.calculations import Ledger
+from datetime import date
+
+from app.services.calculations import Ledger, count_trade_win_losses
 
 
 def test_ledger_tracks_realized_profit_with_remaining_position():
@@ -32,3 +34,45 @@ def test_ledger_registers_loss_for_sell_transactions():
     realized = ledger.apply(trades)
 
     assert realized["2024-02-02"] == pytest.approx(-0.01)
+
+
+def test_count_trade_win_losses_classifies_days_by_net_realized_pnl():
+    trades = [
+        {"date": date(2024, 3, 1), "symbol": "ABC", "action": "BUY", "qty": 10, "price": 10.0},
+        {"date": date(2024, 3, 2), "symbol": "ABC", "action": "SELL", "qty": 10, "price": 12.0},
+        {"date": date(2024, 3, 3), "symbol": "ABC", "action": "BUY", "qty": 5, "price": 10.0},
+        {"date": date(2024, 3, 4), "symbol": "ABC", "action": "SELL", "qty": 5, "price": 8.0},
+    ]
+
+    wins, losses = count_trade_win_losses(trades)
+
+    assert wins == 1
+    assert losses == 1
+
+
+def test_count_trade_win_losses_ignores_days_with_offsetting_trades():
+    trades = [
+        {"date": date(2024, 4, 1), "symbol": "XYZ", "action": "BUY", "qty": 10, "price": 10.0},
+        {"date": date(2024, 4, 2), "symbol": "XYZ", "action": "SELL", "qty": 5, "price": 12.0},
+        {"date": date(2024, 4, 2), "symbol": "XYZ", "action": "SELL", "qty": 5, "price": 8.0},
+    ]
+
+    wins, losses = count_trade_win_losses(trades)
+
+    assert wins == 0
+    assert losses == 0
+
+
+def test_count_trade_win_losses_respects_date_window():
+    trades = [
+        {"date": date(2024, 5, 1), "symbol": "LMN", "action": "BUY", "qty": 10, "price": 10.0},
+        {"date": date(2024, 5, 2), "symbol": "LMN", "action": "SELL", "qty": 5, "price": 12.0},
+        {"date": date(2024, 5, 3), "symbol": "LMN", "action": "SELL", "qty": 5, "price": 8.0},
+    ]
+
+    wins, losses = count_trade_win_losses(
+        trades, start=date(2024, 5, 2), end=date(2024, 5, 2)
+    )
+
+    assert wins == 1
+    assert losses == 0
