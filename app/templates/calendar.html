@@ -491,52 +491,50 @@
     color: #a1a1aa;
   }
 
-  .win-ratio-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.35rem 0.85rem;
-    border-radius: 9999px;
-    border: 1px solid rgba(63, 63, 70, 0.6);
-    background: rgba(17, 17, 17, 0.6);
-    color: #c4c4cc;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .win-ratio-toggle + .win-ratio-toggle {
-    margin-left: 0.5rem;
-  }
-
-  .win-ratio-toggle:hover,
-  .win-ratio-toggle:focus-visible {
-    color: #fafafa;
-    border-color: rgba(82, 82, 91, 0.8);
-    background: rgba(39, 39, 42, 0.7);
-  }
-
-  .win-ratio-toggle.is-active {
-    color: #ecfdf5;
-    background: rgba(34, 197, 94, 0.2);
-    border-color: rgba(34, 197, 94, 0.7);
-    box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.3);
-  }
-
-  .win-ratio-toggle.is-active:hover,
-  .win-ratio-toggle.is-active:focus-visible {
-    border-color: rgba(52, 211, 153, 0.8);
-  }
-
-  .win-ratio-gauge-arc {
-    background: conic-gradient(from 180deg, #ef4444 0deg 180deg, #22c55e 180deg 360deg);
-    transform: rotate(180deg);
-  }
-
   .win-ratio-pointer {
     transition: transform 0.35s ease, opacity 0.25s ease;
+    background: linear-gradient(180deg, rgba(244, 244, 245, 1) 0%, rgba(113, 113, 122, 1) 100%);
+    border-radius: 9999px;
+  }
+
+  .win-ratio-meter-arc {
+    background: conic-gradient(
+      from 180deg,
+      #ef4444 0deg,
+      #f97316 45deg,
+      #facc15 90deg,
+      #84cc16 135deg,
+      #22c55e 180deg,
+      #22c55e 360deg
+    );
+  }
+
+  .win-ratio-meter-cover {
+    background: rgba(7, 7, 7, 0.94);
+    border: 1px solid rgba(39, 39, 42, 0.75);
+  }
+
+  .win-ratio-dial-heading {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #a1a1aa;
+  }
+
+  .win-ratio-dial-value {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #f4f4f5;
+    text-align: center;
+  }
+
+  .win-ratio-scale {
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #71717a;
   }
 
   .day-include-toggle.toggle-excluded {
@@ -986,8 +984,8 @@
 {% endfor %}
 </div>
 
-<div class="mt-6 max-w-3xl">
-  <div class="grid gap-4 sm:grid-cols-2">
+<div class="mt-6 w-full lg:max-w-5xl xl:max-w-6xl">
+  <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.35fr)]">
     <div class="rounded border border-neutral-800 p-3 bg-neutral-950 relative"
          data-month-summary
          data-base-realized="{{ '%.10g'|format(month_realized) }}">
@@ -1009,46 +1007,6 @@
       <div class="calendar-secondary-metric hidden mt-2" data-month-average>
         <span>Avg Daily P&amp;L (<span data-month-average-count>0</span> days):</span>
         <span data-month-average-value></span>
-      </div>
-      {% set month_ratio_text = '—' %}
-      {% if month_win_ratio is not none %}
-        {% set month_ratio_text = '{:.1f}%'.format(month_win_ratio).replace('.0%', '%') %}
-      {% endif %}
-      <div class="mt-4"
-           data-win-ratio
-           data-initial-view="month"
-           data-month-wins="{{ month_wins }}"
-           data-month-losses="{{ month_losses }}"
-           data-year-month-wins="{{ month_year_wins }}"
-           data-year-month-losses="{{ month_year_losses }}"
-           data-year-other-wins="{{ year_other_wins }}"
-           data-year-other-losses="{{ year_other_losses }}"
-           data-month-ratio="{{ month_win_ratio if month_win_ratio is not none else '' }}"
-           data-year-ratio="{{ year_win_ratio if year_win_ratio is not none else '' }}">
-        <div class="flex items-center justify-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-          <button type="button" class="win-ratio-toggle is-active" data-win-ratio-view="month" aria-pressed="true">Monthly</button>
-          <button type="button" class="win-ratio-toggle" data-win-ratio-view="year" aria-pressed="false">Yearly</button>
-        </div>
-        <div class="relative mt-3 mx-auto w-full max-w-xs">
-          <div class="relative w-full pt-[50%]">
-            <div class="absolute inset-0 overflow-hidden">
-              <div class="absolute inset-0 rounded-full border border-neutral-800 overflow-hidden">
-                <div class="absolute inset-0 win-ratio-gauge-arc"></div>
-              </div>
-              <div class="absolute inset-[12%_12%_0_12%] rounded-b-full border border-neutral-900/70 bg-neutral-950"></div>
-              <div class="absolute bottom-0 left-1/2 h-[88%] w-1 -translate-x-1/2 bg-neutral-200 origin-bottom opacity-0 win-ratio-pointer" data-win-ratio-pointer style="transform: translateX(-50%) rotate(-90deg);"></div>
-              <div class="absolute bottom-[8%] left-1/2 -translate-x-1/2 px-3 py-1 rounded-full border border-neutral-800 bg-neutral-900/90 text-sm font-semibold text-neutral-100 shadow-sm" data-win-ratio-value>{{ month_ratio_text }}</div>
-            </div>
-          </div>
-          <div class="mt-2 flex justify-between text-[10px] font-semibold uppercase tracking-[0.3em] text-neutral-500">
-            <span>0</span>
-            <span>100</span>
-          </div>
-        </div>
-        <p class="mt-3 text-center text-sm text-neutral-300" data-win-ratio-label>Monthly win ratio</p>
-        <p class="text-center text-xs text-neutral-500" data-win-ratio-breakdown>
-          Wins: <span data-win-ratio-wins>{{ month_year_wins }}</span> &bull; Losses: <span data-win-ratio-losses>{{ month_year_losses }}</span>
-        </p>
       </div>
       {% set month_note_text = month_note.note | default('', true) %}
       {% set month_note_has = month_note_text.strip() %}
@@ -1076,6 +1034,14 @@
         </a>
         {% endif %}
     </div>
+    {% set month_ratio_text = '—' %}
+    {% if month_win_ratio is not none %}
+      {% set month_ratio_text = '{:.1f}%'.format(month_win_ratio).replace('.0%', '%') %}
+    {% endif %}
+    {% set year_ratio_text = '—' %}
+    {% if year_win_ratio is not none %}
+      {% set year_ratio_text = '{:.1f}%'.format(year_win_ratio).replace('.0%', '%') %}
+    {% endif %}
     <div class="rounded border border-neutral-800 p-3 bg-neutral-950">
       <h2 class="calendar-card-heading">Yearly summary</h2>
       <div class="mt-2 space-y-4">
@@ -1125,7 +1091,63 @@
             <span>Avg Daily P&amp;L (<span data-year-average-count>0</span> days):</span>
             <span data-year-average-value></span>
           </div>
-          
+
+        </div>
+      </div>
+    </div>
+    <div class="rounded border border-neutral-800 p-3 bg-neutral-950"
+         data-win-ratio-panel
+         data-month-wins="{{ month_wins }}"
+         data-month-losses="{{ month_losses }}"
+         data-year-month-wins="{{ month_year_wins }}"
+         data-year-month-losses="{{ month_year_losses }}"
+         data-year-other-wins="{{ year_other_wins }}"
+         data-year-other-losses="{{ year_other_losses }}">
+      <h2 class="calendar-card-heading">Win ratios</h2>
+      <div class="mt-4 grid gap-6 sm:grid-cols-2" data-win-ratio-dials>
+        <div class="flex flex-col items-center gap-3" data-win-ratio-dial="month">
+          <p class="win-ratio-dial-heading">Monthly</p>
+          <div class="relative w-full max-w-xs">
+            <div class="relative w-full pt-[50%]">
+              <div class="absolute inset-0 overflow-hidden">
+                <div class="absolute inset-0 rounded-full border border-neutral-800 overflow-hidden">
+                  <div class="absolute inset-0 win-ratio-meter-arc"></div>
+                </div>
+                <div class="absolute inset-[16%_16%_-8%_16%] rounded-b-full win-ratio-meter-cover"></div>
+                <div class="absolute bottom-0 left-1/2 h-[92%] w-[3px] -translate-x-1/2 origin-bottom opacity-0 win-ratio-pointer" data-win-ratio-pointer style="transform: translateX(-50%) rotate(-90deg);"></div>
+                <div class="absolute bottom-[6%] left-1/2 -translate-x-1/2 rounded-full border border-neutral-800 bg-neutral-900/90 px-3 py-1 shadow-sm win-ratio-dial-value" data-win-ratio-value>{{ month_ratio_text }}</div>
+              </div>
+            </div>
+            <div class="mt-2 flex justify-between win-ratio-scale">
+              <span>0</span>
+              <span>100</span>
+            </div>
+          </div>
+          <p class="text-center text-xs text-neutral-500">
+            Wins: <span data-win-ratio-wins>{{ month_wins }}</span> &bull; Losses: <span data-win-ratio-losses>{{ month_losses }}</span>
+          </p>
+        </div>
+        <div class="flex flex-col items-center gap-3" data-win-ratio-dial="year">
+          <p class="win-ratio-dial-heading">Yearly</p>
+          <div class="relative w-full max-w-xs">
+            <div class="relative w-full pt-[50%]">
+              <div class="absolute inset-0 overflow-hidden">
+                <div class="absolute inset-0 rounded-full border border-neutral-800 overflow-hidden">
+                  <div class="absolute inset-0 win-ratio-meter-arc"></div>
+                </div>
+                <div class="absolute inset-[16%_16%_-8%_16%] rounded-b-full win-ratio-meter-cover"></div>
+                <div class="absolute bottom-0 left-1/2 h-[92%] w-[3px] -translate-x-1/2 origin-bottom opacity-0 win-ratio-pointer" data-win-ratio-pointer style="transform: translateX(-50%) rotate(-90deg);"></div>
+                <div class="absolute bottom-[6%] left-1/2 -translate-x-1/2 rounded-full border border-neutral-800 bg-neutral-900/90 px-3 py-1 shadow-sm win-ratio-dial-value" data-win-ratio-value>{{ year_ratio_text }}</div>
+              </div>
+            </div>
+            <div class="mt-2 flex justify-between win-ratio-scale">
+              <span>0</span>
+              <span>100</span>
+            </div>
+          </div>
+          <p class="text-center text-xs text-neutral-500">
+            Wins: <span data-win-ratio-wins>{{ year_wins }}</span> &bull; Losses: <span data-win-ratio-losses>{{ year_losses }}</span>
+          </p>
         </div>
       </div>
     </div>
@@ -1583,19 +1605,20 @@ const dayImpactSimulator = (() => {
       return Math.round(numeric);
     };
 
-    const pointer = element.querySelector('[data-win-ratio-pointer]');
-    const valueEl = element.querySelector('[data-win-ratio-value]');
-    const winsEl = element.querySelector('[data-win-ratio-wins]');
-    const lossesEl = element.querySelector('[data-win-ratio-losses]');
-    const labelEl = element.querySelector('[data-win-ratio-label]');
-    const toggleButtons = Array.from(element.querySelectorAll('[data-win-ratio-view]'));
-
     const baseYearOtherWins = parseCount(element.dataset.yearOtherWins);
     const baseYearOtherLosses = parseCount(element.dataset.yearOtherLosses);
     const baseMonthWins = parseCount(element.dataset.monthWins);
     const baseMonthLosses = parseCount(element.dataset.monthLosses);
     const baseYearMonthWins = parseCount(element.dataset.yearMonthWins);
     const baseYearMonthLosses = parseCount(element.dataset.yearMonthLosses);
+
+    const dialConfigs = Array.from(element.querySelectorAll('[data-win-ratio-dial]')).map((dial) => ({
+      type: dial.dataset.winRatioDial === 'year' ? 'year' : 'month',
+      pointer: dial.querySelector('[data-win-ratio-pointer]'),
+      valueEl: dial.querySelector('[data-win-ratio-value]'),
+      winsEl: dial.querySelector('[data-win-ratio-wins]'),
+      lossesEl: dial.querySelector('[data-win-ratio-losses]'),
+    }));
 
     const state = {
       month: { wins: baseMonthWins, losses: baseMonthLosses },
@@ -1604,8 +1627,6 @@ const dayImpactSimulator = (() => {
         losses: baseYearOtherLosses + baseYearMonthLosses,
       },
     };
-
-    let activeView = element.dataset.initialView === 'year' ? 'year' : 'month';
 
     const clampRatio = (ratio) => Math.min(100, Math.max(0, Number(ratio)));
 
@@ -1618,66 +1639,46 @@ const dayImpactSimulator = (() => {
       return `${trimmed}%`;
     };
 
-    const updatePointer = (ratio) => {
-      if (!pointer) {
+    const updatePointer = (pointerEl, ratio) => {
+      if (!pointerEl) {
         return;
       }
       if (ratio === null || !Number.isFinite(ratio)) {
-        pointer.style.opacity = '0';
-        pointer.style.transform = 'translateX(-50%) rotate(-90deg)';
+        pointerEl.style.opacity = '0';
+        pointerEl.style.transform = 'translateX(-50%) rotate(-90deg)';
         return;
       }
       const clamped = clampRatio(ratio);
       const angle = -90 + clamped * 1.8;
-      pointer.style.opacity = '1';
-      pointer.style.transform = `translateX(-50%) rotate(${angle}deg)`;
+      pointerEl.style.opacity = '1';
+      pointerEl.style.transform = `translateX(-50%) rotate(${angle}deg)`;
     };
 
-    const updateButtons = () => {
-      toggleButtons.forEach((button) => {
-        const isActive = button.dataset.winRatioView === activeView;
-        button.classList.toggle('is-active', isActive);
-        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-      });
-    };
-
-    const render = () => {
-      const current = state[activeView] || { wins: 0, losses: 0 };
+    const renderDial = (config) => {
+      if (!config || !config.type) {
+        return;
+      }
+      const current = state[config.type] || { wins: 0, losses: 0 };
       const total = current.wins + current.losses;
       const ratio = total > 0 ? clampRatio((current.wins / total) * 100) : null;
 
-      if (valueEl) {
-        valueEl.textContent = formatRatio(ratio);
+      if (config.valueEl) {
+        config.valueEl.textContent = formatRatio(ratio);
       }
-      if (winsEl) {
-        winsEl.textContent = String(current.wins);
+      if (config.winsEl) {
+        config.winsEl.textContent = String(current.wins);
       }
-      if (lossesEl) {
-        lossesEl.textContent = String(current.losses);
+      if (config.lossesEl) {
+        config.lossesEl.textContent = String(current.losses);
       }
-      if (labelEl) {
-        labelEl.textContent = activeView === 'year' ? 'Yearly win ratio' : 'Monthly win ratio';
-      }
-
-      updatePointer(ratio);
-      updateButtons();
+      updatePointer(config.pointer, ratio);
     };
 
-    toggleButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        const view = button.dataset.winRatioView;
-        if (view !== 'month' && view !== 'year') {
-          return;
-        }
-        if (view === activeView) {
-          return;
-        }
-        activeView = view;
-        render();
-      });
-    });
+    const renderAll = () => {
+      dialConfigs.forEach((config) => renderDial(config));
+    };
 
-    render();
+    renderAll();
 
     const normalizeCount = (value) => {
       const numeric = Number(value);
@@ -1693,9 +1694,9 @@ const dayImpactSimulator = (() => {
         state.month.losses = normalizeCount(monthLosses);
         state.year.wins = baseYearOtherWins + normalizeCount(yearMonthWins);
         state.year.losses = baseYearOtherLosses + normalizeCount(yearMonthLosses);
-        render();
+        renderAll();
       },
-      refresh: render,
+      refresh: renderAll,
     };
   };
 
@@ -1852,7 +1853,7 @@ const dayImpactSimulator = (() => {
     entries.sort((a, b) => a.position - b.position);
   });
 
-  const winRatioController = createWinRatioController(document.querySelector('[data-win-ratio]'));
+  const winRatioController = createWinRatioController(document.querySelector('[data-win-ratio-panel]'));
   const monthSummaryEl = document.querySelector('[data-month-summary]');
   const monthRealizedEl = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-realized-value]') : null;
   const monthPercentContainer = monthSummaryEl ? monthSummaryEl.querySelector('[data-month-percent]') : null;
