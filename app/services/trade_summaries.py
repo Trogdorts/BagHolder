@@ -79,7 +79,7 @@ def _trade_to_record(trade: Trade) -> Optional[Dict[str, Any]]:
 
 
 def calculate_daily_trade_map(trades: Sequence[Trade]) -> Dict[str, Dict[str, float]]:
-    """Compute realized and unrealized P/L for each trading day.
+    """Compute realized profit/loss for each trading day.
 
     Parameters
     ----------
@@ -109,7 +109,6 @@ def calculate_daily_trade_map(trades: Sequence[Trade]) -> Dict[str, Dict[str, fl
             continue
         result[day_key] = {
             "realized": _coerce_number(row.get("realized_pl", 0.0)),
-            "unrealized": _coerce_number(row.get("unrealized_pl", 0.0)),
             "total_invested": _coerce_number(row.get("trade_value", 0.0)),
         }
     return result
@@ -135,7 +134,6 @@ def upsert_daily_summaries(
 
     for day, values in daily_map.items():
         realized = _coerce_number(values.get("realized", 0.0))
-        unrealized = _coerce_number(values.get("unrealized", 0.0))
         total_invested = _coerce_number(values.get("total_invested", 0.0))
         row = by_date.get(day)
         if row is None:
@@ -143,7 +141,6 @@ def upsert_daily_summaries(
                 DailySummary(
                     date=day,
                     realized=realized,
-                    unrealized=unrealized,
                     total_invested=total_invested,
                     updated_at=timestamp,
                 )
@@ -151,7 +148,6 @@ def upsert_daily_summaries(
             continue
 
         row.realized = realized
-        row.unrealized = unrealized
         row.total_invested = total_invested
         row.updated_at = timestamp
 

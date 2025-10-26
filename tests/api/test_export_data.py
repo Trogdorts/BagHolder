@@ -28,7 +28,6 @@ def test_export_data_excludes_total_and_updated_at(tmp_path, monkeypatch):
             DailySummary(
                 date="2024-03-01",
                 realized=10.0,
-                unrealized=5.0,
                 total_invested=5.0,
                 updated_at="now",
             )
@@ -37,7 +36,6 @@ def test_export_data_excludes_total_and_updated_at(tmp_path, monkeypatch):
             DailySummary(
                 date="2024-03-02",
                 realized=-3.5,
-                unrealized=0.0,
                 total_invested=0.0,
                 updated_at="then",
             )
@@ -63,7 +61,7 @@ def test_export_data_excludes_total_and_updated_at(tmp_path, monkeypatch):
     content = asyncio.run(gather_body(response))
     lines = content.decode("utf-8").strip().splitlines()
 
-    assert lines[0] == "date,realized,unrealized"
+    assert lines[0] == "date,realized,total_invested"
     assert lines[1:] == [
         "2024-03-01,10.00,5.00",
         "2024-03-02,-3.50,0.00",
@@ -85,7 +83,7 @@ def test_export_data_leaves_empty_values_when_configured(tmp_path, monkeypatch):
     class DummySummary:
         date = "2024-04-01"
         realized = None
-        unrealized = None
+        total_invested = None
 
     class DummyQuery:
         def filter(self, *args, **kwargs):
@@ -117,7 +115,7 @@ def test_export_data_leaves_empty_values_when_configured(tmp_path, monkeypatch):
     content = asyncio.run(gather_body(response))
     lines = content.decode("utf-8").strip().splitlines()
 
-    assert lines[0] == "date,realized,unrealized"
+    assert lines[0] == "date,realized,total_invested"
     assert lines[1:] == [
         "2024-04-01,,",
     ]

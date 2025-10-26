@@ -1,13 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
-{% set show_unrealized = cfg.ui.get('show_unrealized', True) %}
 {% set show_market_value = cfg.ui.get('show_market_value', cfg.ui.get('show_total', True)) %}
 {% set show_trade_count = cfg.ui.get('show_trade_count', False) %}
 {% set show_text = cfg.ui.get('show_text', True) %}
 {% set show_weekends = cfg.ui.get('show_weekends', False) %}
 {% set show_percentages = cfg.ui.get('show_percentages', True) %}
 {% set default_view = cfg.view.get('default', 'latest') %}
-{% set unrealized_fill = cfg.ui.get('unrealized_fill_strategy', 'carry_forward') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
 {% set server_port = cfg.get('server', {}).get('port', 8012) %}
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -230,26 +228,6 @@
           </div>
           <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
             <div>
-              <p class="block text-sm font-medium text-neutral-200">Unrealized values</p>
-              <p class="mt-1 text-xs text-neutral-500" x-show="!showUnrealizedSetting" x-cloak>
-                Unrealized gains and losses remain hidden until toggled from the calendar toolbar.
-              </p>
-            </div>
-            <div>
-              <input type="hidden" name="show_unrealized" value="{{ 'true' if show_unrealized else 'false' }}" :value="showUnrealizedSetting ? 'true' : 'false'">
-              <button type="button" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm font-medium text-neutral-100 transition"
-                      :class="{ 'bg-neutral-800 text-neutral-50 border-neutral-600': !showUnrealizedSetting }"
-                      @click="showUnrealizedSetting = !showUnrealizedSetting"
-                      aria-pressed="{{ 'true' if show_unrealized else 'false' }}"
-                      :aria-pressed="showUnrealizedSetting.toString()">
-                <span x-text="showUnrealizedSetting ? 'Hide by default' : 'Show by default'">
-                  {% if show_unrealized %}Hide by default{% else %}Show by default{% endif %}
-                </span>
-              </button>
-            </div>
-          </div>
-          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
-            <div>
               <p class="block text-sm font-medium text-neutral-200">Market values</p>
               <p class="mt-1 text-xs text-neutral-500" x-show="!showMarketValueSetting" x-cloak>
                 Hide or show the daily market value of holdings by default on the calendar.
@@ -297,16 +275,6 @@
           <p class="text-sm text-neutral-400">Decide how missing values are calculated and exported.</p>
         </header>
         <div class="grid gap-5">
-          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
-            <div>
-              <label for="unrealized_fill_strategy" class="block text-sm font-medium text-neutral-200">Missing unrealized values</label>
-              <p class="mt-1 text-xs text-neutral-500">Determines how empty calendar days are filled when no unrealized value was imported.</p>
-            </div>
-            <select id="unrealized_fill_strategy" name="unrealized_fill_strategy" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-              <option value="carry_forward" {% if unrealized_fill == 'carry_forward' %}selected{% endif %}>Carry forward last known</option>
-              <option value="average_neighbors" {% if unrealized_fill == 'average_neighbors' %}selected{% endif %}>Average nearest values</option>
-            </select>
-          </div>
           <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
             <div>
               <label for="export_empty_values" class="block text-sm font-medium text-neutral-200">Empty values in exports</label>
@@ -655,7 +623,6 @@
 <script>
   document.addEventListener('alpine:init', () => {
     Alpine.data('settingsForm', () => ({
-      showUnrealizedSetting: {{ 'true' if show_unrealized else 'false' }},
       showMarketValueSetting: {{ 'true' if show_market_value else 'false' }},
       hasChanges: false,
       initialData: '',
@@ -664,7 +631,6 @@
       init() {
         this.formEl = this.$el;
         this.initialData = this.serializeForm();
-        this.$watch('showUnrealizedSetting', () => this.evaluateChanges());
         this.$watch('showMarketValueSetting', () => this.evaluateChanges());
         this.formEl.addEventListener('input', () => this.evaluateChanges());
         this.formEl.addEventListener('change', () => this.evaluateChanges());
@@ -674,7 +640,6 @@
           return '';
         }
         const formData = new FormData(this.formEl);
-        formData.set('show_unrealized', this.showUnrealizedSetting ? 'true' : 'false');
         formData.set('show_market_value', this.showMarketValueSetting ? 'true' : 'false');
         return new URLSearchParams(formData).toString();
       },

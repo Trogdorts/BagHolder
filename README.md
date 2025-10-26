@@ -1,6 +1,6 @@
 # BagHolder (Alpha 1)
 
-FastAPI + Jinja2 + HTMX + Alpine.js app to visualize realized and unrealized P&L on a calendar.
+FastAPI + Jinja2 + HTMX + Alpine.js app to visualize realized performance on a calendar.
 Imports ThinkOrSwim (TOS) Account Statement CSVs. No personally identifying account fields are stored.
 
 The **Alpha 1** milestone focuses on containerized deployment and smoother

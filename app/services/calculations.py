@@ -56,38 +56,18 @@ def _apply_trade_to_position(
     return realized
 
 
-def _current_unrealized_total(positions: Dict[str, Dict[str, float]]) -> float:
-    total = 0.0
-    for position in positions.values():
-        shares = float(position.get("shares", 0.0) or 0.0)
-        if not shares:
-            continue
-
-        avg_cost = float(position.get("avg_cost", 0.0) or 0.0)
-        last_price = position.get("last_price")
-        last_price = float(last_price) if last_price is not None else avg_cost
-
-        if shares > 0:
-            total += (last_price - avg_cost) * shares
-        else:
-            total += (avg_cost - last_price) * (-shares)
-
-    return total
-
-
 class Ledger:
     def __init__(self):
         self.positions: Dict[str, Dict[str, float]] = defaultdict(
             lambda: {"shares": 0.0, "avg_cost": 0.0, "last_price": None}
         )
         self.realized_by_date = defaultdict(float)
-        self.unrealized_by_date = defaultdict(float)
 
     def apply(self, trades: List[Dict[str, Any]]):
-        """Process trades and compute realized/unrealized P/L per day."""
+        """Process trades and compute realized P/L per day."""
 
         if not trades:
-            return self.realized_by_date, self.unrealized_by_date
+            return self.realized_by_date
 
         # Trades are expected in chronological order; sort defensively by date.
         sorted_trades = sorted(
@@ -126,7 +106,4 @@ class Ledger:
             if realized:
                 self.realized_by_date[day] += realized
 
-            unrealized_total = _current_unrealized_total(self.positions)
-            self.unrealized_by_date[day] = unrealized_total
-
-        return self.realized_by_date, self.unrealized_by_date
+        return self.realized_by_date
