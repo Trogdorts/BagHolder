@@ -72,6 +72,10 @@
     gap: 0.5rem;
   }
 
+  .toolbar-quick-nav {
+    position: relative;
+  }
+
   @media (min-width: 768px) {
     .toolbar-actions {
       flex-direction: row;
@@ -94,10 +98,156 @@
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
+  .toolbar-nav-button {
+    border: none;
+    background: none;
+    cursor: pointer;
+  }
+
   .toolbar-nav-link:hover,
   .toolbar-nav-link:focus-visible {
     background-color: rgba(63, 63, 70, 0.7);
     color: #fafafa;
+  }
+
+  .toolbar-quick-nav-panel {
+    position: absolute;
+    top: calc(100% + 0.6rem);
+    left: 50%;
+    transform: translateX(-50%);
+    width: max(16rem, 100%);
+    padding: 0.85rem 1rem 1rem;
+    border-radius: 0.75rem;
+    background: rgba(24, 24, 27, 0.96);
+    border: 1px solid rgba(63, 63, 70, 0.85);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+    color: #e4e4e7;
+    z-index: 40;
+  }
+
+  .toolbar-quick-nav-panel h3 {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fafafa;
+  }
+
+  .toolbar-quick-nav-form {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .toolbar-quick-nav-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .toolbar-quick-nav-field label {
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #a1a1aa;
+  }
+
+  .toolbar-quick-nav-stepper {
+    display: flex;
+    align-items: stretch;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(82, 82, 91, 0.75);
+    background: rgba(15, 15, 15, 0.9);
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .toolbar-quick-nav-stepper:focus-within {
+    border-color: #818cf8;
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.35);
+  }
+
+  .toolbar-quick-nav-stepper input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 0.5rem 0.75rem;
+    border: none;
+    background: transparent;
+    color: #fafafa;
+    font-size: 0.95rem;
+    text-align: center;
+  }
+
+  .toolbar-quick-nav-stepper input:focus {
+    outline: none;
+  }
+
+  .toolbar-quick-nav-step {
+    flex: 0 0 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #a1a1aa;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .toolbar-quick-nav-step:hover,
+  .toolbar-quick-nav-step:focus-visible {
+    background-color: rgba(63, 63, 70, 0.65);
+    color: #fafafa;
+  }
+
+  .toolbar-quick-nav-select {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(82, 82, 91, 0.75);
+    background: rgba(15, 15, 15, 0.9);
+    color: #fafafa;
+    font-size: 0.95rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .toolbar-quick-nav-select:focus {
+    outline: none;
+    border-color: #818cf8;
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.35);
+  }
+
+  .toolbar-quick-nav-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .toolbar-quick-nav-go {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 1rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(82, 82, 91, 0.75);
+    background: rgba(39, 39, 42, 0.95);
+    color: #fafafa;
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .toolbar-quick-nav-go:hover,
+  .toolbar-quick-nav-go:focus-visible {
+    background-color: rgba(63, 63, 70, 0.9);
+    border-color: rgba(113, 113, 122, 0.85);
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.35);
+  }
+
+  .toolbar-quick-nav-panel p {
+    margin-top: 0.75rem;
+    font-size: 0.75rem;
+    color: #71717a;
   }
 
   .toolbar-controls {
@@ -368,6 +518,88 @@
           <a href="/calendar/{{ prev_year }}/{{ prev_month }}" class="toolbar-nav-link">Prev</a>
           <a href="/calendar/{{ current_year }}/{{ current_month }}" class="toolbar-nav-link">Today</a>
           <a href="/calendar/{{ next_year }}/{{ next_month }}" class="toolbar-nav-link">Next</a>
+          <div class="toolbar-quick-nav"
+               x-data="quickMonthPicker()"
+               x-init="init()"
+               @pointerdown.window="handleOutside($event)">
+            <button type="button"
+                    class="toolbar-nav-link toolbar-nav-button"
+                    x-ref="trigger"
+                    @click="toggle()"
+                    :aria-expanded="isOpen.toString()"
+                    aria-controls="quick-month-picker"
+                    aria-haspopup="dialog">
+              Jump to…
+            </button>
+            <div x-show="isOpen"
+                 x-transition.origin.top
+                 id="quick-month-picker"
+                 class="toolbar-quick-nav-panel"
+                 role="dialog"
+                 aria-modal="true"
+                 aria-label="Jump to month"
+                 x-ref="panel"
+                 @keydown.escape.window="close()">
+              <h3>Quick navigation</h3>
+              <div class="toolbar-quick-nav-form">
+                <div class="toolbar-quick-nav-field">
+                  <label for="quick-year-input">Year</label>
+                  <div class="toolbar-quick-nav-stepper">
+                    <button type="button"
+                            class="toolbar-quick-nav-step"
+                            @click="stepYear(-1)"
+                            aria-label="Previous year">
+                      −
+                    </button>
+                    <input id="quick-year-input"
+                           type="number"
+                           inputmode="numeric"
+                           min="1"
+                           x-ref="yearInput"
+                           x-model="year"
+                           @change="normalizeYear()"
+                           @blur="normalizeYear()"
+                           @keydown.enter.prevent="go()" />
+                    <button type="button"
+                            class="toolbar-quick-nav-step"
+                            @click="stepYear(1)"
+                            aria-label="Next year">
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div class="toolbar-quick-nav-field">
+                  <label for="quick-month-select">Month</label>
+                  <select id="quick-month-select"
+                          class="toolbar-quick-nav-select"
+                          x-ref="monthSelect"
+                          x-model="month"
+                          @keydown.enter.prevent="go()">
+                    <option value="01">January</option>
+                    <option value="02">February</option>
+                    <option value="03">March</option>
+                    <option value="04">April</option>
+                    <option value="05">May</option>
+                    <option value="06">June</option>
+                    <option value="07">July</option>
+                    <option value="08">August</option>
+                    <option value="09">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </select>
+                </div>
+                <div class="toolbar-quick-nav-actions">
+                  <button type="button"
+                          class="toolbar-quick-nav-go"
+                          @click="go()">
+                    Go
+                  </button>
+                </div>
+              </div>
+              <p>Select a year and month to jump to that calendar view.</p>
+            </div>
+          </div>
         </nav>
         <div class="toolbar-controls">
           <button
@@ -1028,339 +1260,129 @@ function calendarToolbar(initialState = {}) {
   };
 }
 
-function sanitizeSimulatorDefaults(raw) {
-  const base = {
-    years_back: 2,
-    start_balance: 10000,
-    risk_level: 0.5,
-    profit_target: 0.05,
-    stop_loss: 0.03,
-    symbol_cache: 'simulator/us_symbols.csv',
-    price_cache_dir: 'simulator/price_cache',
-    output_dir: 'simulator/output',
-    output_name: 'trades.csv',
-    seed: 42,
-    generate_only: false,
-  };
-  if (!raw || typeof raw !== 'object') {
-    return base;
-  }
-  const result = { ...base };
-  const toNumber = (value) => {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : undefined;
-  };
-  const assignNumber = (key, clamp) => {
-    const candidate = toNumber(raw[key]);
-    if (candidate === undefined) {
-      return;
-    }
-    result[key] = clamp ? clamp(candidate) : candidate;
-  };
-  assignNumber('years_back', (value) => Math.max(1, Math.round(value)));
-  assignNumber('start_balance', (value) => Math.max(1, value));
-  assignNumber('risk_level', (value) => Math.min(1, Math.max(0.01, value)));
-  assignNumber('profit_target', (value) => Math.max(0.0001, value));
-  assignNumber('stop_loss', (value) => Math.max(0.0001, value));
-  assignNumber('seed', (value) => Math.round(value));
-
-  const assignText = (key) => {
-    if (typeof raw[key] === 'string' && raw[key].trim() !== '') {
-      result[key] = raw[key].trim();
-    }
-  };
-  assignText('symbol_cache');
-  assignText('price_cache_dir');
-  assignText('output_dir');
-  assignText('output_name');
-
-  if (typeof raw.generate_only === 'boolean') {
-    result.generate_only = raw.generate_only;
-  }
-  return result;
-}
-
-const simulatorState = (() => {
-  const root = document.querySelector('[data-calendar-root]');
-  if (!root) {
-    return {
-      root: null,
-      defaults: sanitizeSimulatorDefaults({}),
-      accountPath: '',
-    };
-  }
-  let parsedDefaults = {};
-  const rawDefaults = root.dataset.simulatorDefaults;
-  if (rawDefaults) {
-    try {
-      parsedDefaults = JSON.parse(rawDefaults) || {};
-    } catch (error) {
-      console.warn('Unable to parse simulator defaults', error);
-    }
-  }
+function quickMonthPicker() {
   return {
-    root,
-    defaults: sanitizeSimulatorDefaults(parsedDefaults),
-    accountPath: root.dataset.simulatorAccountPath || '',
+    isOpen: false,
+    year: '',
+    month: '',
+    init() {
+      const current = this.currentParts();
+      this.year = current.year || this.defaultYear();
+      this.month = current.month || this.defaultMonth();
+    },
+    currentParts() {
+      const root = document.querySelector('[data-calendar-root]');
+      if (!root) {
+        return { year: '', month: '' };
+      }
+      const year = Number.parseInt(root.dataset.calendarYear, 10);
+      const month = root.dataset.calendarMonth || '';
+      const normalizedMonth = /^(0[1-9]|1[0-2])$/.test(month)
+        ? month
+        : '';
+      return {
+        year: Number.isFinite(year) ? year : '',
+        month: normalizedMonth,
+      };
+    },
+    defaultYear() {
+      return new Date().getFullYear();
+    },
+    defaultMonth() {
+      return String(new Date().getMonth() + 1).padStart(2, '0');
+    },
+    open() {
+      this.isOpen = true;
+      const current = this.currentParts();
+      this.year = current.year || this.sanitizedYear() || this.defaultYear();
+      this.month = current.month || this.ensureMonth(this.month) || this.defaultMonth();
+      this.$nextTick(() => {
+        if (this.$refs.yearInput) {
+          this.$refs.yearInput.focus();
+          if (typeof this.$refs.yearInput.select === 'function') {
+            this.$refs.yearInput.select();
+          }
+        }
+      });
+    },
+    ensureMonth(value) {
+      if (typeof value !== 'string') {
+        return '';
+      }
+      const trimmed = value.trim();
+      if (/^(0[1-9]|1[0-2])$/.test(trimmed)) {
+        return trimmed;
+      }
+      if (/^([1-9]|1[0-2])$/.test(trimmed)) {
+        return String(Number.parseInt(trimmed, 10)).padStart(2, '0');
+      }
+      return '';
+    },
+    close() {
+      this.isOpen = false;
+    },
+    toggle() {
+      if (this.isOpen) {
+        this.close();
+      } else {
+        this.open();
+      }
+    },
+    handleOutside(event) {
+      if (!this.isOpen) {
+        return;
+      }
+      const panel = this.$refs.panel;
+      const trigger = this.$refs.trigger;
+      const target = event ? event.target : null;
+      if (!target) {
+        return;
+      }
+      if ((panel && panel.contains(target)) || (trigger && trigger.contains(target))) {
+        return;
+      }
+      this.close();
+    },
+    sanitizedYear() {
+      const numeric = Number.parseInt(String(this.year).trim(), 10);
+      if (!Number.isFinite(numeric) || numeric < 1) {
+        return null;
+      }
+      return numeric;
+    },
+    normalizeYear() {
+      const sanitized = this.sanitizedYear();
+      if (sanitized === null) {
+        const current = this.currentParts();
+        this.year = current.year || this.defaultYear();
+        return;
+      }
+      this.year = sanitized;
+    },
+    stepYear(delta) {
+      const sanitized = this.sanitizedYear();
+      const base = sanitized !== null
+        ? sanitized
+        : this.currentParts().year || this.defaultYear();
+      const next = base + delta;
+      this.year = next < 1 ? 1 : next;
+    },
+    go() {
+      const year = this.sanitizedYear();
+      const month = this.ensureMonth(this.month);
+      if (year === null) {
+        this.normalizeYear();
+        return;
+      }
+      if (!month) {
+        this.month = this.defaultMonth();
+        return;
+      }
+      this.month = month;
+      this.close();
+      window.location.href = `/calendar/${year}/${month}`;
+    },
   };
-})();
-
-function createSimulatorFormHTML(defaults, accountPath) {
-  const warning =
-    'Generating simulated trades will delete all existing trades, summaries, and notes in this portfolio and replace them with simulated data.';
-  const cacheNotice = accountPath
-    ? `Files are stored relative to <code>${escapeHtml(accountPath)}</code>.`
-    : 'Files are stored inside the active portfolio directory.';
-  return `
-    <form id="simulator-form" class="space-y-4">
-      <div class="rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200" data-simulator-warning>
-        ${escapeHtml(warning)}
-      </div>
-      <p class="hidden text-sm text-danger" data-simulator-error></p>
-      <div class="grid gap-3 md:grid-cols-2">
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Years of price history</span>
-          <input type="number" min="1" step="1" name="years_back" value="${defaults.years_back}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" data-autofocus>
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Starting balance</span>
-          <input type="number" min="1" step="100" name="start_balance" value="${defaults.start_balance}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Risk level (0-1)</span>
-          <input type="number" min="0" max="1" step="0.05" name="risk_level" value="${defaults.risk_level}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Profit target</span>
-          <input type="number" min="0.001" step="0.01" name="profit_target" value="${defaults.profit_target}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Stop loss</span>
-          <input type="number" min="0.001" step="0.01" name="stop_loss" value="${defaults.stop_loss}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Random seed</span>
-          <input type="number" step="1" name="seed" value="${defaults.seed}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
-        </label>
-      </div>
-      <div class="grid gap-3 md:grid-cols-2">
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Symbol cache file</span>
-          <input type="text" name="symbol_cache" value="${escapeHtml(defaults.symbol_cache)}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" autocomplete="off">
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Price cache directory</span>
-          <input type="text" name="price_cache_dir" value="${escapeHtml(defaults.price_cache_dir)}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" autocomplete="off">
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Output directory</span>
-          <input type="text" name="output_dir" value="${escapeHtml(defaults.output_dir)}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" autocomplete="off">
-        </label>
-        <label class="flex flex-col gap-1 text-sm text-neutral-200">
-          <span class="text-xs font-semibold uppercase tracking-wide text-neutral-400">Output filename</span>
-          <input type="text" name="output_name" value="${escapeHtml(defaults.output_name)}" class="rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100" autocomplete="off">
-        </label>
-      </div>
-      <div class="flex items-center gap-2">
-        <input type="checkbox" id="simulator-generate-only" name="generate_only" class="h-4 w-4 rounded border-neutral-700 bg-neutral-900" ${defaults.generate_only ? 'checked' : ''}>
-        <label for="simulator-generate-only" class="text-sm text-neutral-200">Download price data only (do not import trades)</label>
-      </div>
-      <p class="text-xs text-neutral-500" data-simulator-import-note>${cacheNotice}</p>
-    </form>
-  `;
-}
-
-function updateSimulatorWarning(generateOnly, element) {
-  if (!element) {
-    return;
-  }
-  if (generateOnly) {
-    element.textContent =
-      'Symbol lists and historical prices will be refreshed. Existing trades in this portfolio will remain unchanged.';
-    element.classList.remove('text-amber-200');
-    element.classList.add('text-neutral-200');
-  } else {
-    element.textContent =
-      'Generating simulated trades will delete all existing trades, summaries, and notes in this portfolio and replace them with simulated data.';
-    element.classList.remove('text-neutral-200');
-    element.classList.add('text-amber-200');
-  }
-}
-
-function setupSimulatorForm(modal, defaults, accountPath) {
-  const form = document.getElementById('simulator-form');
-  if (!form) {
-    return;
-  }
-  form.dataset.accountPath = accountPath || '';
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    submitSimulatorForm(modal);
-  });
-  const warning = form.querySelector('[data-simulator-warning]');
-  const generateOnlyInput = form.querySelector('#simulator-generate-only');
-  if (generateOnlyInput) {
-    updateSimulatorWarning(generateOnlyInput.checked, warning);
-    generateOnlyInput.addEventListener('change', () => {
-      updateSimulatorWarning(generateOnlyInput.checked, warning);
-    });
-  }
-}
-
-function readSimulatorFormValues(form, defaults) {
-  const fallback = defaults || sanitizeSimulatorDefaults({});
-  const getNumber = (name, clamp) => {
-    const field = form.elements[name];
-    if (!field) {
-      return clamp ? clamp(fallback[name]) : fallback[name];
-    }
-    const parsed = Number(field.value);
-    const candidate = Number.isFinite(parsed) ? parsed : fallback[name];
-    return clamp ? clamp(candidate) : candidate;
-  };
-  const clampRisk = (value) => Math.min(1, Math.max(0.01, value));
-  const clampPositive = (value) => Math.max(0.0001, value);
-  const clampYears = (value) => Math.max(1, Math.round(value));
-  const clampBalance = (value) => Math.max(1, value);
-  const clampSeed = (value) => Math.round(value);
-  const values = {
-    years_back: getNumber('years_back', clampYears),
-    start_balance: getNumber('start_balance', clampBalance),
-    risk_level: getNumber('risk_level', clampRisk),
-    profit_target: getNumber('profit_target', clampPositive),
-    stop_loss: getNumber('stop_loss', clampPositive),
-    seed: getNumber('seed', clampSeed),
-    symbol_cache:
-      (form.elements.symbol_cache && form.elements.symbol_cache.value.trim()) || fallback.symbol_cache,
-    price_cache_dir:
-      (form.elements.price_cache_dir && form.elements.price_cache_dir.value.trim()) || fallback.price_cache_dir,
-    output_dir:
-      (form.elements.output_dir && form.elements.output_dir.value.trim()) || fallback.output_dir,
-    output_name:
-      (form.elements.output_name && form.elements.output_name.value.trim()) || fallback.output_name,
-    generate_only: !!(form.elements.generate_only && form.elements.generate_only.checked),
-  };
-  if (!values.output_name) {
-    values.output_name = 'trades.csv';
-  }
-  return values;
-}
-
-async function submitSimulatorForm(modal) {
-  const form = document.getElementById('simulator-form');
-  if (!form || !modal) {
-    return;
-  }
-  const errorEl = form.querySelector('[data-simulator-error]');
-  if (errorEl) {
-    errorEl.textContent = '';
-    errorEl.classList.add('hidden');
-  }
-  const payload = readSimulatorFormValues(form, simulatorState.defaults);
-  if (!payload.generate_only) {
-    const confirmed = window.confirm(
-      'This will delete all existing trades, summaries, and notes for the active portfolio. Continue?'
-    );
-    if (!confirmed) {
-      return;
-    }
-  }
-  modal.saving = true;
-  let data = null;
-  try {
-    const response = await fetch('/api/simulated-trades', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    try {
-      data = await response.json();
-    } catch (error) {
-      data = null;
-    }
-    if (!response.ok) {
-      const message = data && data.detail ? data.detail : 'Failed to generate simulated trades.';
-      throw new Error(message);
-    }
-  } catch (error) {
-    console.error('Failed to generate simulated trades', error);
-    modal.saving = false;
-    if (errorEl) {
-      const message = error instanceof Error && error.message ? error.message : 'Failed to generate simulated trades.';
-      errorEl.textContent = message;
-      errorEl.classList.remove('hidden');
-    } else {
-      window.alert('Failed to generate simulated trades.');
-    }
-    return;
-  }
-
-  modal.saving = false;
-  simulatorState.defaults = sanitizeSimulatorDefaults({ ...simulatorState.defaults, ...payload });
-
-  if (data && data.generate_only) {
-    modal.body = `
-      <div class="space-y-3">
-        <div class="rounded-lg border border-blue-500/50 bg-blue-500/10 px-4 py-3 text-sm text-neutral-200">
-          Symbol and price caches were updated successfully. Existing trades were not modified.
-        </div>
-        <p class="text-sm text-neutral-300">You can now generate trades using the refreshed market data.</p>
-      </div>
-    `;
-    modal.save = null;
-    modal.closeLabel = 'Close';
-    modal.saveLabel = 'Close';
-    modal.shouldReloadOnClose = false;
-    return;
-  }
-
-  const tradesImported = (data && data.trades_imported) || (data && data.metadata && data.metadata.trades_imported) || 0;
-  const daysAffected = (data && data.days_with_trades) || (data && data.metadata && data.metadata.days_with_trades) || 0;
-  const summaryParts = [];
-  if (tradesImported) {
-    summaryParts.push(`${tradesImported} trade${tradesImported === 1 ? '' : 's'} imported`);
-  }
-  if (daysAffected) {
-    summaryParts.push(`${daysAffected} trading day${daysAffected === 1 ? '' : 's'} updated`);
-  }
-  const summary = summaryParts.length ? summaryParts.join(' across ') : 'Simulated trades imported successfully.';
-
-  modal.body = `
-    <div class="space-y-3">
-      <div class="rounded-lg border border-green-500/50 bg-green-500/10 px-4 py-3 text-sm text-success">
-        Simulated trades were generated and imported successfully.
-      </div>
-      <p class="text-sm text-neutral-200">${escapeHtml(summary)}</p>
-      <p class="text-xs text-neutral-500">Close this dialog to reload the calendar with the new portfolio data.</p>
-    </div>
-  `;
-  modal.save = null;
-  modal.closeLabel = 'Close';
-  modal.saveLabel = 'Close';
-  modal.shouldReloadOnClose = !!(data && data.reload);
-}
-
-function openSimulatorModal(defaults = simulatorState.defaults, accountPath = simulatorState.accountPath) {
-  const modal = getModalController();
-  if (!modal) {
-    return;
-  }
-  modal.title = 'Generate simulated trades';
-  modal.body = createSimulatorFormHTML(defaults, accountPath);
-  modal.closeLabel = 'Cancel';
-  modal.saveLabel = 'Generate';
-  modal.saving = false;
-  modal.shouldReloadOnClose = false;
-  modal.save = () => submitSimulatorForm(modal);
-  modal.open = true;
-  window.setTimeout(() => setupSimulatorForm(modal, defaults, accountPath), 0);
-}
-
-const simulatorButton = document.getElementById('open-simulator');
-if (simulatorButton) {
-  simulatorButton.addEventListener('click', () => openSimulatorModal());
 }
 
 const dayImpactSimulator = (() => {
