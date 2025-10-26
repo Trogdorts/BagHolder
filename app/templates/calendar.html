@@ -2018,6 +2018,7 @@ function openTradeNoteEditor(dateStr, actionSelect, qtyInput, priceInput) {
         text: entry,
         selectionStart: entry.length,
         selectionEnd: entry.length,
+        scrollToSelection: true,
       };
     }
 
@@ -2038,6 +2039,7 @@ function openTradeNoteEditor(dateStr, actionSelect, qtyInput, priceInput) {
       text,
       selectionStart: text.length,
       selectionEnd: text.length,
+      scrollToSelection: true,
     };
   };
 
@@ -2775,6 +2777,7 @@ function openNoteEditor(config) {
       const prepareResult = typeof prepareNote === 'function' ? prepareNote(noteText) : noteText;
       let preparedText;
       let selectionRange = null;
+      let scrollToSelection = false;
       if (prepareResult && typeof prepareResult === 'object') {
         preparedText = typeof prepareResult.text === 'string' ? prepareResult.text : '';
         const start = Number.isFinite(prepareResult.selectionStart) ? prepareResult.selectionStart : null;
@@ -2783,6 +2786,7 @@ function openNoteEditor(config) {
           const safeEnd = end !== null ? end : start;
           selectionRange = { start, end: safeEnd };
         }
+        scrollToSelection = prepareResult.scrollToSelection === true;
       } else {
         preparedText = typeof prepareResult === 'string' ? prepareResult : '';
       }
@@ -2796,6 +2800,7 @@ function openNoteEditor(config) {
         saveUrl,
         onSave,
         saveLabel,
+        scrollToSelection,
       });
     })
     .catch((error) => {
@@ -2818,6 +2823,7 @@ function renderNoteEditor(modal, config) {
     saveUrl,
     onSave,
     saveLabel,
+    scrollToSelection = false,
   } = config;
 
   const subtitleText = subtitle ? escapeHtml(subtitle) : '';
@@ -2858,12 +2864,13 @@ function renderNoteEditor(modal, config) {
       updatedAt,
       saveUrl,
       onSave,
+      scrollToSelection,
     });
   });
 }
 
 function initializeNoteEditor(options) {
-  const { modal, noteText, selectionRange, updatedAt, saveUrl, onSave } = options;
+  const { modal, noteText, selectionRange, updatedAt, saveUrl, onSave, scrollToSelection = false } = options;
   const root = document.querySelector('[data-note-editor-root]');
   if (!root) {
     return;
@@ -2913,7 +2920,11 @@ function initializeNoteEditor(options) {
     field.value = value;
     initialValue = value;
     try {
-      field.focus({ preventScroll: true });
+      if (scrollToSelection) {
+        field.focus();
+      } else {
+        field.focus({ preventScroll: true });
+      }
     } catch (error) {
       field.focus();
     }
@@ -2963,6 +2974,22 @@ function initializeNoteEditor(options) {
       } catch (error) {
         // ignore assignment issues for unsupported inputs
       }
+    }
+    if (scrollToSelection) {
+      window.requestAnimationFrame(() => {
+        if (!field) {
+          return;
+        }
+        if (typeof field.scrollTo === 'function') {
+          try {
+            field.scrollTo({ top: field.scrollHeight });
+          } catch (error) {
+            field.scrollTop = field.scrollHeight;
+          }
+        } else {
+          field.scrollTop = field.scrollHeight;
+        }
+      });
     }
     field.addEventListener('input', () => {
       updateCounter();
