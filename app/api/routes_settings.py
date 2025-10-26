@@ -3,9 +3,9 @@ import logging
 import os
 import re
 import signal
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 from urllib.parse import quote_plus
 from zipfile import BadZipFile
 
@@ -80,6 +80,107 @@ def _resolve_account_directory(request: Request, cfg: AppConfig) -> str:
     base_dir = _resolve_data_directory(cfg)
     _, active = prepare_accounts(cfg, base_dir)
     return active.path
+
+
+_SIMULATION_TRUE_VALUES = {"true", "1", "yes", "on"}
+_SIMULATION_FALSE_VALUES = {"false", "0", "no", "off"}
+
+
+def _format_option_name(name: str) -> str:
+    return name.replace("_", " ").capitalize()
+
+
+def _coerce_int_option(name: str, raw: Any, minimum: int | None = None) -> int:
+    try:
+        value = int(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid value for {_format_option_name(name)}.") from exc
+    if minimum is not None and value < minimum:
+        raise ValueError(
+            f"{_format_option_name(name)} must be at least {minimum}."
+        )
+    return value
+
+
+def _coerce_float_option(
+    name: str,
+    raw: Any,
+    minimum: float | None = None,
+    maximum: float | None = None,
+) -> float:
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Invalid value for {_format_option_name(name)}.") from exc
+    if minimum is not None and value < minimum:
+        raise ValueError(
+            f"{_format_option_name(name)} must be at least {minimum}."
+        )
+    if maximum is not None and value > maximum:
+        raise ValueError(
+            f"{_format_option_name(name)} must be at most {maximum}."
+        )
+    return value
+
+
+def _coerce_bool_option(name: str, raw: Any) -> bool:
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        candidate = raw.strip().lower()
+        if candidate in _SIMULATION_TRUE_VALUES:
+            return True
+        if candidate in _SIMULATION_FALSE_VALUES:
+            return False
+    raise ValueError(f"Invalid value for {_format_option_name(name)}.")
+
+
+def _coerce_string_option(name: str, raw: Any) -> str:
+    if isinstance(raw, str):
+        candidate = raw.strip()
+        if candidate:
+            return candidate
+    raise ValueError(f"{_format_option_name(name)} cannot be empty.")
+
+
+def _merge_simulation_options(
+    options: "SimulationOptions",
+    overrides: Mapping[str, Any] | None,
+) -> "SimulationOptions":
+    if not overrides:
+        return options
+
+    updates: dict[str, Any] = {}
+
+    if "years_back" in overrides:
+        updates["years_back"] = _coerce_int_option("years_back", overrides["years_back"], minimum=1)
+    if "start_balance" in overrides:
+        updates["start_balance"] = _coerce_float_option("start_balance", overrides["start_balance"], minimum=0.01)
+    if "risk_level" in overrides:
+        updates["risk_level"] = _coerce_float_option("risk_level", overrides["risk_level"], minimum=0.0, maximum=1.0)
+    if "profit_target" in overrides:
+        updates["profit_target"] = _coerce_float_option("profit_target", overrides["profit_target"], minimum=0.0)
+    if "stop_loss" in overrides:
+        updates["stop_loss"] = _coerce_float_option("stop_loss", overrides["stop_loss"], minimum=0.0)
+    if "seed" in overrides:
+        updates["seed"] = _coerce_int_option("seed", overrides["seed"])
+    if "max_workers" in overrides:
+        updates["max_workers"] = _coerce_int_option("max_workers", overrides["max_workers"], minimum=1)
+    if "generate_only" in overrides:
+        updates["generate_only"] = _coerce_bool_option("generate_only", overrides["generate_only"])
+    if "symbol_cache" in overrides:
+        updates["symbol_cache"] = _coerce_string_option("symbol_cache", overrides["symbol_cache"])
+    if "price_cache_dir" in overrides:
+        updates["price_cache_dir"] = _coerce_string_option("price_cache_dir", overrides["price_cache_dir"])
+    if "output_dir" in overrides:
+        updates["output_dir"] = _coerce_string_option("output_dir", overrides["output_dir"])
+    if "output_name" in overrides:
+        updates["output_name"] = _coerce_string_option("output_name", overrides["output_name"])
+
+    if not updates:
+        return options
+
+    return replace(options, **updates)
 
 
 def _normalize_redirect_target(value: str | None) -> str:
@@ -934,8 +1035,29 @@ def switch_active_account(
     return _account_success_redirect("switched", redirect_to)
 
 
+@router.get("/api/accounts/{account_id}/simulate/options")
+async def get_simulation_defaults(request: Request, account_id: str):
+    cfg: AppConfig = request.app.state.config
+    base_dir = _resolve_data_directory(cfg)
+
+    accounts_records, _ = prepare_accounts(cfg, base_dir)
+    record_lookup = {account.id: account for account in accounts_records}
+    target = record_lookup.get(account_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="Portfolio not found.")
+
+    if not target.path:
+        raise HTTPException(
+            status_code=500,
+            detail="The portfolio directory could not be determined.",
+        )
+
+    options = build_default_simulation_options(target.path)
+    return JSONResponse({"options": options.as_dict()})
+
+
 @router.post("/api/accounts/{account_id}/simulate")
-def simulate_portfolio_trades(request: Request, account_id: str):
+async def simulate_portfolio_trades(request: Request, account_id: str):
     cfg: AppConfig = request.app.state.config
     base_dir = _resolve_data_directory(cfg)
 
@@ -945,6 +1067,13 @@ def simulate_portfolio_trades(request: Request, account_id: str):
     target = record_lookup.get(account_id)
     if target is None:
         raise HTTPException(status_code=404, detail="Portfolio not found.")
+
+    account_dir = target.path
+    if not account_dir:
+        raise HTTPException(
+            status_code=500,
+            detail="The portfolio directory could not be determined.",
+        )
 
     switched = False
     if active_record.id != target.id:
@@ -956,17 +1085,41 @@ def simulate_portfolio_trades(request: Request, account_id: str):
 
     if switched:
         reload_application_state(request.app, data_dir=base_dir)
-        account_dir = getattr(request.app.state, "account_data_dir", target.path)
-    else:
-        account_dir = target.path
-
-    if not account_dir:
-        raise HTTPException(
-            status_code=500,
-            detail="The portfolio directory could not be determined.",
-        )
+        account_dir = getattr(request.app.state, "account_data_dir", account_dir)
+        if not account_dir:
+            raise HTTPException(
+                status_code=500,
+                detail="The portfolio directory could not be determined.",
+            )
 
     options = build_default_simulation_options(account_dir)
+
+    payload: Any = {}
+    content_type = request.headers.get("content-type", "")
+    if "application/json" in content_type.lower():
+        try:
+            payload = await request.json()
+        except json.JSONDecodeError as exc:  # pragma: no cover - defensive guard
+            raise HTTPException(status_code=400, detail="Invalid JSON payload.") from exc
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Invalid simulation options payload.")
+
+    overrides: Mapping[str, Any] | None = payload.get("options")
+    if overrides is None:
+        overrides = payload
+
+    try:
+        options = _merge_simulation_options(options, overrides)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    symbol_dir = os.path.dirname(options.symbol_cache)
+    if symbol_dir:
+        os.makedirs(symbol_dir, exist_ok=True)
+    os.makedirs(options.price_cache_dir, exist_ok=True)
+    os.makedirs(options.output_dir, exist_ok=True)
 
     try:
         result = import_simulated_trades(
