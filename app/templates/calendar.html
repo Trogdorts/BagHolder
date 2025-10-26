@@ -1150,16 +1150,10 @@ const dayImpactSimulator = (() => {
 
     const toggle = cell.querySelector('[data-day-toggle]');
     if (toggle) {
-      const isDisabled = toggle.disabled;
-      setDayToggleState(toggle, day.included);
-      const shouldExclude = !day.included && day.inMonth;
-      cell.classList.toggle('day-excluded', shouldExclude);
-      if (!isDisabled) {
+      day.toggle = toggle;
+      if (!toggle.disabled) {
         toggle.addEventListener('click', () => {
           day.included = !day.included;
-          setDayToggleState(toggle, day.included);
-          const shouldExclude = !day.included && day.inMonth;
-          cell.classList.toggle('day-excluded', shouldExclude);
           if (day.inMonth) {
             updateExcludedStorage(dateStr, day.included);
           }
@@ -1252,6 +1246,28 @@ const dayImpactSimulator = (() => {
     }
     return state.included !== false;
   };
+
+  const isDayEffectivelyIncluded = (day) => {
+    if (!day) {
+      return false;
+    }
+    if (!day.included) {
+      return false;
+    }
+    return isWeekIncluded(day.weekKey);
+  };
+
+  function updateDayVisualState(day) {
+    if (!day) {
+      return;
+    }
+    const included = isDayEffectivelyIncluded(day);
+    if (day.toggle) {
+      setDayToggleState(day.toggle, included);
+    }
+    const shouldExclude = day.inMonth && !included;
+    day.cell.classList.toggle('day-excluded', shouldExclude);
+  }
 
   const yearBaseRealized = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseRealized);
   const yearBaseTradingDays = parseNumber(yearSummaryEl && yearSummaryEl.dataset.baseTradingDays);
@@ -1365,10 +1381,9 @@ const dayImpactSimulator = (() => {
     collectInvestedSample(yearInvestedSamples, yearOtherInvestedMax);
 
     dayMap.forEach((day) => {
-      if (!day.included) {
-        return;
-      }
-      if (!isWeekIncluded(day.weekKey)) {
+      const included = isDayEffectivelyIncluded(day);
+      updateDayVisualState(day);
+      if (!included) {
         return;
       }
       if (day.inMonth && day.hasValues) {
@@ -1486,7 +1501,7 @@ const dayImpactSimulator = (() => {
       if (weekIncluded) {
         entries.forEach((entry) => {
           const day = dayMap.get(entry.date);
-          if (!day || !day.inMonth || !day.included) {
+          if (!day || !day.inMonth || !isDayEffectivelyIncluded(day)) {
             return;
           }
           if (day.hasValues) {
