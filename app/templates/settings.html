@@ -33,6 +33,7 @@
     <a href="#configuration-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Configuration</a>
     <a href="#backup-settings" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Backups</a>
     <a href="#user-management" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">User management</a>
+    <a href="#contact-support" class="rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 font-medium text-neutral-200 transition hover:border-blue-500/60 hover:text-blue-200">Contact</a>
   </nav>
 
   <div class="space-y-3">
@@ -88,6 +89,7 @@
       <a href="#configuration-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Configuration</a>
       <a href="#backup-settings" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Full backup</a>
       <a href="#user-management" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">User management</a>
+      <a href="#contact-support" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Contact</a>
     </aside>
 
     <div class="flex flex-col gap-6">
@@ -655,6 +657,34 @@
             <p class="mt-3 text-xs text-neutral-400">Need other help? Contact an administrator to reset data or invite you again.</p>
           </div>
         {% endif %}
+    </section>
+    <section id="contact-support" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
+      <header class="mb-4">
+        <h2 class="text-lg font-semibold text-neutral-50">Contact &amp; support</h2>
+        <p class="mt-1 text-sm text-neutral-400">Get in touch when you need help or want to share feedback.</p>
+      </header>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-5">
+          <h3 class="text-sm font-semibold text-neutral-100">Join the community</h3>
+          <p class="mt-2 text-xs text-neutral-400 leading-relaxed">
+            Start a thread in the r/bagholder_dev subreddit to ask questions, share feature ideas, or learn how others deploy BagHolder.
+          </p>
+          <a href="https://www.reddit.com/r/bagholder_dev" target="_blank" rel="noopener noreferrer"
+             class="btn btn-outline-primary mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm">
+            <span>Visit Reddit</span>
+          </a>
+        </div>
+        <div class="rounded-xl border border-neutral-800/70 bg-neutral-950/50 p-5">
+          <h3 class="text-sm font-semibold text-neutral-100">Open a GitHub issue</h3>
+          <p class="mt-2 text-xs text-neutral-400 leading-relaxed">
+            Prefer collaborating in public? Create an issue with steps to reproduce or feature ideas so the community can jump in.
+          </p>
+          <a href="https://github.com/jesse-ai/bagholder/issues" target="_blank" rel="noopener noreferrer"
+             class="btn btn-outline-primary mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm">
+            <span>Visit GitHub</span>
+          </a>
+        </div>
+      </div>
     </section>
     <a href="https://buymeacoffee.com/crissejdav6" target="_blank" rel="noopener noreferrer"
        class="btn btn-outline-danger inline-flex w-full justify-center rounded-full px-4 py-2 text-xs uppercase tracking-wide">
