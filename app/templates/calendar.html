@@ -276,23 +276,21 @@
       </div>
     </div>
   </div>
-</div>
 
-{% set day_labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
-{% set visible_day_labels = day_labels if show_weekends else day_labels[:5] %}
-{% set grid_columns = visible_day_labels|length + 1 %}
+  {% set day_labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}
+  {% set visible_day_labels = day_labels if show_weekends else day_labels[:5] %}
+  {% set grid_columns = visible_day_labels|length + 1 %}
+  <div class="grid gap-2" style="grid-template-columns: repeat({{ grid_columns }}, minmax(0, 1fr));">
+    {% for label in visible_day_labels %}
+    <div class="text-xs text-neutral-400">{{ label }}</div>
+    {% endfor %}
+    <div class="text-xs text-neutral-400 text-right">Week</div>
+  </div>
 
-<div class="grid gap-2" style="grid-template-columns: repeat({{ grid_columns }}, minmax(0, 1fr));">
-  {% for label in visible_day_labels %}
-  <div class="text-xs text-neutral-400">{{ label }}</div>
-  {% endfor %}
-  <div class="text-xs text-neutral-400 text-right">Week</div>
-</div>
-
-<div class="grid gap-2 mt-2" style="grid-template-columns: repeat({{ grid_columns }}, minmax(0, 1fr));">
-{% for week in weeks %}
-  {% for d in week.days %}
-    {% if show_weekends or not d.is_weekend %}
+  <div class="grid gap-2 mt-2" style="grid-template-columns: repeat({{ grid_columns }}, minmax(0, 1fr));">
+  {% for week in weeks %}
+    {% for d in week.days %}
+      {% if show_weekends or not d.is_weekend %}
       {% set cls = (d.realized > 0) and 'cell-bg-pos' or (d.realized < 0) and 'cell-bg-neg' or 'bg-neutral-900' %}
       {% set day_identifier = d.date.strftime('%Y-%m-%d') %}
       {% set week_key = week.week_year ~ '-' ~ week.week_number %}
@@ -712,6 +710,8 @@
       </button>
     </div>
   </div>
+</div>
+
 </div>
 
 <script>
