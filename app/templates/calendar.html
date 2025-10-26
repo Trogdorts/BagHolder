@@ -3,7 +3,7 @@
 {% set ui_cfg = cfg.get('ui', {}) %}
 {% set notes_cfg = cfg.get('notes', {}) %}
 {% set show_unrealized_default = show_unrealized_flag if show_unrealized_flag is defined else ui_cfg.get('show_unrealized', True) %}
-{% set show_total_default = show_total_flag if show_total_flag is defined else ui_cfg.get('show_total', True) %}
+{% set show_market_value_default = show_market_value_flag if show_market_value_flag is defined else ui_cfg.get('show_market_value', ui_cfg.get('show_total', True)) %}
 {% set show_trade_count_badges = show_trade_badges if show_trade_badges is defined else ui_cfg.get('show_trade_count', False) %}
 {% set show_text_default = show_text_flag if show_text_flag is defined else ui_cfg.get('show_text', True) %}
 {% set show_percentages_default = show_percentages_flag if show_percentages_flag is defined else ui_cfg.get('show_percentages', True) %}
@@ -12,7 +12,7 @@
 {% set notes_enabled = notes_enabled_flag if notes_enabled_flag is defined else notes_cfg.get('enabled', True) %}
 <div x-data="calendarToolbar({
         showUnrealized: {{ 'true' if show_unrealized_default else 'false' }},
-        showTotal: {{ 'true' if show_total_default else 'false' }},
+        showMarketValue: {{ 'true' if show_market_value_default else 'false' }},
         showExcludeControls: {{ 'true' if show_exclude_controls else 'false' }},
         showPercentages: {{ 'true' if show_percentages_default else 'false' }},
         showWeekends: {{ 'true' if show_weekends else 'false' }},
@@ -236,12 +236,12 @@
           </button>
           <button type="button"
                   class="toolbar-toggle"
-                  :class="{ 'is-active': !showTotal }"
-                  @click="toggleTotal()"
-                  aria-pressed="{{ 'true' if show_total_default else 'false' }}"
-                  :aria-pressed="showTotal.toString()">
-            <span x-text="showTotal ? 'Hide total' : 'Show total'">
-              {% if show_total_default %}Hide total{% else %}Show total{% endif %}
+                  :class="{ 'is-active': !showMarketValue }"
+                  @click="toggleMarketValue()"
+                  aria-pressed="{{ 'true' if show_market_value_default else 'false' }}"
+                  :aria-pressed="showMarketValue.toString()">
+            <span x-text="showMarketValue ? 'Hide market value' : 'Show market value'">
+              {% if show_market_value_default %}Hide market value{% else %}Show market value{% endif %}
             </span>
           </button>
           <button type="button"
@@ -310,7 +310,7 @@
            data-day-cell="{{ day_identifier }}"
            data-day-realized="{{ '%.10g'|format(d.realized) }}"
            data-day-unrealized="{{ '%.10g'|format(d.unrealized) }}"
-           data-day-total="{{ '%.10g'|format(d.total) }}"
+           data-day-market-value="{{ '%.10g'|format(d.market_value) }}"
            data-day-invested="{{ '%.10g'|format(d.invested) }}"
            data-day-has-values="{{ 'true' if d.has_values else 'false' }}"
            data-day-in-month="{{ 'true' if d.in_month else 'false' }}"
@@ -367,8 +367,8 @@
             Unrealized: {{ d.unrealized|money }}
           </div>
           <div class="text-neutral-200"
-               x-show="showTotal" x-cloak>
-            Total: {{ d.total|money }}
+               x-show="showMarketValue" x-cloak>
+            Market value: {{ d.market_value|money }}
           </div>
         </div>
         {% endif %}
@@ -761,10 +761,10 @@ async function updateUiPreferences(payload) {
 function calendarToolbar(initialState = {}) {
   return {
     showUnrealized: !!initialState.showUnrealized,
-    showTotal:
-      initialState.showTotal === undefined
+    showMarketValue:
+      initialState.showMarketValue === undefined
         ? true
-        : !!initialState.showTotal,
+        : !!initialState.showMarketValue,
     showExcludeControls:
       initialState.showExcludeControls === undefined
         ? true
@@ -787,13 +787,13 @@ function calendarToolbar(initialState = {}) {
         this.showUnrealized = previous;
       }
     },
-    async toggleTotal() {
-      const previous = this.showTotal;
+    async toggleMarketValue() {
+      const previous = this.showMarketValue;
       const next = !previous;
-      this.showTotal = next;
-      const saved = await updateUiPreferences({ show_total: next });
+      this.showMarketValue = next;
+      const saved = await updateUiPreferences({ show_market_value: next });
       if (!saved) {
-        this.showTotal = previous;
+        this.showMarketValue = previous;
       }
     },
     async toggleExcludeControls() {
@@ -993,7 +993,7 @@ const dayImpactSimulator = (() => {
       cell,
       realized: parseNumber(cell.dataset.dayRealized),
       unrealized: parseNumber(cell.dataset.dayUnrealized),
-      total: parseNumber(cell.dataset.dayTotal),
+      marketValue: parseNumber(cell.dataset.dayMarketValue),
       invested: parseNumber(cell.dataset.dayInvested),
       hasValues: cell.dataset.dayHasValues === 'true',
       inMonth: cell.dataset.dayInMonth === 'true',
@@ -2204,7 +2204,7 @@ function updateTradeIndicators(dateStr, trades) {
         <p class="text-sm text-red-400 hidden" data-manual-error></p>
         <p class="text-sm leading-relaxed text-amber-200 bg-amber-900/40 border border-amber-500/40 rounded px-3 py-2">
           Manual overrides are not recommended when trades are also tracked for this day. The next trade import or recompute
-          will overwrite these values and can leave your stock totals mismatched.
+          will overwrite these values and can leave your stock market values mismatched.
         </p>
         <label class="block text-sm space-y-1">
           <span class="text-neutral-300">Realized</span>

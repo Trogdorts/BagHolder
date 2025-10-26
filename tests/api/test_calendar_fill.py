@@ -116,7 +116,7 @@ def test_average_fill_for_missing_unrealized(tmp_path, monkeypatch):
     db.dispose_engine()
 
 
-def test_total_includes_cumulative_realized_and_unrealized(tmp_path, monkeypatch):
+def test_market_value_reflects_invested_and_unrealized(tmp_path, monkeypatch):
     data_dir = tmp_path / "data"
     monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
     app = create_app()
@@ -135,8 +135,8 @@ def test_total_includes_cumulative_realized_and_unrealized(tmp_path, monkeypatch
             DailySummary(
                 date="2024-03-01",
                 realized=10.0,
-                unrealized=100.0,
-                total_invested=0.0,
+                unrealized=35.0,
+                total_invested=100.0,
                 updated_at="now",
             )
         )
@@ -144,8 +144,8 @@ def test_total_includes_cumulative_realized_and_unrealized(tmp_path, monkeypatch
             DailySummary(
                 date="2024-03-02",
                 realized=90.0,
-                unrealized=150.0,
-                total_invested=0.0,
+                unrealized=50.0,
+                total_invested=125.0,
                 updated_at="now",
             )
         )
@@ -153,8 +153,8 @@ def test_total_includes_cumulative_realized_and_unrealized(tmp_path, monkeypatch
             DailySummary(
                 date="2024-03-04",
                 realized=-20.0,
-                unrealized=90.0,
-                total_invested=0.0,
+                unrealized=-10.0,
+                total_invested=220.0,
                 updated_at="now",
             )
         )
@@ -166,13 +166,13 @@ def test_total_includes_cumulative_realized_and_unrealized(tmp_path, monkeypatch
         weeks = response.context["weeks"]
 
         march_first = _get_day(weeks, date(2024, 3, 1))
-        assert march_first["total"] == pytest.approx(135.0)
+        assert march_first["market_value"] == pytest.approx(135.0)
 
         march_second = _get_day(weeks, date(2024, 3, 2))
-        assert march_second["total"] == pytest.approx(275.0)
+        assert march_second["market_value"] == pytest.approx(175.0)
 
         march_fourth = _get_day(weeks, date(2024, 3, 4))
-        assert march_fourth["total"] == pytest.approx(195.0)
+        assert march_fourth["market_value"] == pytest.approx(210.0)
 
     db.dispose_engine()
 

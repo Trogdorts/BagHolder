@@ -31,7 +31,8 @@ from pydantic import BaseModel, Field, field_validator
 router = APIRouter()
 class UIPreferencesUpdate(BaseModel):
     show_unrealized: Optional[bool] = None
-    show_total: Optional[bool] = None
+    show_market_value: Optional[bool] = None
+    show_total: Optional[bool] = None  # Legacy support
     show_percentages: Optional[bool] = None
     show_weekends: Optional[bool] = None
     show_exclude_controls: Optional[bool] = None
@@ -104,7 +105,9 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     fill_strategy = ui_cfg.get("unrealized_fill_strategy", "carry_forward")
     show_trade_badges = coerce_bool(ui_cfg.get("show_trade_count", False), False)
     show_unrealized_default = coerce_bool(ui_cfg.get("show_unrealized", True), True)
-    show_total_default = coerce_bool(ui_cfg.get("show_total", True), True)
+    show_market_value_default = coerce_bool(
+        ui_cfg.get("show_market_value", ui_cfg.get("show_total", True)), True
+    )
     show_text_default = coerce_bool(ui_cfg.get("show_text", True), True)
     show_percentages_default = coerce_bool(ui_cfg.get("show_percentages", True), True)
     show_weekends_default = coerce_bool(ui_cfg.get("show_weekends", True), True)
@@ -232,37 +235,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     cal = calendar.Calendar(firstweekday=0)  # Monday=0 or Sunday=6; we'll keep 0
     weeks = []
     month_days = cal.monthdatescalendar(year, month)
-    displayed_end = month_days[-1][-1] if month_days else date(year, month, 1)
-
-    cumulative_rows = (
-        db.query(DailySummary)
-        .filter(DailySummary.date <= displayed_end.strftime("%Y-%m-%d"))
-        .order_by(DailySummary.date.asc())
-        .all()
-    )
-    cumulative_realized_dates: List[date] = []
-    cumulative_realized_values: List[float] = []
-    cumulative_running_total = 0.0
-    for row in cumulative_rows:
-        try:
-            row_date = date.fromisoformat(row.date)
-        except (TypeError, ValueError):
-            continue
-        try:
-            realized_amount = float(row.realized)
-        except (TypeError, ValueError):
-            realized_amount = 0.0
-        cumulative_running_total += realized_amount
-        cumulative_realized_dates.append(row_date)
-        cumulative_realized_values.append(cumulative_running_total)
-
-    def get_cumulative_realized(day: date) -> float:
-        if not cumulative_realized_dates:
-            return 0.0
-        idx = bisect_right(cumulative_realized_dates, day) - 1
-        if idx < 0:
-            return 0.0
-        return cumulative_realized_values[idx]
     def calculate_percentage(realized_value: float, invested_samples: List[float]) -> Optional[float]:
         total_invested = sum(
             abs(sample)
@@ -345,11 +317,10 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             percent_value = (
                 calculate_percentage(realized_value, [invested_value]) if ds else None
             )
-            cumulative_realized_total = get_cumulative_realized(d)
             if is_future_day and not ds:
-                total_value = 0.0
+                market_value = 0.0
             else:
-                total_value = invested_value + cumulative_realized_total + day_unrealized
+                market_value = invested_value + day_unrealized
 
             wk.append({
                 "date": d,
@@ -360,7 +331,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "invested": invested_value,
                 "show_realized": show_realized,
                 "percent": percent_value,
-                "total": total_value,
+                "market_value": market_value,
                 "note": note_text,
                 "note_updated_at": note_updated_at,
                 "has_note": bool(note_text.strip()),
@@ -496,7 +467,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "cfg": request.app.state.config.raw,
         "show_trade_badges": show_trade_badges,
         "show_unrealized_flag": show_unrealized_default,
-        "show_total_flag": show_total_default,
+        "show_market_value_flag": show_market_value_default,
         "show_text_flag": show_text_default,
         "show_percentages_flag": show_percentages_default,
         "show_weekends_flag": show_weekends_default,
@@ -520,7 +491,7 @@ def update_ui_preferences(payload: UIPreferencesUpdate, request: Request):
     updates: Dict[str, bool] = {}
     for field, key in (
         ("show_unrealized", "show_unrealized"),
-        ("show_total", "show_total"),
+        ("show_market_value", "show_market_value"),
         ("show_percentages", "show_percentages"),
         ("show_weekends", "show_weekends"),
         ("show_exclude_controls", "show_exclude_controls"),
@@ -530,6 +501,13 @@ def update_ui_preferences(payload: UIPreferencesUpdate, request: Request):
         if value is not None:
             ui_section[key] = bool(value)
             updates[key] = bool(value)
+
+    if payload.show_total is not None and "show_market_value" not in updates:
+        ui_section["show_market_value"] = bool(payload.show_total)
+        updates["show_market_value"] = bool(payload.show_total)
+
+    if "show_total" in ui_section:
+        ui_section.pop("show_total")
 
     if not updates:
         raise HTTPException(status_code=400, detail="No preferences provided.")

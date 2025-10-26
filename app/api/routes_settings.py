@@ -5,7 +5,7 @@ import re
 import signal
 from dataclasses import asdict
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import quote_plus
 from zipfile import BadZipFile
 
@@ -515,7 +515,8 @@ def save_settings(
     theme: str = Form(...),
     show_text: str = Form("true"),
     show_unrealized: str = Form("true"),
-    show_total: str = Form("true"),
+    show_market_value: Optional[str] = Form(None),
+    show_total: Optional[str] = Form(None),
     show_trade_count: str = Form("false"),
     show_percentages: str = Form("true"),
     show_weekends: str = Form("false"),
@@ -546,7 +547,12 @@ def save_settings(
     ui_section["theme"] = theme
     ui_section["show_text"] = coerce_bool(show_text, True)
     ui_section["show_unrealized"] = coerce_bool(show_unrealized, True)
-    ui_section["show_total"] = coerce_bool(show_total, True)
+    resolved_market_value = show_market_value
+    if resolved_market_value is None:
+        resolved_market_value = show_total if show_total is not None else "true"
+    ui_section["show_market_value"] = coerce_bool(resolved_market_value, True)
+    if "show_total" in ui_section:
+        ui_section.pop("show_total")
     ui_section["show_trade_count"] = coerce_bool(show_trade_count, False)
     ui_section["show_percentages"] = coerce_bool(show_percentages, True)
     ui_section["show_weekends"] = coerce_bool(show_weekends, False)
