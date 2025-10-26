@@ -24,6 +24,7 @@ class DailySummary(Base):
     __tablename__ = "daily_summary"
     date: Mapped[str] = mapped_column(String, primary_key=True)  # YYYY-MM-DD
     realized: Mapped[float] = mapped_column(Float, default=0.0)
+    unrealized: Mapped[float] = mapped_column(Float, default=0.0)
     total_invested: Mapped[float] = mapped_column(Float, default=0.0)
     updated_at: Mapped[str] = mapped_column(String, default="", nullable=False)
 

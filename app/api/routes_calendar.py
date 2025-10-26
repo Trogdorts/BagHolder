@@ -186,6 +186,73 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 max_value = magnitude
         return max_value
 
+    def win_loss_counts(rows: List[DailySummary]) -> tuple[int, int]:
+        wins = 0
+        losses = 0
+        for row in rows:
+            try:
+                realized_value = float(row.realized)
+            except (TypeError, ValueError):
+                continue
+            if math.isclose(realized_value, 0.0, abs_tol=0.005):
+                continue
+            if realized_value > 0:
+                wins += 1
+            elif realized_value < 0:
+                losses += 1
+        return wins, losses
+
+    def win_ratio_from_counts(wins: int, losses: int) -> Optional[float]:
+        total = wins + losses
+        if total == 0:
+            return None
+        return round((wins / total) * 100.0, 1)
+
+    # Monthly totals
+    month_realized = sum(float(r.realized) for r in q)
+    month_invested_samples: List[float] = []
+    for row in q:
+        try:
+            magnitude = abs(float(row.total_invested))
+        except (TypeError, ValueError):
+            continue
+        if math.isclose(magnitude, 0.0, abs_tol=0.005):
+            continue
+        month_invested_samples.append(magnitude)
+    month_invested_average = (
+        sum(month_invested_samples) / len(month_invested_samples)
+        if month_invested_samples
+        else 0.0
+    )
+    month_invested_count = len(month_invested_samples)
+    month_percent = calculate_percentage(
+        month_realized,
+        [float(r.total_invested) for r in q],
+    )
+
+    month_wins, month_losses = win_loss_counts(q)
+    month_win_ratio = win_ratio_from_counts(month_wins, month_losses)
+
+    month_year_wins = 0
+    month_year_losses = 0
+    for row in q:
+        try:
+            row_date = date.fromisoformat(row.date)
+        except (TypeError, ValueError):
+            continue
+        if row_date.year != year:
+            continue
+        try:
+            realized_value = float(row.realized)
+        except (TypeError, ValueError):
+            continue
+        if math.isclose(realized_value, 0.0, abs_tol=0.005):
+            continue
+        if realized_value > 0:
+            month_year_wins += 1
+        elif realized_value < 0:
+            month_year_losses += 1
+
     for week in month_days:
         iso_year, iso_week, _ = week[0].isocalendar()
         wk = []
@@ -205,6 +272,14 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                     invested_value = float(ds.total_invested)
                 except (TypeError, ValueError):
                     invested_value = 0.0
+            unrealized_value = 0.0
+            if ds:
+                try:
+                    unrealized_value = float(getattr(ds, "unrealized", 0.0))
+                except (TypeError, ValueError):
+                    unrealized_value = 0.0
+            else:
+                unrealized_value = month_invested_average if month_invested_samples else 0.0
             day_trades = trades_by_day.get(day_key, [])
             has_trades = bool(day_trades)
             has_sell_trade = any(
@@ -217,10 +292,15 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             percent_value = (
                 calculate_percentage(realized_value, [invested_value]) if ds else None
             )
-            if is_future_day and not ds:
-                market_value = 0.0
-            else:
+            if ds:
                 market_value = invested_value
+            elif is_future_day:
+                market_value = 0.0
+            elif month_invested_samples:
+                estimated_market = month_invested_average * month_invested_count
+                market_value = float(round(estimated_market, -1))
+            else:
+                market_value = 0.0
 
             wk.append({
                 "date": d,
@@ -231,6 +311,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "show_realized": show_realized,
                 "percent": percent_value,
                 "market_value": market_value,
+                "unrealized": unrealized_value,
                 "note": note_text,
                 "note_updated_at": note_updated_at,
                 "has_note": bool(note_text.strip()),
@@ -289,13 +370,6 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "updated_at": month_note_row.updated_at if month_note_row and month_note_row.updated_at else "",
     }
 
-    # Monthly totals
-    month_realized = sum(float(r.realized) for r in q)
-    month_percent = calculate_percentage(
-        month_realized,
-        [float(r.total_invested) for r in q],
-    )
-
     # Yearly totals
     year_rows = (
         db.query(DailySummary)
@@ -308,6 +382,11 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         year_realized,
         [float(r.total_invested) for r in year_rows],
     )
+
+    year_wins_total, year_losses_total = win_loss_counts(year_rows)
+    year_win_ratio = win_ratio_from_counts(year_wins_total, year_losses_total)
+    year_other_wins = max(year_wins_total - month_year_wins, 0)
+    year_other_losses = max(year_losses_total - month_year_losses, 0)
 
     # Rolling 12 month totals ending at the current month
     rolling_rows = (
@@ -346,11 +425,21 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
         "year_realized": year_realized,
         "year_trading_days": year_trading_days,
         "year_percent": year_percent,
+        "year_win_ratio": year_win_ratio,
+        "year_wins": year_wins_total,
+        "year_losses": year_losses_total,
         "rolling_year_realized": rolling_realized,
         "rolling_year_trading_days": rolling_trading_days,
         "rolling_year_percent": rolling_year_percent,
         "year_other_invested_max": year_other_invested_max,
         "rolling_year_other_invested_max": rolling_other_invested_max,
+        "month_win_ratio": month_win_ratio,
+        "month_wins": month_wins,
+        "month_losses": month_losses,
+        "month_year_wins": month_year_wins,
+        "month_year_losses": month_year_losses,
+        "year_other_wins": year_other_wins,
+        "year_other_losses": year_other_losses,
         "cfg": request.app.state.config.raw,
         "show_trade_badges": show_trade_badges,
         "show_market_value_flag": show_market_value_default,
