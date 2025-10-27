@@ -4,6 +4,7 @@ from datetime import datetime, date
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import math
+from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.core.models import DailySummary, Trade
@@ -69,16 +70,32 @@ def _trade_to_record(trade: Trade) -> Optional[Dict[str, Any]]:
     except (TypeError, ValueError):
         return None
 
+    timestamp = None
+    time_value = (getattr(trade, "time", "") or "").strip()
+    if time_value:
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                parsed_time = datetime.strptime(time_value, fmt).time()
+                timestamp = datetime.combine(trade_date, parsed_time)
+                break
+            except ValueError:
+                continue
+
     return {
         "date": trade_date,
         "side": action,
         "symbol": symbol,
         "quantity": float(quantity),
         "price": float(price),
+        "fee": float(getattr(trade, "fee", 0.0) or 0.0),
+        "sequence": int(getattr(trade, "sequence", 0) or 0),
+        "datetime": timestamp,
     }
 
 
-def calculate_daily_trade_map(trades: Sequence[Trade]) -> Dict[str, Dict[str, float]]:
+def calculate_daily_trade_map(
+    trades: Sequence[Trade], *, method: str = "fifo"
+) -> Dict[str, Dict[str, float]]:
     """Compute realized profit/loss for each trading day.
 
     Parameters
@@ -101,7 +118,7 @@ def calculate_daily_trade_map(trades: Sequence[Trade]) -> Dict[str, Dict[str, fl
     if not records:
         return {}
 
-    daily_df = compute_daily_pnl_records(records)
+    daily_df = compute_daily_pnl_records(records, method=method)
     result: Dict[str, Dict[str, float]] = {}
     for row in daily_df.to_dict("records"):
         day_key = _normalize_date(row.get("date"))
@@ -152,7 +169,9 @@ def upsert_daily_summaries(
         row.updated_at = timestamp
 
 
-def recompute_daily_summaries(db: Session) -> Dict[str, Dict[str, float]]:
+def recompute_daily_summaries(
+    db: Session, *, method: str = "fifo"
+) -> Dict[str, Dict[str, float]]:
     """Recalculate and persist daily summaries for all recorded trades."""
 
     trades = (
@@ -161,6 +180,6 @@ def recompute_daily_summaries(db: Session) -> Dict[str, Dict[str, float]]:
         .all()
     )
 
-    daily_map = calculate_daily_trade_map(trades)
+    daily_map = calculate_daily_trade_map(trades, method=method)
     upsert_daily_summaries(db, daily_map)
     return daily_map

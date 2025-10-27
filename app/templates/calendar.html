@@ -2322,10 +2322,13 @@ function createTradeEditorHTML() {
         <table class="min-w-full text-sm text-left text-neutral-200 border border-neutral-800">
           <thead class="bg-neutral-900 text-neutral-400">
             <tr>
+              <th class="px-2 py-1 border border-neutral-800 text-center">Order</th>
               <th class="px-2 py-1 border border-neutral-800">Action</th>
               <th class="px-2 py-1 border border-neutral-800">Symbol</th>
               <th class="px-2 py-1 border border-neutral-800 text-right">Quantity</th>
               <th class="px-2 py-1 border border-neutral-800 text-right">Price</th>
+              <th class="px-2 py-1 border border-neutral-800 text-center">Time</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right">Fee</th>
               <th class="px-2 py-1 border border-neutral-800 text-center">Note</th>
               <th class="px-2 py-1 border border-neutral-800 text-right">Actions</th>
             </tr>
@@ -2385,12 +2388,16 @@ function captureTradeEditorSnapshot() {
     const symbolInput = row.querySelector('.trade-symbol');
     const qtyInput = row.querySelector('.trade-qty');
     const priceInput = row.querySelector('.trade-price');
+    const timeInput = row.querySelector('.trade-time');
+    const feeInput = row.querySelector('.trade-fee');
     return {
       id: row.dataset.tradeId ? String(row.dataset.tradeId) : '',
       action: actionSelect ? actionSelect.value : '',
       symbol: symbolInput ? symbolInput.value : '',
       qty: qtyInput ? qtyInput.value : '',
       price: priceInput ? priceInput.value : '',
+      time: timeInput ? timeInput.value : '',
+      fee: feeInput ? feeInput.value : '',
     };
   });
   return JSON.stringify(normalized);
@@ -2437,7 +2444,7 @@ function setupTradeEditor(trades, dateStr, options = {}) {
   if (addButton) {
     addButton.onclick = () => {
       hideTradeEditorSuccess();
-      tbody.appendChild(createTradeRow({ action: 'BUY', symbol: '', qty: '', price: '' }, dateStr));
+      tbody.appendChild(createTradeRow({ action: 'BUY', symbol: '', qty: '', price: '', time: '', fee: '' }, dateStr));
       updateTradeEmptyState();
       refreshTradeEditorDirtyState();
     };
@@ -2501,11 +2508,55 @@ function createTradeRow(trade, dateStr) {
   if (trade && trade.id !== undefined && trade.id !== null) {
     row.dataset.tradeId = String(trade.id);
   }
+  if (trade && trade.sequence !== undefined && trade.sequence !== null) {
+    row.dataset.tradeSequence = String(trade.sequence);
+  }
 
   const markDirty = () => {
     hideTradeEditorSuccess();
     refreshTradeEditorDirtyState();
   };
+
+  const moveRow = (direction) => {
+    const tbody = row.parentElement;
+    if (!tbody) {
+      return;
+    }
+    if (direction < 0) {
+      const previous = row.previousElementSibling;
+      if (previous) {
+        tbody.insertBefore(row, previous);
+        markDirty();
+      }
+    } else if (direction > 0) {
+      const next = row.nextElementSibling;
+      if (next) {
+        tbody.insertBefore(next, row);
+        markDirty();
+      }
+    }
+  };
+
+  const orderCell = document.createElement('td');
+  orderCell.className = 'px-2 py-1 border border-neutral-800 text-center align-middle';
+  const orderControls = document.createElement('div');
+  orderControls.className = 'flex items-center justify-center gap-1';
+  const moveUpButton = document.createElement('button');
+  moveUpButton.type = 'button';
+  moveUpButton.className = 'trade-move-up inline-flex h-6 w-6 items-center justify-center rounded border border-neutral-700 bg-neutral-900 text-xs text-neutral-300 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600';
+  moveUpButton.title = 'Move up';
+  moveUpButton.textContent = '↑';
+  moveUpButton.addEventListener('click', () => moveRow(-1));
+  const moveDownButton = document.createElement('button');
+  moveDownButton.type = 'button';
+  moveDownButton.className = 'trade-move-down inline-flex h-6 w-6 items-center justify-center rounded border border-neutral-700 bg-neutral-900 text-xs text-neutral-300 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600';
+  moveDownButton.title = 'Move down';
+  moveDownButton.textContent = '↓';
+  moveDownButton.addEventListener('click', () => moveRow(1));
+  orderControls.appendChild(moveUpButton);
+  orderControls.appendChild(moveDownButton);
+  orderCell.appendChild(orderControls);
+  row.appendChild(orderCell);
 
   const actionCell = document.createElement('td');
   actionCell.className = 'px-2 py-1 border border-neutral-800';
@@ -2560,6 +2611,35 @@ function createTradeRow(trade, dateStr) {
   priceInput.addEventListener('input', markDirty);
   priceCell.appendChild(priceInput);
   row.appendChild(priceCell);
+
+  const timeCell = document.createElement('td');
+  timeCell.className = 'px-2 py-1 border border-neutral-800 text-center';
+  const timeInput = document.createElement('input');
+  timeInput.type = 'time';
+  timeInput.step = '1';
+  timeInput.className = 'trade-time w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-center';
+  timeInput.value = trade && trade.time ? trade.time : '';
+  timeInput.addEventListener('change', markDirty);
+  timeInput.addEventListener('input', markDirty);
+  timeCell.appendChild(timeInput);
+  row.appendChild(timeCell);
+
+  const feeCell = document.createElement('td');
+  feeCell.className = 'px-2 py-1 border border-neutral-800 text-right';
+  const feeInput = document.createElement('input');
+  feeInput.type = 'number';
+  feeInput.min = '0';
+  feeInput.step = '0.01';
+  feeInput.className = 'trade-fee w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  if (trade && trade.fee !== undefined && trade.fee !== null) {
+    const feeNumber = Number(trade.fee);
+    if (Number.isFinite(feeNumber)) {
+      feeInput.value = feeNumber === 0 ? '' : String(feeNumber);
+    }
+  }
+  feeInput.addEventListener('input', markDirty);
+  feeCell.appendChild(feeInput);
+  row.appendChild(feeCell);
 
   const noteCell = document.createElement('td');
   noteCell.className = 'px-2 py-1 border border-neutral-800 text-center';
@@ -2668,6 +2748,8 @@ function restoreTradeEditorState(state) {
     symbol: row && row.symbol ? row.symbol : '',
     qty: row && row.qty !== undefined ? row.qty : '',
     price: row && row.price !== undefined ? row.price : '',
+    time: row && row.time !== undefined ? row.time : '',
+    fee: row && row.fee !== undefined ? row.fee : '',
   }));
 
   const overrideSnapshot = typeof state.initialSnapshot === 'string' ? state.initialSnapshot : undefined;
@@ -2840,6 +2922,36 @@ function normalizeNumberString(value) {
   return value.replace(/[^0-9.\-]/g, '');
 }
 
+function normalizeTradeTime(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const match = trimmed.match(/^(\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?$/);
+  if (!match) {
+    return '';
+  }
+  const hour = Number(match[1]);
+  const minute = match[2] !== undefined ? Number(match[2]) : 0;
+  const second = match[3] !== undefined ? Number(match[3]) : null;
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+    return '';
+  }
+  if (!Number.isInteger(minute) || minute < 0 || minute > 59) {
+    return '';
+  }
+  if (second !== null) {
+    if (!Number.isInteger(second) || second < 0 || second > 59) {
+      return '';
+    }
+    return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`;
+  }
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
 function parseTradeCsv(text) {
   const rows = parseCsv(text);
   if (!rows.length) {
@@ -2851,6 +2963,8 @@ function parseTradeCsv(text) {
     symbol: ['symbol', 'ticker', 'security'],
     qty: ['qty', 'quantity', 'shares', 'volume'],
     price: ['price', 'fill price', 'trade price', 'avg price'],
+    time: ['time', 'trade time', 'execution time', 'filled at', 'fill time'],
+    fee: ['fee', 'fees', 'commission', 'commissions'],
   };
 
   const normalizedHeader = rows[0].map((cell) => cell.trim().toLowerCase());
@@ -2891,6 +3005,14 @@ function parseTradeCsv(text) {
       symbol: columnIndex.symbol < cells.length ? cells[columnIndex.symbol] : '',
       qty: columnIndex.qty < cells.length ? cells[columnIndex.qty] : '',
       price: columnIndex.price < cells.length ? cells[columnIndex.price] : '',
+      time:
+        columnIndex.time !== undefined && columnIndex.time < cells.length
+          ? cells[columnIndex.time]
+          : '',
+      fee:
+        columnIndex.fee !== undefined && columnIndex.fee < cells.length
+          ? cells[columnIndex.fee]
+          : '',
     };
 
     const trimmed = {
@@ -2898,9 +3020,11 @@ function parseTradeCsv(text) {
       symbol: (values.symbol || '').trim(),
       qty: (values.qty || '').trim(),
       price: (values.price || '').trim(),
+      time: (values.time || '').trim(),
+      fee: (values.fee || '').trim(),
     };
 
-    if (!trimmed.action && !trimmed.symbol && !trimmed.qty && !trimmed.price) {
+    if (!trimmed.action && !trimmed.symbol && !trimmed.qty && !trimmed.price && !trimmed.time && !trimmed.fee) {
       return;
     }
 
@@ -2934,6 +3058,15 @@ function parseTradeCsv(text) {
 
     const qtyValue = parseFloat(normalizeNumberString(trimmed.qty));
     const priceValue = parseFloat(normalizeNumberString(trimmed.price));
+    const timeValue = trimmed.time ? normalizeTradeTime(trimmed.time) : '';
+    if (trimmed.time && !timeValue) {
+      errors.push(`Row ${rowNumber}: Time must be in HH:MM or HH:MM:SS format.`);
+      return;
+    }
+    let feeValue = 0;
+    if (trimmed.fee) {
+      feeValue = parseFloat(normalizeNumberString(trimmed.fee));
+    }
 
     if (!Number.isFinite(qtyValue) || qtyValue <= 0) {
       errors.push(`Row ${rowNumber}: Quantity must be a positive number.`);
@@ -2945,11 +3078,18 @@ function parseTradeCsv(text) {
       return;
     }
 
+    if (trimmed.fee && (!Number.isFinite(feeValue) || feeValue < 0)) {
+      errors.push(`Row ${rowNumber}: Fee must be zero or a positive number.`);
+      return;
+    }
+
     trades.push({
       action: normalizedAction,
       symbol: trimmed.symbol.toUpperCase(),
       qty: Math.abs(qtyValue),
       price: Math.abs(priceValue),
+      time: timeValue,
+      fee: trimmed.fee ? Math.abs(feeValue) : 0,
     });
   });
 
@@ -2971,13 +3111,16 @@ function applyImportedTrades(trades, dateStr) {
   }
 
   tbody.innerHTML = '';
-  trades.forEach((trade) => {
+  trades.forEach((trade, index) => {
     tbody.appendChild(
       createTradeRow({
         action: trade.action,
         symbol: trade.symbol,
         qty: trade.qty,
         price: trade.price,
+        time: trade.time || '',
+        fee: trade.fee !== undefined ? trade.fee : '',
+        sequence: index,
       }, dateStr)
     );
   });
@@ -3053,7 +3196,9 @@ function exportTradesToCsv(dateStr) {
     const symbol = (row.symbol || '').trim();
     const qty = (row.qty || '').toString().trim();
     const price = (row.price || '').toString().trim();
-    const hasAny = symbol || qty || price;
+    const time = (row.time || '').toString().trim();
+    const fee = (row.fee || '').toString().trim();
+    const hasAny = symbol || qty || price || time || fee;
     if (!hasAny) {
       return;
     }
@@ -3067,6 +3212,8 @@ function exportTradesToCsv(dateStr) {
       symbol.toUpperCase(),
       qty,
       price,
+      time,
+      fee || '0',
     ]);
   });
 
@@ -3081,7 +3228,7 @@ function exportTradesToCsv(dateStr) {
   }
 
   const csvRows = [
-    ['Action', 'Symbol', 'Quantity', 'Price'],
+    ['Action', 'Symbol', 'Quantity', 'Price', 'Time', 'Fee'],
     ...rows,
   ];
 
@@ -3113,16 +3260,20 @@ function saveTrades(dateStr) {
   const trades = [];
   let hasError = false;
 
-  rows.forEach(row => {
+  rows.forEach((row, index) => {
     const actionSelect = row.querySelector('.trade-action');
     const symbolInput = row.querySelector('.trade-symbol');
     const qtyInput = row.querySelector('.trade-qty');
     const priceInput = row.querySelector('.trade-price');
+    const timeInput = row.querySelector('.trade-time');
+    const feeInput = row.querySelector('.trade-fee');
 
     const symbol = symbolInput ? symbolInput.value.trim() : '';
     const qtyRaw = qtyInput ? qtyInput.value.trim() : '';
     const priceRaw = priceInput ? priceInput.value.trim() : '';
-    const isEmpty = !symbol && !qtyRaw && !priceRaw;
+    const timeRaw = timeInput ? timeInput.value.trim() : '';
+    const feeRaw = feeInput ? feeInput.value.trim() : '';
+    const isEmpty = !symbol && !qtyRaw && !priceRaw && !timeRaw && !feeRaw;
 
     if (isEmpty) {
       row.classList.remove('bg-danger-soft');
@@ -3131,7 +3282,11 @@ function saveTrades(dateStr) {
 
     const qty = parseFloat(qtyRaw);
     const price = parseFloat(priceRaw);
-    if (!symbol || Number.isNaN(qty) || Number.isNaN(price) || qty <= 0 || price <= 0) {
+    let fee = 0;
+    if (feeRaw) {
+      fee = parseFloat(feeRaw);
+    }
+    if (!symbol || Number.isNaN(qty) || Number.isNaN(price) || qty <= 0 || price <= 0 || (feeRaw && (Number.isNaN(fee) || fee < 0))) {
       row.classList.add('bg-danger-soft');
       hasError = true;
       return;
@@ -3144,6 +3299,9 @@ function saveTrades(dateStr) {
       action: actionSelect ? actionSelect.value : 'BUY',
       qty: Math.abs(qty),
       price: Math.abs(price),
+      time: timeRaw || null,
+      fee: feeRaw ? Math.abs(fee) : 0,
+      sequence: index,
     });
   });
 

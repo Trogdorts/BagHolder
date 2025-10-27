@@ -36,6 +36,33 @@ def test_ledger_registers_loss_for_sell_transactions():
     assert realized["2024-02-02"] == pytest.approx(-0.01)
 
 
+def test_ledger_respects_lifo_method():
+    ledger = Ledger(method="lifo")
+    trades = [
+        {"date": "2024-06-01", "symbol": "ABC", "action": "BUY", "qty": 1, "price": 10.0},
+        {"date": "2024-06-01", "symbol": "ABC", "action": "BUY", "qty": 1, "price": 20.0},
+        {"date": "2024-06-02", "symbol": "ABC", "action": "SELL", "qty": 1, "price": 15.0},
+        {"date": "2024-06-03", "symbol": "ABC", "action": "SELL", "qty": 1, "price": 25.0},
+    ]
+
+    realized = ledger.apply(trades)
+
+    assert realized["2024-06-02"] == pytest.approx(-5.0)
+    assert realized["2024-06-03"] == pytest.approx(15.0)
+
+
+def test_ledger_accounts_for_fees():
+    ledger = Ledger()
+    trades = [
+        {"date": "2024-07-01", "symbol": "FEE", "action": "BUY", "qty": 1, "price": 10.0, "fee": 1.0},
+        {"date": "2024-07-02", "symbol": "FEE", "action": "SELL", "qty": 1, "price": 15.0, "fee": 2.0},
+    ]
+
+    realized = ledger.apply(trades)
+
+    assert realized["2024-07-02"] == pytest.approx(2.0)
+
+
 def test_count_trade_win_losses_classifies_days_by_net_realized_pnl():
     trades = [
         {"date": date(2024, 3, 1), "symbol": "ABC", "action": "BUY", "qty": 10, "price": 10.0},

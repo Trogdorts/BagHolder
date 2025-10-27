@@ -5,11 +5,13 @@ from __future__ import annotations
 import os
 from datetime import datetime
 import re
+from collections import defaultdict
 from typing import Any, Dict, Iterable, List, Tuple
 
 from fastapi import FastAPI
 
 from app.core import database
+from app.core.config import AppConfig
 from app.core.lifecycle import reload_application_state
 from app.core.models import NoteDaily, Trade
 from app.services.data_reset import clear_all_data
@@ -149,7 +151,10 @@ def import_simulated_trades(
         )
 
     with database.SessionLocal() as session:
+        sequence_by_date: Dict[str, int] = defaultdict(int)
         for trade in prepared:
+            sequence = sequence_by_date[trade["date"]]
+            sequence_by_date[trade["date"]] = sequence + 1
             session.add(
                 Trade(
                     date=trade["date"],
@@ -158,6 +163,9 @@ def import_simulated_trades(
                     qty=trade["qty"],
                     price=trade["price"],
                     amount=trade["amount"],
+                    time="",
+                    fee=0.0,
+                    sequence=sequence,
                 )
             )
         if note_lines_by_date:
@@ -182,7 +190,8 @@ def import_simulated_trades(
                         )
                     )
         session.flush()
-        recompute_daily_summaries(session)
+        method = _resolve_method_from_app(app)
+        recompute_daily_summaries(session, method=method)
         session.commit()
 
     reload_application_state(app, data_dir=base_data_dir)
@@ -204,3 +213,15 @@ def import_simulated_trades(
         "days_with_trades": len(unique_days),
         "reload": True,
     }
+def _resolve_method_from_app(app: FastAPI | None) -> str:
+    if app is None:
+        return "fifo"
+    cfg = getattr(app.state, "config", None)
+    if isinstance(cfg, AppConfig):
+        try:
+            method = cfg.raw.get("trades", {}).get("pnl_method", "fifo")
+        except AttributeError:  # pragma: no cover - defensive guard
+            return "fifo"
+        if isinstance(method, str) and method.strip().lower() == "lifo":
+            return "lifo"
+    return "fifo"

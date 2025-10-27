@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.models import Base, Meta
 
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 
 def _ensure_daily_summary_unrealized_column(engine) -> None:
@@ -59,7 +59,34 @@ def _ensure_users_admin_column(engine) -> None:
                 conn.execute(
                     text("UPDATE users SET is_admin = 1 WHERE id = :user_id"),
                     {"user_id": first_user[0]},
+            )
+
+
+def _ensure_trade_editor_columns(engine) -> None:
+    """Add new trade metadata columns if they do not yet exist."""
+
+    with engine.begin() as conn:
+        columns = {
+            row[1]: row for row in conn.execute(text("PRAGMA table_info(trades)"))
+        }
+        if "time" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE trades ADD COLUMN time TEXT NOT NULL DEFAULT ''"
                 )
+            )
+        if "fee" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE trades ADD COLUMN fee FLOAT NOT NULL DEFAULT 0.0"
+                )
+            )
+        if "sequence" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE trades ADD COLUMN sequence INTEGER NOT NULL DEFAULT 0"
+                )
+            )
 
 
 def ensure_seed(db_path: str):
@@ -89,6 +116,10 @@ def ensure_seed(db_path: str):
         if current_version < 5:
             _ensure_daily_summary_unrealized_column(engine)
             current_version = 5
+
+        if current_version < 6:
+            _ensure_trade_editor_columns(engine)
+            current_version = 6
 
         if current_version < SCHEMA_VERSION:
             schema_meta.value = str(SCHEMA_VERSION)
