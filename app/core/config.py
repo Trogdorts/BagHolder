@@ -62,6 +62,9 @@ DEFAULT_CONFIG = {
     "export": {
         "fill_empty_with_zero": True,
     },
+    "trades": {
+        "pnl_method": "fifo",
+    },
     "diagnostics": {
         "debug_logging": False,
         "log_max_bytes": 1_048_576,

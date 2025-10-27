@@ -37,6 +37,20 @@ from pydantic import BaseModel, Field, field_validator
 router = APIRouter(dependencies=[Depends(require_user)])
 
 log = logging.getLogger(__name__)
+
+
+def _resolve_pnl_method(request: Request | None) -> str:
+    if request is None:
+        return "fifo"
+    cfg = getattr(request.app.state, "config", None)
+    if isinstance(cfg, AppConfig):
+        try:
+            method = cfg.raw.get("trades", {}).get("pnl_method", "fifo")
+        except AttributeError:  # pragma: no cover - defensive guard
+            method = "fifo"
+        if isinstance(method, str) and method.strip().lower() == "lifo":
+            return "lifo"
+    return "fifo"
 class UIPreferencesUpdate(BaseModel):
     show_market_value: Optional[bool] = None
     show_total: Optional[bool] = None  # Legacy support
@@ -52,6 +66,9 @@ class TradeUpdate(BaseModel):
     action: str
     qty: float
     price: float
+    time: Optional[str] = None
+    fee: float = 0.0
+    sequence: Optional[int] = None
 
     @field_validator("symbol")
     @classmethod
@@ -78,6 +95,50 @@ class TradeUpdate(BaseModel):
             raise ValueError("Must be a number") from exc
         if number <= 0:
             raise ValueError("Must be greater than zero")
+        return number
+
+    @field_validator("time", mode="before")
+    @classmethod
+    def validate_time(cls, value: Optional[str]) -> str:
+        if value is None:
+            return ""
+        text = str(value).strip()
+        if not text:
+            return ""
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                parsed = datetime.strptime(text, fmt)
+                if fmt == "%H:%M":
+                    return parsed.strftime("%H:%M")
+                return parsed.strftime("%H:%M:%S")
+            except ValueError:
+                continue
+        raise ValueError("Time must be in HH:MM or HH:MM:SS format")
+
+    @field_validator("fee", mode="before")
+    @classmethod
+    def validate_fee(cls, value: Optional[float]) -> float:
+        if value in (None, ""):
+            return 0.0
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:  # pragma: no cover - validation guard
+            raise ValueError("Fee must be a number") from exc
+        if number < 0:
+            raise ValueError("Fee cannot be negative")
+        return number
+
+    @field_validator("sequence", mode="before")
+    @classmethod
+    def validate_sequence(cls, value: Optional[int]) -> Optional[int]:
+        if value in (None, ""):
+            return None
+        try:
+            number = int(value)
+        except (TypeError, ValueError) as exc:  # pragma: no cover - validation guard
+            raise ValueError("Sequence must be an integer") from exc
+        if number < 0:
+            raise ValueError("Sequence must be zero or greater")
         return number
 
 
@@ -592,7 +653,7 @@ def get_trades_for_day(date_str: str, db: Session = Depends(get_session)):
     trades = (
         db.query(Trade)
         .filter(Trade.date == date_str)
-        .order_by(Trade.id.asc())
+        .order_by(Trade.sequence.asc(), Trade.id.asc())
         .all()
     )
     return {
@@ -603,6 +664,9 @@ def get_trades_for_day(date_str: str, db: Session = Depends(get_session)):
                 "action": trade.action,
                 "qty": float(trade.qty),
                 "price": float(trade.price),
+                "time": trade.time or "",
+                "fee": float(trade.fee or 0.0),
+                "sequence": int(trade.sequence or 0),
             }
             for trade in trades
         ]
@@ -613,19 +677,20 @@ def get_trades_for_day(date_str: str, db: Session = Depends(get_session)):
 def save_trades_for_day(
     date_str: str,
     payload: TradeUpdatePayload,
+    request: Request = None,
     db: Session = Depends(get_session),
 ):
     existing = (
         db.query(Trade)
         .filter(Trade.date == date_str)
-        .order_by(Trade.id.asc())
+        .order_by(Trade.sequence.asc(), Trade.id.asc())
         .all()
     )
     existing_map = {trade.id: trade for trade in existing}
     seen_ids = set()
     had_existing_trades = bool(existing)
 
-    for trade_update in payload.trades:
+    for sequence_index, trade_update in enumerate(payload.trades):
         trade = None
         if trade_update.id is not None:
             trade = existing_map.get(trade_update.id)
@@ -637,13 +702,19 @@ def save_trades_for_day(
             seen_ids.add(trade_update.id)
 
         amount = trade_update.qty * trade_update.price
-        signed_amount = amount if trade_update.action == "SELL" else -amount
+        if trade_update.action == "SELL":
+            signed_amount = amount - trade_update.fee
+        else:
+            signed_amount = -(amount + trade_update.fee)
 
         if trade is not None:
             trade.symbol = trade_update.symbol
             trade.action = trade_update.action
             trade.qty = trade_update.qty
             trade.price = trade_update.price
+            trade.time = trade_update.time or ""
+            trade.fee = trade_update.fee
+            trade.sequence = sequence_index
             trade.amount = signed_amount
         else:
             db.add(
@@ -653,6 +724,9 @@ def save_trades_for_day(
                     action=trade_update.action,
                     qty=trade_update.qty,
                     price=trade_update.price,
+                    time=trade_update.time or "",
+                    fee=trade_update.fee,
+                    sequence=sequence_index,
                     amount=signed_amount,
                 )
             )
@@ -675,11 +749,12 @@ def save_trades_for_day(
 
     db.flush()
 
-    daily_map = recompute_daily_summaries(db)
+    method = _resolve_pnl_method(request)
+    daily_map = recompute_daily_summaries(db, method=method)
     updated = (
         db.query(Trade)
         .filter(Trade.date == date_str)
-        .order_by(Trade.id.asc())
+        .order_by(Trade.sequence.asc(), Trade.id.asc())
         .all()
     )
     response_trades = [
@@ -689,6 +764,9 @@ def save_trades_for_day(
             "action": trade.action,
             "qty": float(trade.qty),
             "price": float(trade.price),
+            "time": trade.time or "",
+            "fee": float(trade.fee or 0.0),
+            "sequence": int(trade.sequence or 0),
         }
         for trade in updated
     ]
@@ -740,11 +818,15 @@ def generate_simulated_trades(request: Request, payload: SimulationRequest):
 
 
 @router.delete("/api/trades/{date_str}")
-def clear_trades_for_day(date_str: str, db: Session = Depends(get_session)):
+def clear_trades_for_day(
+    date_str: str,
+    request: Request = None,
+    db: Session = Depends(get_session),
+):
     trades = (
         db.query(Trade)
         .filter(Trade.date == date_str)
-        .order_by(Trade.id.asc())
+        .order_by(Trade.sequence.asc(), Trade.id.asc())
         .all()
     )
     deleted = 0
@@ -758,7 +840,8 @@ def clear_trades_for_day(date_str: str, db: Session = Depends(get_session)):
 
     db.flush()
 
-    daily_map = recompute_daily_summaries(db)
+    method = _resolve_pnl_method(request)
+    daily_map = recompute_daily_summaries(db, method=method)
 
     db.commit()
 

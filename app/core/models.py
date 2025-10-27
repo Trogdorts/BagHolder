@@ -16,6 +16,9 @@ class Trade(Base):
     action: Mapped[str] = mapped_column(String)  # BUY/SELL
     qty: Mapped[float] = mapped_column(Float)
     price: Mapped[float] = mapped_column(Float)
+    time: Mapped[str] = mapped_column(String, default="", nullable=False)
+    fee: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    sequence: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     amount: Mapped[float] = mapped_column(Float)
     # Composite uniqueness to prevent duplicate imports
     __table_args__ = (UniqueConstraint("date", "symbol", "action", "qty", "price", "amount", name="uix_trade_dedup"),)

@@ -8,6 +8,7 @@
 {% set show_percentages = cfg.ui.get('show_percentages', True) %}
 {% set default_view = cfg.view.get('default', 'latest') %}
 {% set export_fill_empty = cfg.export.get('fill_empty_with_zero', True) %}
+{% set trade_pnl_method = cfg.get('trades', {}).get('pnl_method', 'fifo') %}
 {% set server_port = cfg.get('server', {}).get('port', 8012) %}
 {% set running_in_docker = running_in_docker | default(false) %}
 <div class="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -308,6 +309,16 @@
             <select id="market_value_fill_mode" name="market_value_fill_mode" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
               <option value="average" {% if market_value_fill_mode == 'average' %}selected{% endif %}>Estimate from monthly average</option>
               <option value="zero" {% if market_value_fill_mode == 'zero' %}selected{% endif %}>Leave blank when no data</option>
+            </select>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="pnl_method" class="block text-sm font-medium text-neutral-200">Realized profit calculation</label>
+              <p class="mt-1 text-xs text-neutral-500">Choose whether profit uses FIFO (first in, first out) or LIFO (last in, first out) trade matching.</p>
+            </div>
+            <select id="pnl_method" name="pnl_method" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="fifo" {% if trade_pnl_method == 'fifo' %}selected{% endif %}>FIFO (oldest trades close first)</option>
+              <option value="lifo" {% if trade_pnl_method == 'lifo' %}selected{% endif %}>LIFO (newest trades close first)</option>
             </select>
           </div>
         </div>
