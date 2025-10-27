@@ -704,6 +704,7 @@ def save_settings(
     trade_badge_text_color: str = Form("#111827"),
     note_icon_color: str = Form("#80cbc4"),
     export_empty_values: str = Form("zero"),
+    pnl_method: str = Form("fifo"),
 ):
     cfg: AppConfig = request.app.state.config
     server_section = cfg.raw.setdefault("server", {})
@@ -711,6 +712,7 @@ def save_settings(
     notes_section = cfg.raw.setdefault("notes", {})
     diagnostics_section = cfg.raw.setdefault("diagnostics", {})
     view_section = cfg.raw.setdefault("view", {})
+    trades_section = cfg.raw.setdefault("trades", {})
     current_port = server_section.get("port", DEFAULT_CONFIG["server"]["port"])
     server_section["port"] = _coerce_port(listening_port, current_port)
     ui_section["theme"] = theme
@@ -750,6 +752,9 @@ def save_settings(
     export_preference = export_empty_values.lower()
     cfg.raw.setdefault("export", {})
     cfg.raw["export"]["fill_empty_with_zero"] = export_preference != "empty"
+    method_value = _resolve_form_str(pnl_method, "fifo")
+    normalized_method = (method_value or "fifo").strip().lower()
+    trades_section["pnl_method"] = "lifo" if normalized_method == "lifo" else "fifo"
     debug_logging_enabled = coerce_bool(debug_logging, diagnostics_section.get("debug_logging", False))
     diagnostics_section["debug_logging"] = debug_logging_enabled
     cfg.save()

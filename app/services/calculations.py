@@ -1,67 +1,16 @@
 import math
 from collections import defaultdict
 from datetime import date, datetime
-from typing import Iterable, List, Dict, Any, MutableMapping, Optional, Tuple
+from typing import Iterable, List, Dict, Any, Optional, Tuple
 
-
-def _apply_trade_to_position(
-    position: MutableMapping[str, float], side: str, qty: float, price: float
-) -> float:
-    """Apply a trade to an in-memory position and return realized P/L."""
-
-    shares = float(position.get("shares", 0.0) or 0.0)
-    avg_cost = float(position.get("avg_cost", 0.0) or 0.0)
-    realized = 0.0
-
-    if side == "BUY":
-        remaining = qty
-
-        if shares < 0:
-            cover_qty = min(remaining, -shares)
-            realized += (avg_cost - price) * cover_qty
-            shares += cover_qty
-            remaining -= cover_qty
-            if shares == 0:
-                avg_cost = 0.0
-
-        if remaining > 0:
-            cost_basis = avg_cost * shares if shares > 0 else 0.0
-            cost_basis += price * remaining
-            shares += remaining
-            avg_cost = cost_basis / shares if shares else 0.0
-
-    elif side == "SELL":
-        remaining = qty
-
-        if shares > 0:
-            sell_qty = min(remaining, shares)
-            realized += (price - avg_cost) * sell_qty
-            shares -= sell_qty
-            remaining -= sell_qty
-            if shares == 0:
-                avg_cost = 0.0
-
-        if remaining > 0:
-            short_shares = -shares if shares < 0 else 0.0
-            total_proceeds = avg_cost * short_shares if short_shares else 0.0
-            total_proceeds += price * remaining
-            short_shares += remaining
-            if short_shares:
-                avg_cost = total_proceeds / short_shares
-                shares = -short_shares
-
-    position["shares"] = shares
-    position["avg_cost"] = avg_cost
-    position["last_price"] = price
-
-    return realized
+from app.services.trade_matching import apply_trade, create_position
 
 
 class Ledger:
-    def __init__(self):
-        self.positions: Dict[str, Dict[str, float]] = defaultdict(
-            lambda: {"shares": 0.0, "avg_cost": 0.0, "last_price": None}
-        )
+    def __init__(self, *, method: str = "fifo"):
+        normalized = (method or "fifo") if isinstance(method, str) else "fifo"
+        self.method = "lifo" if str(normalized).strip().lower() == "lifo" else "fifo"
+        self.positions: Dict[str, Dict[str, Any]] = defaultdict(create_position)
         self.realized_by_date = defaultdict(float)
 
     def apply(self, trades: List[Dict[str, Any]]):
@@ -70,14 +19,7 @@ class Ledger:
         if not trades:
             return self.realized_by_date
 
-        # Trades are expected in chronological order; sort defensively by date.
-        sorted_trades = sorted(
-            trades,
-            key=lambda row: (
-                row.get("date"),
-                row.get("datetime"),
-            ),
-        )
+        sorted_trades = sorted(trades, key=_trade_sort_key)
 
         for trade in sorted_trades:
             raw_date = trade.get("date")
@@ -103,7 +45,8 @@ class Ledger:
                 continue
 
             position = self.positions[symbol]
-            realized = _apply_trade_to_position(position, side, qty, price)
+            fee = float(trade.get("fee") or 0.0)
+            realized = apply_trade(position, side, qty, price, fee=fee, method=self.method)
             if realized:
                 self.realized_by_date[day] += realized
 
@@ -130,7 +73,7 @@ def _normalize_trade_day(raw: Any) -> Optional[date]:
         return None
 
 
-def _trade_sort_key(trade: Dict[str, Any]) -> Tuple[str, str, float]:
+def _trade_sort_key(trade: Dict[str, Any]) -> Tuple[str, int, str, float]:
     """Provide a deterministic sort key for trade records."""
 
     day = trade.get("date")
@@ -140,6 +83,12 @@ def _trade_sort_key(trade: Dict[str, Any]) -> Tuple[str, str, float]:
         day_key = day.strftime("%Y-%m-%d")
     else:
         day_key = str(day)
+
+    sequence = trade.get("sequence")
+    try:
+        sequence_key = int(sequence)
+    except (TypeError, ValueError):  # pragma: no cover - defensive
+        sequence_key = 0
 
     stamp = trade.get("datetime")
     if isinstance(stamp, datetime):
@@ -159,7 +108,7 @@ def _trade_sort_key(trade: Dict[str, Any]) -> Tuple[str, str, float]:
     except (TypeError, ValueError):  # pragma: no cover - defensive
         numeric_id = 0.0
 
-    return (day_key, stamp_key, numeric_id)
+    return (day_key, sequence_key, stamp_key, numeric_id)
 
 
 def count_trade_win_losses(
@@ -167,6 +116,7 @@ def count_trade_win_losses(
     *,
     start: Optional[date] = None,
     end: Optional[date] = None,
+    method: str = "fifo",
 ) -> tuple[int, int]:
     """Count winning and losing days within an optional window.
 
@@ -177,9 +127,9 @@ def count_trade_win_losses(
     loss.
     """
 
-    positions: Dict[str, Dict[str, float]] = defaultdict(
-        lambda: {"shares": 0.0, "avg_cost": 0.0, "last_price": None}
-    )
+    normalized = (method or "fifo") if isinstance(method, str) else "fifo"
+    method_value = "lifo" if str(normalized).strip().lower() == "lifo" else "fifo"
+    positions: Dict[str, Dict[str, Any]] = defaultdict(create_position)
     daily_realized: Dict[date, float] = defaultdict(float)
 
     sorted_trades = sorted(trades, key=_trade_sort_key)
@@ -205,7 +155,8 @@ def count_trade_win_losses(
             continue
 
         position = positions[symbol]
-        realized = _apply_trade_to_position(position, side, qty, price)
+        fee = float(trade.get("fee") or 0.0)
+        realized = apply_trade(position, side, qty, price, fee=fee, method=method_value)
 
         if start and day < start:
             # Context-only trade; do not classify outcome but maintain position.
