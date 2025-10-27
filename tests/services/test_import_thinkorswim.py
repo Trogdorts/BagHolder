@@ -12,6 +12,7 @@ import pytest
 from app.services.import_thinkorswim import (
     compute_daily_pnl_records,
     parse_thinkorswim_csv,
+    parse_thinkorswim_daily_trades,
 )
 
 
@@ -45,6 +46,25 @@ Trade Date,Time,Action,Quantity,Symbol,Description,Price,Amount
         },
     ]
 
+    daily_records = parse_thinkorswim_daily_trades(content)
+
+    assert daily_records == [
+        {
+            "date": date(2024, 2, 5),
+            "side": "BUY",
+            "symbol": "AAPL",
+            "quantity": 1.0,
+            "price": 150.0,
+        },
+        {
+            "date": date(2024, 2, 5),
+            "side": "SELL",
+            "symbol": "AAPL",
+            "quantity": 1.0,
+            "price": 152.0,
+        },
+    ]
+
 
 def test_parse_simple_csv_without_section_heading():
     content = """Trade Date,Action,Symbol,Qty,Price,Amount
@@ -73,6 +93,25 @@ def test_parse_simple_csv_without_section_heading():
         },
     ]
 
+    daily_records = parse_thinkorswim_daily_trades(content)
+
+    assert daily_records == [
+        {
+            "date": date(2024, 2, 6),
+            "side": "BUY",
+            "symbol": "MSFT",
+            "quantity": 10.0,
+            "price": 315.5,
+        },
+        {
+            "date": date(2024, 2, 7),
+            "side": "SELL",
+            "symbol": "MSFT",
+            "quantity": 5.0,
+            "price": 320.0,
+        },
+    ]
+
 
 def test_parse_plaintext_statement():
     content = (
@@ -98,6 +137,25 @@ def test_parse_plaintext_statement():
             "qty": 1.0,
             "price": 192.5,
             "amount": 192.5,
+        },
+    ]
+
+    daily_records = parse_thinkorswim_daily_trades(content)
+
+    assert daily_records == [
+        {
+            "date": date(2025, 10, 21),
+            "side": "BUY",
+            "symbol": "AAPL",
+            "quantity": 1.0,
+            "price": 190.0,
+        },
+        {
+            "date": date(2025, 10, 22),
+            "side": "SELL",
+            "symbol": "AAPL",
+            "quantity": 1.0,
+            "price": 192.5,
         },
     ]
 
@@ -132,6 +190,25 @@ Trade Date,Trade Time,Type,Instrument,Quantity,Trade Price,Trade Amount
         },
     ]
 
+    daily_records = parse_thinkorswim_daily_trades(content)
+
+    assert daily_records == [
+        {
+            "date": date(2025, 10, 21),
+            "side": "BUY",
+            "symbol": "NERV",
+            "quantity": 200.0,
+            "price": 8.8101,
+        },
+        {
+            "date": date(2025, 10, 21),
+            "side": "SELL",
+            "symbol": "NERV",
+            "quantity": 200.0,
+            "price": 8.8101,
+        },
+    ]
+
 
 def test_parse_trade_history_section_with_blank_line():
     content = """Account Statement,,,,,
@@ -152,6 +229,18 @@ Trade Date,Time,Action,Quantity,Symbol,Description,Price,Amount
             "qty": 1.0,
             "price": 150.0,
             "amount": -150.0,
+        }
+    ]
+
+    daily_records = parse_thinkorswim_daily_trades(content)
+
+    assert daily_records == [
+        {
+            "date": date(2024, 2, 5),
+            "side": "BUY",
+            "symbol": "AAPL",
+            "quantity": 1.0,
+            "price": 150.0,
         }
     ]
 
@@ -185,6 +274,25 @@ Trade Date,Time,Action,Quantity,Symbol,Description,Price,Amount
             "qty": 2.0,
             "price": 320.0,
             "amount": 640.0,
+        },
+    ]
+
+    daily_records = parse_thinkorswim_daily_trades(content)
+
+    assert daily_records == [
+        {
+            "date": date(2024, 2, 5),
+            "side": "BUY",
+            "symbol": "AAPL",
+            "quantity": 1.0,
+            "price": 150.0,
+        },
+        {
+            "date": date(2024, 2, 6),
+            "side": "SELL",
+            "symbol": "MSFT",
+            "quantity": 2.0,
+            "price": 320.0,
         },
     ]
 
