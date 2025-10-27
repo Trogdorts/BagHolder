@@ -2,7 +2,7 @@ import csv
 import io
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
@@ -764,21 +764,89 @@ def _parse_statement_trade_lines(content: bytes) -> List[Dict[str, Any]]:
     return results
 
 
+def _collect_trade_rows(content: bytes) -> Tuple[Optional[str], List[Dict[str, Any]]]:
+    parsers: List[Tuple[str, Any]] = [
+        ("trade_history_section", _parse_statement_trade_lines),
+        ("plaintext_statement", _parse_plaintext_statement),
+        ("statement_rows", _read_statement_rows),
+        ("dataframe", _parse_dataframe),
+    ]
+
+    for name, parser in parsers:
+        rows = parser(content)
+        if rows:
+            return name, rows
+    return None, []
+
+
 def parse_thinkorswim_csv(content: bytes) -> List[Dict[str, Any]]:
-    section_rows = _parse_statement_trade_lines(content)
-    if section_rows:
-        log.debug("Parsed %s trades from 'Account Trade History' section", len(section_rows))
-        return _deduplicate_trades(section_rows)
+    source, rows = _collect_trade_rows(content)
+    if not rows:
+        return []
 
-    plaintext_rows = _parse_plaintext_statement(content)
-    if plaintext_rows:
-        return _deduplicate_trades(plaintext_rows)
+    if source == "trade_history_section":
+        log.debug("Parsed %s trades from 'Account Trade History' section", len(rows))
 
-    rows = _read_statement_rows(content)
-    if rows:
-        return _deduplicate_trades(rows)
+    return _deduplicate_trades(rows)
 
-    return _deduplicate_trades(_parse_dataframe(content))
+
+def _normalize_trade_date(value: Any) -> Optional[date]:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+            try:
+                return datetime.strptime(text, fmt).date()
+            except ValueError:
+                continue
+    return None
+
+
+def parse_thinkorswim_daily_trades(content: bytes) -> List[Dict[str, Any]]:
+    """Extract per-trade records suitable for daily P/L aggregation."""
+
+    _, rows = _collect_trade_rows(content)
+    if not rows:
+        return []
+
+    normalized_trades = []
+    for trade in _deduplicate_trades(rows):
+        trade_date = _normalize_trade_date(trade.get("date"))
+        if trade_date is None:
+            continue
+
+        action = (trade.get("action") or "").strip().upper()
+        if action not in {"BUY", "SELL"}:
+            continue
+
+        symbol = (trade.get("symbol") or "").strip().upper()
+        if not symbol:
+            continue
+
+        qty_val = _parse_float(trade.get("qty"))
+        price_val = _parse_float(trade.get("price"))
+
+        if qty_val is None or qty_val <= 0:
+            continue
+        if price_val is None or price_val <= 0:
+            continue
+
+        normalized_trades.append(
+            {
+                "date": trade_date,
+                "side": action,
+                "symbol": symbol,
+                "quantity": float(qty_val),
+                "price": float(price_val),
+            }
+        )
+
+    return normalized_trades
 
 
 def _apply_trade_to_position(
