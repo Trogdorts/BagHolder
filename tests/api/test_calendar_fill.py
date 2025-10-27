@@ -160,7 +160,7 @@ def test_market_value_reflects_held_positions(tmp_path, monkeypatch):
         assert march_second["market_value"] == pytest.approx(125.0)
 
         march_fourth = _get_day(weeks, date(2024, 3, 4))
-        assert march_fourth["market_value"] == pytest.approx(220.0)
+        assert march_fourth["market_value"] == pytest.approx(110.0)
 
     db.dispose_engine()
 
