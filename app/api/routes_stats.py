@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from app.core.authentication import require_user
 from app.core.database import get_session
 from app.core.models import DailySummary
 from app.services.summaries import group_by_week
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_user)])
 
 @router.get("/api/stats/monthly/{year}/{month}")
 def stats_monthly(year: int, month: int, db: Session = Depends(get_session)):

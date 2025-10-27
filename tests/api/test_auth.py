@@ -8,7 +8,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
 from app.main import create_app  # noqa: E402
-from app.main import _is_api_like_request  # noqa: E402
+from app.core.authentication import AuthContext, _is_api_like_request  # noqa: E402
 from app.api.routes_auth import (  # noqa: E402
     login_action,
     login_form,
@@ -172,14 +172,13 @@ def test_login_form_redirects_when_authenticated(tmp_path, monkeypatch):
     with db.SessionLocal() as session:
         user = session.query(User).first()
         request = _build_request(app)
-        request.state.user = user
-        response = login_form(request, db=session)
+        response = login_form(request, context=AuthContext(user=user, needs_setup=False))
         assert response.status_code == 303
         assert response.headers["location"] == "/"
 
     with db.SessionLocal() as session:
         request = _build_request(app)
-        response = login_form(request, db=session)
+        response = login_form(request, context=AuthContext(user=None, needs_setup=False))
         assert response.status_code == 200
         assert response.context["allow_registration"] is False
 

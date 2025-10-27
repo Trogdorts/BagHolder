@@ -1,11 +1,12 @@
 """Developer focused utility endpoints."""
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from app.core.authentication import require_user
 from app.core.lifecycle import reload_application_state
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 @router.post("/dev/reload")

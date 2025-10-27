@@ -2,31 +2,30 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.core.authentication import AuthContext, get_auth_context
 from app.core.database import get_session
+from app.core.templating import render_template
 from app.services.identity import IdentityService
 
 router = APIRouter()
 
 
 @router.get("/login", response_class=HTMLResponse)
-def login_form(request: Request, db: Session = Depends(get_session)):
-    if getattr(request.state, "user", None) is not None:
+def login_form(request: Request, context: AuthContext = Depends(get_auth_context)):
+    if context.user is not None:
         return RedirectResponse(url="/", status_code=303)
 
-    identity = IdentityService(db)
-    allow_registration = identity.allow_self_registration()
-    if allow_registration:
+    if context.needs_setup:
         return RedirectResponse(url="/setup", status_code=303)
 
-    context = {
-        "request": request,
-        "cfg": request.app.state.config.raw,
-        "allow_registration": allow_registration,
-        "login_error": None,
-        "registration_error": None,
-        "submitted_username": "",
-    }
-    return request.app.state.templates.TemplateResponse(request, "login.html", context)
+    return render_template(
+        request,
+        "login.html",
+        allow_registration=False,
+        login_error=None,
+        registration_error=None,
+        submitted_username="",
+    )
 
 
 @router.post("/login", response_class=HTMLResponse)
@@ -40,15 +39,15 @@ def login_action(
     result = identity.authenticate(username=username, password=password)
 
     if not result.success or result.user is None:
-        context = {
-            "request": request,
-            "cfg": request.app.state.config.raw,
-            "allow_registration": identity.allow_self_registration(),
-            "login_error": result.error_message or "Invalid username or password.",
-            "registration_error": None,
-            "submitted_username": username,
-        }
-        return request.app.state.templates.TemplateResponse(request, "login.html", context, status_code=401)
+        return render_template(
+            request,
+            "login.html",
+            status_code=401,
+            allow_registration=identity.allow_self_registration(),
+            login_error=result.error_message or "Invalid username or password.",
+            registration_error=None,
+            submitted_username=username,
+        )
 
     request.session["user_id"] = result.user.id
     return RedirectResponse(url="/", status_code=303)
@@ -67,20 +66,15 @@ def register_action(
 
     if not result.success or result.user is None:
         allow_registration = identity.allow_self_registration()
-        context = {
-            "request": request,
-            "cfg": request.app.state.config.raw,
-            "allow_registration": allow_registration,
-            "login_error": None,
-            "registration_error": result.error_message,
-            "submitted_username": username,
-        }
         status_code = 400 if allow_registration else 403
-        return request.app.state.templates.TemplateResponse(
+        return render_template(
             request,
             "login.html",
-            context,
             status_code=status_code,
+            allow_registration=allow_registration,
+            login_error=None,
+            registration_error=result.error_message,
+            submitted_username=username,
         )
 
     request.session["user_id"] = result.user.id

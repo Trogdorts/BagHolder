@@ -23,6 +23,8 @@ class SignedCookieSessionMiddleware(BaseHTTPMiddleware):
         *,
         cookie_name: str = "bagholder_session",
         https_only: bool = False,
+        max_age: int | None = None,
+        samesite: str = "lax",
     ) -> None:
         if not secret_key:
             raise RuntimeError("A non-empty secret_key is required for session middleware")
@@ -30,6 +32,11 @@ class SignedCookieSessionMiddleware(BaseHTTPMiddleware):
         self._secret = secret_key.encode("utf-8")
         self._cookie_name = cookie_name
         self._https_only = https_only
+        normalized_samesite = (samesite or "lax").lower()
+        if normalized_samesite not in {"lax", "strict", "none"}:
+            normalized_samesite = "lax"
+        self._samesite = normalized_samesite
+        self._max_age = max_age
 
     async def dispatch(self, request, call_next):
         session_data = self._load_cookie(request.cookies.get(self._cookie_name))
@@ -51,7 +58,8 @@ class SignedCookieSessionMiddleware(BaseHTTPMiddleware):
                 payload,
                 httponly=True,
                 secure=self._https_only,
-                samesite="lax",
+                samesite=self._samesite,
+                max_age=self._max_age,
                 path="/",
             )
         else:

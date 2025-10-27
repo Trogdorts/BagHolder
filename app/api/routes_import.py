@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
+from app.core.authentication import require_user
 from app.core.config import DEFAULT_CONFIG
 from app.core.database import get_session
 from app.core.logger import get_logger
@@ -15,7 +16,7 @@ from app.services.import_thinkorswim import parse_thinkorswim_csv
 from app.services.import_trades_csv import parse_trade_csv
 from app.services.trade_summaries import calculate_daily_trade_map, upsert_daily_summaries
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_user)])
 log = get_logger(__name__)
 
 

@@ -1,97 +1,13 @@
 import os
-import sys
-from pathlib import Path
 
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import JSONResponse, RedirectResponse
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.types import ASGIApp
-
-if __package__ in {None, ""}:
-    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.bootstrap import maybe_bootstrap_admin_from_env
 from app.core.lifecycle import reload_application_state
-from app.core import database
 from app.core.session import SignedCookieSessionMiddleware
-from app.services.identity import IdentityService
+from app.core.utils import coerce_bool
 from app.version import __version__
-
-
-class LoginRequiredMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp) -> None:
-        super().__init__(app)
-
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
-        path = request.url.path
-
-        if path.startswith("/static"):
-            return await call_next(request)
-
-        request.state.user = None
-
-        session_data = request.scope.get("session")
-        if not isinstance(session_data, dict):
-            session_data = {}
-            request.scope["session"] = session_data
-
-        session_user_id = session_data.get("user_id")
-        needs_setup = database.SessionLocal is None
-
-        if database.SessionLocal is not None:
-            with database.SessionLocal() as db_session:
-                identity = IdentityService(db_session)
-
-                if session_user_id is not None:
-                    user = identity.get_user_by_id(session_user_id)
-                    if user is not None:
-                        request.state.user = user
-                    else:
-                        session_data.pop("user_id", None)
-
-                if request.state.user is None:
-                    needs_setup = identity.allow_self_registration()
-
-        public_paths = {"/login", "/login/register", "/setup"}
-        is_public = (
-            path in public_paths
-            or path.startswith("/docs")
-            or path.startswith("/openapi")
-            or path.startswith("/static")
-        )
-
-        if request.state.user is None and not is_public:
-            if needs_setup and path != "/setup":
-                status_code = 303 if request.method.upper() != "GET" else 302
-                return RedirectResponse(url="/setup", status_code=status_code)
-
-            if _is_api_like_request(request, path):
-                return JSONResponse({"detail": "Authentication required."}, status_code=401)
-
-            status_code = 303 if request.method.upper() != "GET" else 302
-            return RedirectResponse(url="/login", status_code=status_code)
-
-        response = await call_next(request)
-        return response
-
-
-def _is_api_like_request(request: Request, path: str) -> bool:
-    accept_header = (request.headers.get("accept") or "").lower()
-    content_type = (request.headers.get("content-type") or "").lower()
-    return any(
-        [
-            path.startswith("/api"),
-            "application/json" in accept_header,
-            "application/json" in content_type,
-            request.headers.get("hx-request", "").lower() == "true",
-            request.headers.get("x-requested-with", "").lower() == "xmlhttprequest",
-            request.method.upper() != "GET" and "text/html" not in accept_header,
-        ]
-    )
 
 
 def create_app():
@@ -102,16 +18,42 @@ def create_app():
         name="static",
     )
 
-    secret_key = os.environ.get("BAGHOLDER_SECRET_KEY", "bagholder-dev-secret")
-    app.add_middleware(LoginRequiredMiddleware)
-    app.add_middleware(SignedCookieSessionMiddleware, secret_key=secret_key)
-
     cfg = reload_application_state(app)
     if cfg.path:
         data_dir = os.path.dirname(cfg.path)
     else:
         data_dir = None
     maybe_bootstrap_admin_from_env(data_dir=data_dir)
+    debug_logging_enabled = getattr(app.state, "debug_logging_enabled", False)
+    secret_key = os.environ.get("BAGHOLDER_SECRET_KEY", "bagholder-dev-secret")
+
+    secure_env = os.environ.get("BAGHOLDER_SESSION_SECURE")
+    if secure_env is not None:
+        https_only = coerce_bool(secure_env, False)
+    else:
+        https_only = not debug_logging_enabled
+
+    max_age_env = os.environ.get("BAGHOLDER_SESSION_MAX_AGE")
+    session_max_age = None
+    if max_age_env:
+        try:
+            session_max_age = int(max_age_env)
+        except ValueError:
+            session_max_age = None
+
+    samesite_env = (os.environ.get("BAGHOLDER_SESSION_SAMESITE") or "lax").lower()
+    allowed_samesite = {"lax", "strict", "none"}
+    samesite = samesite_env if samesite_env in allowed_samesite else "lax"
+    if samesite == "none" and not https_only:
+        https_only = True
+
+    app.add_middleware(
+        SignedCookieSessionMiddleware,
+        secret_key=secret_key,
+        https_only=https_only,
+        max_age=session_max_age,
+        samesite=samesite,
+    )
     app.state.version = __version__
     app.version = __version__
 
