@@ -1,4 +1,6 @@
+import logging
 import os
+import secrets
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +10,9 @@ from app.core.lifecycle import reload_application_state
 from app.core.session import SignedCookieSessionMiddleware
 from app.core.utils import coerce_bool
 from app.version import __version__
+
+
+log = logging.getLogger(__name__)
 
 
 def create_app():
@@ -25,13 +30,23 @@ def create_app():
         data_dir = None
     maybe_bootstrap_admin_from_env(data_dir=data_dir)
     debug_logging_enabled = getattr(app.state, "debug_logging_enabled", False)
-    secret_key = os.environ.get("BAGHOLDER_SECRET_KEY", "bagholder-dev-secret")
+    secret_key = os.environ.get("BAGHOLDER_SECRET_KEY")
+    if not secret_key:
+        secret_key = secrets.token_urlsafe(32)
+        log.warning(
+            "BAGHOLDER_SECRET_KEY is not set; generated an ephemeral session secret. "
+            "Set BAGHOLDER_SECRET_KEY to persist sessions across restarts."
+        )
 
     secure_env = os.environ.get("BAGHOLDER_SESSION_SECURE")
     if secure_env is not None:
         https_only = coerce_bool(secure_env, False)
     else:
-        https_only = not debug_logging_enabled
+        https_only = False
+        log.warning(
+            "Session cookies are not marked Secure. Set BAGHOLDER_SESSION_SECURE=1 "
+            "when deploying behind HTTPS."
+        )
 
     max_age_env = os.environ.get("BAGHOLDER_SESSION_MAX_AGE")
     session_max_age = None

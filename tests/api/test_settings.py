@@ -9,6 +9,7 @@ import shutil
 import zipfile
 import yaml
 from starlette.requests import Request
+from types import SimpleNamespace
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -35,7 +36,9 @@ from app.services.data_backup import create_backup_archive  # noqa: E402
 
 
 def _build_request(app, method: str = "POST"):
-    return Request({"type": "http", "app": app, "method": method, "path": "/", "headers": []})
+    request = Request({"type": "http", "app": app, "method": method, "path": "/", "headers": []})
+    request.state.user = SimpleNamespace(id=0, username="admin", is_admin=True)
+    return request
 
 
 class DummyUploadFile:
@@ -62,8 +65,21 @@ def test_shutdown_application_schedules_process_signal(tmp_path, monkeypatch):
         assert response.context["cleared"] is False
         assert response.background is not None
         asyncio.run(response.background())
-
+    
     mock_kill.assert_called_once()
+
+
+def test_shutdown_application_rejects_non_admin(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+    request = _build_request(app)
+    request.state.user = SimpleNamespace(id=2, username="user", is_admin=False)
+
+    response = shutdown_application(request)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/settings?user_error=forbidden"
 
 
 def test_export_settings_config_returns_current_state(tmp_path, monkeypatch):
@@ -113,6 +129,22 @@ def test_import_settings_config_updates_state_and_persists(tmp_path, monkeypatch
     assert contents["ui"]["theme"] == "light"
     assert contents["ui"]["show_trade_count"] is False
     assert contents["ui"]["show_percentages"] is False
+
+
+def test_import_settings_config_rejects_non_admin(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    new_config = app.state.config.as_dict()
+    upload = DummyUploadFile("config.json", json.dumps(new_config).encode("utf-8"))
+    request = _build_request(app)
+    request.state.user = SimpleNamespace(id=3, username="member", is_admin=False)
+
+    response = asyncio.run(import_settings_config(request, config_file=upload))
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/settings?config_error=forbidden"
 
 
 def test_import_settings_config_with_invalid_json_sets_error(tmp_path, monkeypatch):
@@ -351,6 +383,22 @@ def test_import_full_backup_replaces_data_and_reloads_state(tmp_path, monkeypatc
     assert (new_dir / "extra.txt").read_text(encoding="utf-8") == "extra"
     assert app.state.config.raw["ui"]["theme"] == "light"
     assert app.state.templates.env.globals["cfg"]["ui"]["theme"] == "light"
+
+
+def test_import_full_backup_rejects_non_admin(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    monkeypatch.setenv("BAGHOLDER_DATA", str(data_dir))
+    app = create_app()
+
+    archive_bytes = create_backup_archive(Path(app.state.config.path).parent)
+    upload = DummyUploadFile("backup.zip", archive_bytes)
+    request = _build_request(app)
+    request.state.user = SimpleNamespace(id=4, username="member", is_admin=False)
+
+    response = asyncio.run(import_full_backup(request, backup_file=upload))
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/settings?backup_error=forbidden"
 
 
 def test_update_account_password_changes_credentials(tmp_path, monkeypatch):

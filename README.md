@@ -34,7 +34,10 @@ BAGHOLDER_BOOTSTRAP_PASSWORD=super-secret-password
 ```
 
 When both bootstrap variables are provided the container automatically creates
-the initial administrator account on startup.
+the initial administrator account on startup. If `BAGHOLDER_SECRET_KEY` is not
+set the server generates a random, in-memory secret at launch; this allows
+quick experiments but invalidates existing sessions whenever the process
+restarts.
 
 ## Manual dev
 
@@ -62,9 +65,11 @@ By default the application stores its configuration, logs, and database under
 `BAGHOLDER_DATA` environment variable before starting the server.
 
 - `BAGHOLDER_SECRET_KEY` customizes the session signing key. Always set a strong
-  value in production deployments.
+  value in production deployments to keep sessions valid across restarts.
 - `BAGHOLDER_BOOTSTRAP_USERNAME` and `BAGHOLDER_BOOTSTRAP_PASSWORD` enable
   unattended administrator provisioning (e.g., Docker deployments).
+- `BAGHOLDER_SESSION_SECURE` forces the session cookie to require HTTPS when set
+  to a truthy value (recommended for TLS-enabled deployments).
 - `profitloss.db` (SQLite)
 - `config.yaml`
 - `logs/bagholder.log`
