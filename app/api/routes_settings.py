@@ -261,6 +261,24 @@ def _format_size(num_bytes: int) -> str:
 _HEX_COLOR_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
+def _resolve_form_str(value: Any, fallback: str) -> str:
+    """Return a plain string when a FastAPI ``Form`` parameter is unset."""
+
+    if isinstance(value, str):
+        return value
+    if value is None:
+        return fallback
+    getter = getattr(value, "get_default", None)
+    if callable(getter):
+        default_value = getter()
+        if isinstance(default_value, str):
+            return default_value
+    default_attr = getattr(value, "default", None)
+    if isinstance(default_attr, str):
+        return default_attr
+    return fallback
+
+
 def _sanitize_hex_color(value: str, default: str, existing: str | None = None) -> str:
     """Return a normalized hex color from user input."""
 
@@ -693,7 +711,8 @@ def save_settings(
     if resolved_market_value is None:
         resolved_market_value = show_total if show_total is not None else "true"
     ui_section["show_market_value"] = coerce_bool(resolved_market_value, True)
-    normalized_fill_mode = (market_value_fill_mode or "average").lower()
+    fill_mode_value = _resolve_form_str(market_value_fill_mode, "average")
+    normalized_fill_mode = (fill_mode_value or "average").strip().lower()
     if normalized_fill_mode not in {"average", "zero"}:
         normalized_fill_mode = "average"
     ui_section["market_value_fill_mode"] = normalized_fill_mode

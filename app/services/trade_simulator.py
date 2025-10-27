@@ -180,15 +180,51 @@ def update_price_cache(
     os.makedirs(cache_dir, exist_ok=True)
     end = datetime.today()
     start = end - timedelta(days=365 * years_back)
-    cached = [f[:-4] for f in os.listdir(cache_dir) if f.endswith(".csv")]
     candidates = [s for s in symbols if s.isalpha() and len(s) <= 5]
-    to_fetch = [s for s in candidates if s not in cached][: _MAX_FETCH_SYMBOLS]
 
-    if not to_fetch:
-        log.info("Price cache is up to date (%s symbols).", len(cached))
-        return cached
+    cached_files = {
+        filename[:-4]: os.path.join(cache_dir, filename)
+        for filename in os.listdir(cache_dir)
+        if filename.endswith(".csv")
+    }
 
-    log.info("Fetching %s symbols for price cache…", len(to_fetch))
+    stale: List[str] = []
+    fresh: List[str] = []
+    for symbol, path in cached_files.items():
+        try:
+            head = pd.read_csv(path, usecols=["Date"], nrows=1, parse_dates=["Date"])
+        except Exception as exc:  # pragma: no cover - corrupted cache
+            log.warning("Refreshing %s due to unreadable cache: %s", symbol, exc)
+            stale.append(symbol)
+            continue
+        if head.empty:
+            stale.append(symbol)
+            continue
+        oldest: datetime = head.loc[0, "Date"]
+        if oldest > start:
+            stale.append(symbol)
+        else:
+            fresh.append(symbol)
+
+    missing = [s for s in candidates if s not in cached_files]
+    to_fetch_all = stale + missing
+    if to_fetch_all:
+        limited = to_fetch_all[: _MAX_FETCH_SYMBOLS]
+        stale_selected = [s for s in limited if s in stale]
+        missing_selected = [s for s in limited if s in missing]
+        if stale_selected:
+            log.info(
+                "Refreshing %s cached symbols to extend price history…",
+                len(stale_selected),
+            )
+        if missing_selected:
+            log.info(
+                "Fetching %s new symbols for price cache…",
+                len(missing_selected),
+            )
+    else:
+        log.info("Price cache is up to date (%s symbols).", len(fresh))
+        return sorted(fresh)
 
     def fetch(sym: str) -> str | None:
         try:
@@ -211,7 +247,7 @@ def update_price_cache(
         return sym
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(fetch, sym) for sym in to_fetch]
+        futures = [executor.submit(fetch, sym) for sym in limited]
         for completed in as_completed(futures):  # pragma: no branch - iteration only
             symbol = completed.result()
             if symbol:
