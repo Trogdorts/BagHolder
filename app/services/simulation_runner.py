@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Any, Dict, Iterable
+import re
+from typing import Any, Dict, Iterable, List, Tuple
 
 from fastapi import FastAPI
 
 from app.core import database
 from app.core.lifecycle import reload_application_state
-from app.core.models import Trade
+from app.core.models import NoteDaily, Trade
 from app.services.data_reset import clear_all_data
 from app.services.trade_simulator import (
     SimulationError,
@@ -48,8 +49,31 @@ def build_default_simulation_options(account_dir: str) -> SimulationOptions:
     )
 
 
-def _prepare_trade_records(records: Iterable[Dict[str, Any]]) -> list[Dict[str, Any]]:
+_NOTE_PREFIX_PATTERN = re.compile(r"^\[\s*(BUY|SELL)\b", re.IGNORECASE)
+
+
+def _format_trade_note(action: str, qty: float, price: float, note: str) -> str:
+    action_label = action.strip().upper() or "BUY"
+    qty_value = float(qty)
+    if qty_value.is_integer():
+        qty_text = str(int(qty_value))
+    else:
+        qty_text = f"{qty_value:.2f}".rstrip("0").rstrip(".")
+    price_text = f"{float(price):.2f}"
+    prefix = f"[ {action_label} - {qty_text} x ${price_text} ]"
+    cleaned_note = (note or "").replace("\r\n", "\n").strip()
+    if not cleaned_note:
+        return prefix
+    if _NOTE_PREFIX_PATTERN.match(cleaned_note):
+        return cleaned_note
+    return f"{prefix} {cleaned_note}"
+
+
+def _prepare_trade_records(
+    records: Iterable[Dict[str, Any]]
+) -> Tuple[List[Dict[str, Any]], Dict[str, List[str]]]:
     prepared: list[Dict[str, Any]] = []
+    note_lines_by_date: Dict[str, List[str]] = {}
     for row in records:
         raw_date = str(row.get("date", "")).strip()
         try:
@@ -79,7 +103,14 @@ def _prepare_trade_records(records: Iterable[Dict[str, Any]]) -> list[Dict[str, 
                 "amount": amount,
             }
         )
-    return prepared
+
+        raw_note = row.get("notes") if "notes" in row else row.get("note")
+        note_text = str(raw_note or "").strip()
+        if note_text:
+            formatted_note = _format_trade_note(action, qty, price, note_text)
+            note_lines_by_date.setdefault(iso_date, []).append(formatted_note)
+
+    return prepared, note_lines_by_date
 
 
 def import_simulated_trades(
@@ -106,7 +137,9 @@ def import_simulated_trades(
     if result.trades.empty:
         raise SimulationError("The simulator did not return any trades to import.")
 
-    prepared = _prepare_trade_records(result.trades.to_dict("records"))
+    prepared, note_lines_by_date = _prepare_trade_records(
+        result.trades.to_dict("records")
+    )
 
     clear_all_data(account_dir)
 
@@ -127,6 +160,27 @@ def import_simulated_trades(
                     amount=trade["amount"],
                 )
             )
+        if note_lines_by_date:
+            timestamp = datetime.utcnow().isoformat()
+            for date_str in sorted(note_lines_by_date):
+                note_text = "\n\n".join(note_lines_by_date[date_str])
+                record = session.get(NoteDaily, date_str)
+                if record:
+                    existing = (record.note or "").rstrip()
+                    record.note = (
+                        f"{existing}\n\n{note_text}".strip() if existing else note_text
+                    )
+                    record.is_markdown = False
+                    record.updated_at = timestamp
+                else:
+                    session.add(
+                        NoteDaily(
+                            date=date_str,
+                            note=note_text,
+                            is_markdown=False,
+                            updated_at=timestamp,
+                        )
+                    )
         session.flush()
         recompute_daily_summaries(session)
         session.commit()
