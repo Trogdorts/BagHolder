@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
         "show_weekends": False,
         "show_exclude_controls": True,
         "highlight_weekends": True,
+        "market_value_fill_mode": "average",
         "auto_dark_mode": True,
         "opacity_gain": 0.7,
         "opacity_loss": 0.7,

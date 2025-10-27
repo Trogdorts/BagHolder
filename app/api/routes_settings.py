@@ -663,6 +663,7 @@ def save_settings(
     show_trade_count: str = Form("false"),
     show_percentages: str = Form("true"),
     show_weekends: str = Form("false"),
+    market_value_fill_mode: str = Form("average"),
     default_view: str = Form("latest"),
     listening_port: str = Form(str(DEFAULT_CONFIG["server"]["port"])),
     debug_logging: str = Form("false"),
@@ -692,6 +693,10 @@ def save_settings(
     if resolved_market_value is None:
         resolved_market_value = show_total if show_total is not None else "true"
     ui_section["show_market_value"] = coerce_bool(resolved_market_value, True)
+    normalized_fill_mode = (market_value_fill_mode or "average").lower()
+    if normalized_fill_mode not in {"average", "zero"}:
+        normalized_fill_mode = "average"
+    ui_section["market_value_fill_mode"] = normalized_fill_mode
     if "show_total" in ui_section:
         ui_section.pop("show_total")
     ui_section["show_trade_count"] = coerce_bool(show_trade_count, False)

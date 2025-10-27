@@ -180,6 +180,12 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
     show_market_value_default = coerce_bool(
         ui_cfg.get("show_market_value", ui_cfg.get("show_total", True)), True
     )
+    market_value_fill_mode = str(
+        ui_cfg.get("market_value_fill_mode", "average") or "average"
+    ).lower()
+    if market_value_fill_mode not in {"average", "zero"}:
+        market_value_fill_mode = "average"
+    estimate_missing_market_values = market_value_fill_mode == "average"
     show_text_default = coerce_bool(ui_cfg.get("show_text", True), True)
     show_percentages_default = coerce_bool(ui_cfg.get("show_percentages", True), True)
     show_weekends_default = coerce_bool(ui_cfg.get("show_weekends", True), True)
@@ -361,7 +367,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             )
             if ds:
                 market_value = invested_value
-            elif is_future_day:
+            elif is_future_day or not estimate_missing_market_values:
                 market_value = 0.0
             elif month_invested_samples:
                 estimated_market = month_invested_average

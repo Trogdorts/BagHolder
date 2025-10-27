@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 {% set show_market_value = cfg.ui.get('show_market_value', cfg.ui.get('show_total', True)) %}
+{% set market_value_fill_mode = cfg.ui.get('market_value_fill_mode', 'average') %}
 {% set show_trade_count = cfg.ui.get('show_trade_count', False) %}
 {% set show_text = cfg.ui.get('show_text', True) %}
 {% set show_weekends = cfg.ui.get('show_weekends', False) %}
@@ -297,6 +298,16 @@
             <select id="export_empty_values" name="export_empty_values" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
               <option value="zero" {% if export_fill_empty %}selected{% endif %}>Fill with 0</option>
               <option value="empty" {% if not export_fill_empty %}selected{% endif %}>Leave empty</option>
+            </select>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:items-start">
+            <div>
+              <label for="market_value_fill_mode" class="block text-sm font-medium text-neutral-200">Missing market values</label>
+              <p class="mt-1 text-xs text-neutral-500">Choose how days without trades display market value totals.</p>
+            </div>
+            <select id="market_value_fill_mode" name="market_value_fill_mode" class="w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100">
+              <option value="average" {% if market_value_fill_mode == 'average' %}selected{% endif %}>Estimate from monthly average</option>
+              <option value="zero" {% if market_value_fill_mode == 'zero' %}selected{% endif %}>Leave blank when no data</option>
             </select>
           </div>
         </div>
