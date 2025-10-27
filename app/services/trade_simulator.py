@@ -106,14 +106,25 @@ def _write_csv(df: pd.DataFrame, path: str) -> None:
     os.replace(tmp, path)
 
 
-def _calculate_rsi(series: pd.Series, window: int = 14) -> pd.Series:
-    delta = series.diff()
+def _calculate_rsi(
+    series: pd.Series, *, window: int = 14, min_periods: int | None = None
+) -> pd.Series:
+    if min_periods is None:
+        min_periods = window
+
+    delta = series.diff().fillna(0)
     up = delta.clip(lower=0)
     down = (-1 * delta.clip(upper=0)).abs()
-    ma_up = up.rolling(window).mean()
-    ma_down = down.rolling(window).mean()
-    rs = ma_up / ma_down
-    return 100 - (100 / (1 + rs))
+    ma_up = up.rolling(window, min_periods=min_periods).mean()
+    ma_down = down.rolling(window, min_periods=min_periods).mean()
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rs = ma_up / ma_down
+        rsi = 100 - (100 / (1 + rs))
+
+    rsi[(ma_up == 0) & (ma_down == 0)] = 50
+    rsi.fillna(100, inplace=True)
+    return rsi.clip(lower=0, upper=100)
 
 
 def _read_symbol_cache(path: str) -> List[str]:
@@ -306,6 +317,13 @@ def simulate_trades(price_map: Mapping[str, pd.DataFrame], options: SimulationOp
 
     log.info("Starting simulation with balance $%s", f"{cash:,.2f}")
 
+    relaxed_warmup = False
+    try:
+        relaxed_warmup = options.effective_months() <= 1
+    except ValueError:
+        # Validation elsewhere will surface this error; fall back to defaults here.
+        pass
+
     for symbol, raw_df in symbols:
         if len(raw_df) < 15:
             continue
@@ -320,9 +338,15 @@ def simulate_trades(price_map: Mapping[str, pd.DataFrame], options: SimulationOp
             long_window = max(short_window + 1, min(long_window, available // 2))
             rsi_window = max(3, min(rsi_window, available // 3))
 
-        df["SMA_short"] = df["Close"].rolling(short_window).mean()
-        df["SMA_long"] = df["Close"].rolling(long_window).mean()
-        df["RSI"] = _calculate_rsi(df["Close"], window=rsi_window)
+        short_min_periods = 1 if relaxed_warmup else short_window
+        long_min_periods = 1 if relaxed_warmup else long_window
+        rsi_min_periods = 1 if relaxed_warmup else rsi_window
+
+        df["SMA_short"] = df["Close"].rolling(short_window, min_periods=short_min_periods).mean()
+        df["SMA_long"] = df["Close"].rolling(long_window, min_periods=long_min_periods).mean()
+        df["RSI"] = _calculate_rsi(
+            df["Close"], window=rsi_window, min_periods=rsi_min_periods
+        )
         df.dropna(inplace=True)
         if df.empty:
             continue
