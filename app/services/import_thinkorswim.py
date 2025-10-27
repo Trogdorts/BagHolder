@@ -398,9 +398,12 @@ def _iter_trade_blocks(text: str) -> Iterable[Tuple[List[Tuple[str, str]], List[
     for raw_row in reader:
         row = [cell.strip() for cell in raw_row]
         if not any(row):
-            flushed = flush_current()
-            if flushed:
-                yield flushed
+            if header_mappings is None:
+                continue
+            if rows:
+                # Blank spacer line within a trade block; keep accumulating rows.
+                continue
+            # Blank line encountered after detecting headers but before data; skip.
             continue
 
         first_cell = row[0].strip().lower() if row else ""
@@ -683,7 +686,10 @@ def _extract_trade_section(text: str) -> List[str]:
         lowered = stripped.lower()
         if not stripped:
             if collecting:
-                break
+                # Some statements insert blank spacer lines between trade rows;
+                # treat them as delimiters but keep scanning for more trades
+                # within the same section instead of terminating early.
+                continue
             continue
         if "equities" in lowered or "profits" in lowered:
             break
