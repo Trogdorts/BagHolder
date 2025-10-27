@@ -12,10 +12,10 @@ ui:
   theme: dark
   show_text: true
   show_market_value: false
-  show_trade_count: false
+  show_trade_count: true
   show_percentages: false
   show_weekends: false
-  show_exclude_controls: true
+  show_exclude_controls: false
   highlight_weekends: true
   auto_dark_mode: true
   opacity_gain: 0.7
@@ -30,7 +30,7 @@ ui:
   danger_hover_color: '#b91c1c'
   trade_badge_color: '#34d399'
   trade_badge_text_color: '#111827'
-  market_value_fill_mode: average
+  market_value_fill_mode: zero
 notes:
   enabled: true
   icon_opacity: 0.25
@@ -56,6 +56,6 @@ backup:
 export:
   fill_empty_with_zero: true
 diagnostics:
-  debug_logging: false
+  debug_logging: true
   log_max_bytes: 1048576
   log_retention: 5

@@ -219,3 +219,5 @@ app/data/accounts/ddd/profitloss.db
 app/data/simulator/output/
 
 app/data/simulator/price_cache/
+
+app/data/logs/
