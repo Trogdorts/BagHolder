@@ -1782,7 +1782,8 @@ const dayImpactSimulator = (() => {
     }
     toggle.classList.toggle('toggle-excluded', !included);
     toggle.setAttribute('aria-pressed', included ? 'true' : 'false');
-    toggle.textContent = included ? 'Include week' : 'Excluded week';
+    toggle.dataset.state = included ? 'included' : 'excluded';
+    toggle.textContent = included ? 'Exclude week' : 'Include week';
   };
 
   cells.forEach((cell) => {
