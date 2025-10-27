@@ -364,7 +364,7 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             elif is_future_day:
                 market_value = 0.0
             elif month_invested_samples:
-                estimated_market = month_invested_average * month_invested_count
+                estimated_market = month_invested_average
                 market_value = float(round(estimated_market, -1))
             else:
                 market_value = 0.0
