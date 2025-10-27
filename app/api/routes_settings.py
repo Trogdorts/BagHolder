@@ -50,6 +50,11 @@ router = APIRouter(dependencies=[Depends(require_user)])
 log = logging.getLogger(__name__)
 
 
+def _is_admin_user(request: Request) -> bool:
+    current_user = getattr(request.state, "user", None)
+    return bool(current_user and getattr(current_user, "is_admin", False))
+
+
 def _is_running_in_docker() -> bool:
     """Best-effort detection to determine if the app is running inside Docker."""
     dockerenv_path = "/.dockerenv"
@@ -410,6 +415,7 @@ _CONFIG_IMPORT_ERRORS = {
     "invalid_json": "Unable to import configuration: the provided data was not valid JSON.",
     "invalid_type": "Unable to import configuration: the JSON must describe an object.",
     "apply_failed": "Unable to import configuration due to an unknown error.",
+    "forbidden": "You do not have permission to import configuration.",
 }
 
 _BACKUP_IMPORT_ERRORS = {
@@ -417,6 +423,7 @@ _BACKUP_IMPORT_ERRORS = {
     "invalid_zip": "Unable to import backup: the uploaded file is not a valid ZIP archive.",
     "unsafe": "Unable to import backup: archive paths would write outside the data directory.",
     "apply_failed": "Unable to import backup due to an unknown error.",
+    "forbidden": "You do not have permission to import backups.",
 }
 
 _TRADE_IMPORT_ERRORS = {
@@ -1190,6 +1197,8 @@ async def simulate_portfolio_trades(request: Request, account_id: str):
 
 @router.get("/settings/config/export")
 def export_settings_config(request: Request):
+    if not _is_admin_user(request):
+        raise HTTPException(status_code=403, detail="Forbidden.")
     cfg: AppConfig = request.app.state.config
     log.info("Configuration exported as JSON")
     return JSONResponse(
@@ -1207,6 +1216,11 @@ def _config_error_redirect(message: str) -> RedirectResponse:
 @router.post("/settings/config/import", response_class=HTMLResponse)
 async def import_settings_config(request: Request, config_file: UploadFile = File(None)):
     cfg: AppConfig = request.app.state.config
+
+    if not _is_admin_user(request):
+        if config_file is not None:
+            await config_file.close()
+        return RedirectResponse("/settings?config_error=forbidden", status_code=303)
 
     if config_file is None or not config_file.filename:
         log.warning("Configuration import attempted without a file")
@@ -1291,6 +1305,8 @@ def clear_settings_data(
 
 @router.post("/settings/shutdown", response_class=HTMLResponse)
 def shutdown_application(request: Request):
+    if not _is_admin_user(request):
+        return RedirectResponse("/settings?user_error=forbidden", status_code=303)
     cfg: AppConfig = request.app.state.config
 
     def _trigger_shutdown():
@@ -1319,6 +1335,8 @@ def shutdown_application(request: Request):
 
 @router.get("/settings/backup/export")
 def export_full_backup(request: Request):
+    if not _is_admin_user(request):
+        raise HTTPException(status_code=403, detail="Forbidden.")
     cfg: AppConfig = request.app.state.config
     data_dir = _resolve_data_directory(cfg)
     payload = create_backup_archive(data_dir)
@@ -1351,6 +1369,10 @@ def export_debug_logs(request: Request):
 
 @router.post("/settings/backup/import", response_class=HTMLResponse)
 async def import_full_backup(request: Request, backup_file: UploadFile = File(...)):
+    if not _is_admin_user(request):
+        if backup_file is not None:
+            await backup_file.close()
+        return RedirectResponse("/settings?backup_error=forbidden", status_code=303)
     cfg: AppConfig = request.app.state.config
     data_dir = _resolve_data_directory(cfg)
 
