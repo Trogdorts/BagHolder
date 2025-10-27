@@ -30,6 +30,7 @@ ui:
   danger_hover_color: '#b91c1c'
   trade_badge_color: '#34d399'
   trade_badge_text_color: '#111827'
+  market_value_fill_mode: average
 notes:
   enabled: true
   icon_opacity: 0.25
