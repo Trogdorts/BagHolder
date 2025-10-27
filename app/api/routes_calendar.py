@@ -15,6 +15,7 @@ from fastapi.responses import (
 from sqlalchemy import tuple_
 from sqlalchemy.orm import Session
 import calendar
+from app.core.authentication import require_user
 from app.core import database
 from app.core.config import AppConfig
 from app.core.database import get_session
@@ -33,7 +34,7 @@ from app.services.trade_simulator import SimulationError, SimulationOptions
 from app.services.simulation_runner import import_simulated_trades
 from pydantic import BaseModel, Field, field_validator
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_user)])
 
 log = logging.getLogger(__name__)
 class UIPreferencesUpdate(BaseModel):

@@ -19,6 +19,7 @@ from fastapi.responses import (
 from starlette.background import BackgroundTask
 from sqlalchemy.orm import Session
 
+from app.core.authentication import require_user
 from app.core.config import AppConfig, DEFAULT_CONFIG
 from app.core.lifecycle import reload_application_state
 from app.core.logger import configure_logging
@@ -43,7 +44,7 @@ from app.services.simulation_runner import (
 )
 from app.services.trade_simulator import SimulationError
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_user)])
 
 
 log = logging.getLogger(__name__)

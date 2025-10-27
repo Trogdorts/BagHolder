@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Form, Depends
 from sqlalchemy.orm import Session
+from app.core.authentication import require_user
 from app.core.database import get_session
 from app.services.notes_manager import (
     set_daily_note,
@@ -10,7 +11,7 @@ from app.services.notes_manager import (
     get_monthly_note,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_user)])
 
 @router.get("/api/notes/daily/{date}")
 def get_daily(date: str, db: Session = Depends(get_session)):
