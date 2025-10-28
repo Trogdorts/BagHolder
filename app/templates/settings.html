@@ -477,7 +477,7 @@
     <section id="stock-data-import" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4">
           <h2 class="text-lg font-semibold text-neutral-50">Import trade history</h2>
-          <p class="mt-1 text-sm text-neutral-400">Upload CSV trade summaries or ThinkOrSwim statements.</p>
+          <p class="mt-1 text-sm text-neutral-400">Upload CSV trade summaries.</p>
           <p class="mt-3 text-xs text-neutral-400">
             Imports are applied to <span class="font-semibold text-neutral-100">{{ active_account.name }}</span>
             (<span class="text-neutral-300">{{ active_account.storage }}</span>)
@@ -492,17 +492,6 @@
             <div class="mt-3 rounded border border-red-500/60 bg-red-500/10 px-3 py-2 text-xs text-red-200">{{ trade_csv_error_message }}</div>
             {% endif %}
             <form action="/import/trades" method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3">
-              <input type="file" name="file" accept=".csv" class="block w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 file:mr-4 file:rounded-md file:border-0 file:bg-neutral-800 file:px-4 file:py-2 file:text-neutral-200 hover:file:bg-neutral-700">
-              <button class="btn btn-primary px-4 py-2">Upload</button>
-            </form>
-          </div>
-          <div class="rounded-xl border border-neutral-800/80 bg-neutral-950/50 p-4 shadow-inner shadow-black/30">
-            <h3 class="text-sm font-semibold text-neutral-100">ThinkOrSwim account statement</h3>
-            <p class="mt-1 text-xs text-neutral-500">Only trade fields are persisted (date, symbol, action, qty, price, amount). Account identifiers are discarded after parsing.</p>
-            {% if thinkorswim_error_message %}
-            <div class="mt-3 rounded border border-red-500/60 bg-red-500/10 px-3 py-2 text-xs text-red-200">{{ thinkorswim_error_message }}</div>
-            {% endif %}
-            <form action="/import/thinkorswim" method="post" enctype="multipart/form-data" class="mt-4 flex flex-col gap-3">
               <input type="file" name="file" accept=".csv" class="block w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 file:mr-4 file:rounded-md file:border-0 file:bg-neutral-800 file:px-4 file:py-2 file:text-neutral-200 hover:file:bg-neutral-700">
               <button class="btn btn-primary px-4 py-2">Upload</button>
             </form>

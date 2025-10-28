@@ -5,7 +5,7 @@
   {{ inserted }} new trade{{ '' if inserted == 1 else 's' }} imported. Some days already had values in the calendar.
   Please choose which figures to keep for each conflicting date below.
 </p>
-<form action="/import/thinkorswim/conflicts" method="post" class="space-y-4"
+<form action="/import/trades/conflicts" method="post" class="space-y-4"
       x-data="{
         dates: {{ conflicts | map(attribute='date') | list | tojson }},
         selected: [],
