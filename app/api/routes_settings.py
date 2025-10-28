@@ -42,6 +42,7 @@ from app.services.simulation_runner import (
     build_default_simulation_options,
     import_simulated_trades,
 )
+from app.services.trade_summaries import recompute_daily_summaries
 from app.services.trade_simulator import SimulationError
 
 router = APIRouter(dependencies=[Depends(require_user)])
@@ -672,6 +673,7 @@ def settings_page(request: Request, db: Session = Depends(get_session)):
 @router.post("/settings", response_class=HTMLResponse)
 def save_settings(
     request: Request,
+    db: Session = Depends(get_session),
     theme: str = Form(...),
     show_text: str = Form("true"),
     show_market_value: Optional[str] = Form(None),
@@ -703,6 +705,7 @@ def save_settings(
     diagnostics_section = cfg.raw.setdefault("diagnostics", {})
     view_section = cfg.raw.setdefault("view", {})
     trades_section = cfg.raw.setdefault("trades", {})
+    previous_method = (trades_section.get("pnl_method", "fifo") or "fifo").strip().lower()
     current_port = server_section.get("port", DEFAULT_CONFIG["server"]["port"])
     server_section["port"] = _coerce_port(listening_port, current_port)
     ui_section["theme"] = theme
@@ -744,7 +747,9 @@ def save_settings(
     cfg.raw["export"]["fill_empty_with_zero"] = export_preference != "empty"
     method_value = _resolve_form_str(pnl_method, "fifo")
     normalized_method = (method_value or "fifo").strip().lower()
-    trades_section["pnl_method"] = "lifo" if normalized_method == "lifo" else "fifo"
+    resolved_method = "lifo" if normalized_method == "lifo" else "fifo"
+    trades_section["pnl_method"] = resolved_method
+    method_changed = resolved_method != previous_method
     debug_logging_enabled = coerce_bool(debug_logging, diagnostics_section.get("debug_logging", False))
     diagnostics_section["debug_logging"] = debug_logging_enabled
     cfg.save()
@@ -757,11 +762,24 @@ def save_settings(
     )
     request.app.state.log_path = str(log_path)
     request.app.state.debug_logging_enabled = debug_logging_enabled
+    if method_changed:
+        try:
+            recompute_daily_summaries(db, method=resolved_method)
+            db.commit()
+        except Exception as exc:  # pragma: no cover - ensure failure is visible
+            db.rollback()
+            log.exception("Failed to recompute daily summaries after PnL method change")
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to recalculate trade summaries with the selected profit method.",
+            ) from exc
+
     log.info(
-        "Settings updated (theme=%s, debug_logging=%s, port=%s)",
+        "Settings updated (theme=%s, debug_logging=%s, port=%s, pnl_method=%s)",
         theme,
         debug_logging_enabled,
         server_section["port"],
+        trades_section.get("pnl_method", "fifo"),
     )
     return RedirectResponse(url="/settings", status_code=303)
 
