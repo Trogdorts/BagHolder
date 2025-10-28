@@ -11,7 +11,8 @@ from app.core.authentication import require_user
 from app.core.config import DEFAULT_CONFIG
 from app.core.database import get_session
 from app.core.logger import get_logger
-from app.core.models import DailySummary, NoteDaily, Trade
+from app.core.models import DailySummary, Dividend, NoteDaily, Trade
+from app.services.import_charles_schwab import parse_charles_schwab_csv
 from app.services.import_thinkorswim import parse_thinkorswim_csv
 from app.services.import_trades_csv import parse_trade_csv
 from app.services.trade_summaries import calculate_daily_trade_map, upsert_daily_summaries
@@ -186,6 +187,8 @@ def _persist_trade_rows(db: Session, rows):
     deduped_rows = []
     seen = set()
     for row in rows:
+        fee_value = float(row.get("fee") or 0.0)
+        time_value = (row.get("time") or "").strip()
         key = (
             row["date"],
             row["symbol"],
@@ -193,20 +196,23 @@ def _persist_trade_rows(db: Session, rows):
             float(row["qty"]),
             float(row["price"]),
             float(row["amount"]),
+            fee_value,
+            time_value,
         )
         if key in seen:
             continue
         seen.add(key)
-        deduped_rows.append(
-            {
-                "date": row["date"],
-                "symbol": row["symbol"],
-                "action": row["action"],
-                "qty": float(row["qty"]),
-                "price": float(row["price"]),
-                "amount": float(row["amount"]),
-            }
-        )
+        record = {
+            "date": row["date"],
+            "symbol": row["symbol"],
+            "action": row["action"],
+            "qty": float(row["qty"]),
+            "price": float(row["price"]),
+            "amount": float(row["amount"]),
+            "fee": fee_value,
+            "time": time_value,
+        }
+        deduped_rows.append(record)
 
     if not deduped_rows:
         return 0
@@ -256,6 +262,118 @@ def _persist_trade_rows(db: Session, rows):
 
     db.commit()
     log.info("Persisted %s trades to database", inserted)
+    return inserted
+
+
+def _persist_dividend_rows(db: Session, rows):
+    if not rows:
+        return 0
+
+    normalized_rows = []
+    seen = set()
+    for row in rows:
+        date_value = row.get("date")
+        action_value = (row.get("action") or "").strip()
+        if not date_value or not action_value:
+            continue
+        symbol_value = (row.get("symbol") or "").strip().upper()
+        description_value = (row.get("description") or "").strip()
+        qty_value = float(row.get("qty") or 0.0)
+        price_value = float(row.get("price") or 0.0)
+        fee_value = float(row.get("fee") or 0.0)
+        amount_value = float(row.get("amount") or 0.0)
+        time_value = (row.get("time") or "").strip()
+        key = (
+            date_value,
+            symbol_value,
+            action_value,
+            round(amount_value, 6),
+            round(qty_value, 6),
+            round(price_value, 6),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        normalized_rows.append(
+            {
+                "date": date_value,
+                "symbol": symbol_value,
+                "description": description_value,
+                "action": action_value,
+                "qty": qty_value,
+                "price": price_value,
+                "fee": fee_value,
+                "amount": amount_value,
+                "time": time_value,
+            }
+        )
+
+    if not normalized_rows:
+        return 0
+
+    affected_dates = {row["date"] for row in normalized_rows}
+    existing_rows = []
+    if affected_dates:
+        existing_rows = (
+            db.query(Dividend)
+            .filter(Dividend.date.in_(affected_dates))
+            .all()
+        )
+
+    existing_keys = {
+        (
+            entry.date,
+            (entry.symbol or "").strip().upper(),
+            (entry.action or "").strip(),
+            round(float(entry.amount or 0.0), 6),
+            round(float(entry.qty or 0.0), 6),
+            round(float(entry.price or 0.0), 6),
+        )
+        for entry in existing_rows
+    }
+
+    sequence_tracker: Dict[str, int] = {}
+    for entry in existing_rows:
+        seq = int(getattr(entry, "sequence", 0) or 0)
+        current = sequence_tracker.get(entry.date, -1)
+        if seq > current:
+            sequence_tracker[entry.date] = seq
+
+    inserted = 0
+    for row in normalized_rows:
+        key = (
+            row["date"],
+            row["symbol"],
+            row["action"],
+            round(row["amount"], 6),
+            round(row["qty"], 6),
+            round(row["price"], 6),
+        )
+        if key in existing_keys:
+            continue
+        existing_keys.add(key)
+        current_sequence = sequence_tracker.get(row["date"], -1) + 1
+        sequence_tracker[row["date"]] = current_sequence
+        db.add(
+            Dividend(
+                date=row["date"],
+                symbol=row["symbol"],
+                description=row["description"],
+                action=row["action"],
+                qty=row["qty"],
+                price=row["price"],
+                fee=row["fee"],
+                amount=row["amount"],
+                time=row["time"],
+                sequence=current_sequence,
+            )
+        )
+        inserted += 1
+
+    if inserted:
+        db.commit()
+        log.info("Persisted %s dividend records to database", inserted)
+
     return inserted
 
 
@@ -396,6 +514,49 @@ async def import_thinkorswim(
         inserted,
     )
     return _finalize_trade_import(request, db, inserted)
+
+
+@router.post("/import/charles-schwab")
+async def import_charles_schwab(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_session),
+):
+    max_bytes, allowed_formats = _import_config(request)
+    try:
+        content = await _read_upload(file, allowed_formats, max_bytes)
+    except HTTPException as exc:
+        await file.close()
+        query = "file_too_large" if exc.status_code == 413 else "invalid_format"
+        return RedirectResponse(
+            f"/settings?schwab_error={query}#stock-data-import",
+            status_code=303,
+        )
+
+    trades, dividends = parse_charles_schwab_csv(content)
+    await file.close()
+
+    if not trades and not dividends:
+        log.warning(
+            "Charles Schwab CSV upload produced no recognized rows (filename=%s)",
+            file.filename,
+        )
+        return RedirectResponse(
+            "/settings?schwab_error=no_activity#stock-data-import",
+            status_code=303,
+        )
+
+    inserted_trades = _persist_trade_rows(db, trades)
+    inserted_dividends = _persist_dividend_rows(db, dividends)
+    log.info(
+        "Imported Charles Schwab CSV (filename=%s, trades=%s, dividends=%s)",
+        file.filename,
+        len(trades),
+        len(dividends),
+    )
+    if inserted_dividends:
+        log.info("Persisted %s Schwab dividend rows", inserted_dividends)
+    return _finalize_trade_import(request, db, inserted_trades)
 
 
 @router.post("/import/thinkorswim/conflicts", response_class=HTMLResponse)

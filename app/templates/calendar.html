@@ -831,6 +831,26 @@
                     {% if not show_trade_count_badges %}style="display: none;"{% endif %}>{{ trade_count }}</span>
             {% endif %}
           </button>
+          {% set dividend_button_classes = [
+            'relative inline-flex items-center justify-center rounded-full p-1.5 dividend-button focus:outline-none focus-ring-success transition'
+          ] %}
+          {% if not d.has_dividends %}
+            {% set dividend_button_classes = dividend_button_classes + ['icon-translucent'] %}
+          {% endif %}
+          <button type="button"
+                  class="{{ dividend_button_classes|join(' ') }}"
+                  onclick="openDividends('{{ d.date.strftime('%Y-%m-%d') }}'); return false;"
+                  aria-label="View dividends">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.5 9.25c0-1.24 1.12-2.25 2.5-2.25s2.5.9 2.5 2c0 1.8-3.75 1.8-3.75 3.6 0 1.1.93 1.9 2.25 1.9 1.32 0 2.25-.8 2.25-1.9M12 6.5v11" />
+            </svg>
+            <span class="sr-only">View dividends</span>
+            {% set dividend_count = d.dividends|length %}
+            {% if dividend_count %}
+              <span class="dividend-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full text-[10px] font-semibold px-1 text-center">{{ dividend_count }}</span>
+            {% endif %}
+          </button>
         </div>
 
         {% if show_text_default %}
@@ -2330,7 +2350,7 @@ function createTradeEditorHTML() {
               <th class="px-2 py-1 border border-neutral-800 text-center">Time</th>
               <th class="px-2 py-1 border border-neutral-800 text-right">Fee</th>
               <th class="px-2 py-1 border border-neutral-800 text-center">Note</th>
-              <th class="px-2 py-1 border border-neutral-800 text-right">Actions</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right">Remove</th>
             </tr>
           </thead>
           <tbody id="trade-table-body"></tbody>
@@ -2353,11 +2373,105 @@ function createTradeEditorHTML() {
     </div>`;
 }
 
+function createTableDragManager(tbody, options = {}) {
+  if (!tbody) {
+    return { registerRow: () => {} };
+  }
+
+  const handleSelector = options.handleSelector || '.drag-handle';
+  const onReorder = typeof options.onReorder === 'function' ? options.onReorder : () => {};
+  const state = {
+    dragging: null,
+    moved: false,
+  };
+
+  function getDragAfterElement(container, y) {
+    const rows = Array.from(container.querySelectorAll('tr:not(.is-dragging)'));
+    let closest = { offset: Number.NEGATIVE_INFINITY, element: null };
+    rows.forEach((child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        closest = { offset, element: child };
+      }
+    });
+    return closest.element;
+  }
+
+  function handleDragOver(event) {
+    if (!state.dragging) {
+      return;
+    }
+    event.preventDefault();
+    const afterElement = getDragAfterElement(tbody, event.clientY);
+    const dragging = state.dragging;
+    if (!dragging) {
+      return;
+    }
+    if (afterElement === null) {
+      if (tbody.lastElementChild !== dragging) {
+        tbody.appendChild(dragging);
+        state.moved = true;
+      }
+    } else if (afterElement !== dragging) {
+      tbody.insertBefore(dragging, afterElement);
+      state.moved = true;
+    }
+  }
+
+  tbody.addEventListener('dragover', handleDragOver);
+  tbody.addEventListener('drop', (event) => {
+    if (!state.dragging) {
+      return;
+    }
+    event.preventDefault();
+    handleDragOver(event);
+  });
+
+  function registerRow(row) {
+    if (!row) {
+      return;
+    }
+    row.setAttribute('draggable', 'true');
+    row.addEventListener('dragstart', (event) => {
+      if (!event.target || !event.target.closest(handleSelector)) {
+        event.preventDefault();
+        row.setAttribute('draggable', 'false');
+        window.setTimeout(() => row.setAttribute('draggable', 'true'), 0);
+        return;
+      }
+      state.dragging = row;
+      state.moved = false;
+      row.classList.add('is-dragging');
+      try {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', '');
+      } catch (error) {
+        // Ignore browsers that block dataTransfer modification
+      }
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('is-dragging');
+      const moved = state.moved;
+      state.dragging = null;
+      state.moved = false;
+      if (moved) {
+        onReorder();
+      }
+    });
+  }
+
+  return {
+    registerRow,
+  };
+}
+
 const tradeEditorState = {
   initialSnapshot: '[]',
   isDirty: false,
   unsavedWarning: null,
   currentDate: null,
+  dragManager: null,
 };
 
 function getTradeEditorWarningElement() {
@@ -2436,15 +2550,29 @@ function setupTradeEditor(trades, dateStr, options = {}) {
   if (!tbody) return;
 
   tbody.innerHTML = '';
+  tradeEditorState.dragManager = createTableDragManager(tbody, {
+    handleSelector: '.trade-drag-handle',
+    onReorder: () => {
+      hideTradeEditorSuccess();
+      refreshTradeEditorDirtyState();
+    },
+  });
+
   (trades || []).forEach(trade => {
-    tbody.appendChild(createTradeRow(trade, dateStr));
+    tbody.appendChild(createTradeRow(trade, dateStr, tradeEditorState.dragManager));
   });
 
   const addButton = document.getElementById('add-trade-row');
   if (addButton) {
     addButton.onclick = () => {
       hideTradeEditorSuccess();
-      tbody.appendChild(createTradeRow({ action: 'BUY', symbol: '', qty: '', price: '', time: '', fee: '' }, dateStr));
+      tbody.appendChild(
+        createTradeRow(
+          { action: 'BUY', symbol: '', qty: '', price: '', time: '', fee: '' },
+          dateStr,
+          tradeEditorState.dragManager,
+        ),
+      );
       updateTradeEmptyState();
       refreshTradeEditorDirtyState();
     };
@@ -2502,7 +2630,7 @@ function setupTradeEditor(trades, dateStr, options = {}) {
   }
 }
 
-function createTradeRow(trade, dateStr) {
+function createTradeRow(trade, dateStr, dragManager) {
   const row = document.createElement('tr');
   row.className = 'border-b border-neutral-800';
   if (trade && trade.id !== undefined && trade.id !== null) {
@@ -2517,45 +2645,13 @@ function createTradeRow(trade, dateStr) {
     refreshTradeEditorDirtyState();
   };
 
-  const moveRow = (direction) => {
-    const tbody = row.parentElement;
-    if (!tbody) {
-      return;
-    }
-    if (direction < 0) {
-      const previous = row.previousElementSibling;
-      if (previous) {
-        tbody.insertBefore(row, previous);
-        markDirty();
-      }
-    } else if (direction > 0) {
-      const next = row.nextElementSibling;
-      if (next) {
-        tbody.insertBefore(next, row);
-        markDirty();
-      }
-    }
-  };
-
   const orderCell = document.createElement('td');
   orderCell.className = 'px-2 py-1 border border-neutral-800 text-center align-middle';
-  const orderControls = document.createElement('div');
-  orderControls.className = 'flex items-center justify-center gap-1';
-  const moveUpButton = document.createElement('button');
-  moveUpButton.type = 'button';
-  moveUpButton.className = 'trade-move-up inline-flex h-6 w-6 items-center justify-center rounded border border-neutral-700 bg-neutral-900 text-xs text-neutral-300 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600';
-  moveUpButton.title = 'Move up';
-  moveUpButton.textContent = '↑';
-  moveUpButton.addEventListener('click', () => moveRow(-1));
-  const moveDownButton = document.createElement('button');
-  moveDownButton.type = 'button';
-  moveDownButton.className = 'trade-move-down inline-flex h-6 w-6 items-center justify-center rounded border border-neutral-700 bg-neutral-900 text-xs text-neutral-300 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600';
-  moveDownButton.title = 'Move down';
-  moveDownButton.textContent = '↓';
-  moveDownButton.addEventListener('click', () => moveRow(1));
-  orderControls.appendChild(moveUpButton);
-  orderControls.appendChild(moveDownButton);
-  orderCell.appendChild(orderControls);
+  const handleButton = document.createElement('button');
+  handleButton.type = 'button';
+  handleButton.className = 'trade-drag-handle drag-handle inline-flex h-6 w-6 items-center justify-center rounded border border-neutral-700 bg-neutral-900 text-xs text-neutral-300 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600';
+  handleButton.innerHTML = '<span aria-hidden="true">☰</span><span class="sr-only">Drag to reorder</span>';
+  orderCell.appendChild(handleButton);
   row.appendChild(orderCell);
 
   const actionCell = document.createElement('td');
@@ -2593,7 +2689,7 @@ function createTradeRow(trade, dateStr) {
   qtyInput.step = '1';
   qtyInput.min = '0';
   qtyInput.inputMode = 'decimal';
-  qtyInput.className = 'trade-qty w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  qtyInput.className = 'trade-qty w-full min-w-[6rem] bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
   qtyInput.value = trade && trade.qty !== undefined && trade.qty !== null ? trade.qty : '';
   qtyInput.addEventListener('input', markDirty);
   qtyCell.appendChild(qtyInput);
@@ -2606,7 +2702,7 @@ function createTradeRow(trade, dateStr) {
   priceInput.step = '0.01';
   priceInput.min = '0';
   priceInput.inputMode = 'decimal';
-  priceInput.className = 'trade-price w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  priceInput.className = 'trade-price w-full min-w-[6rem] bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
   priceInput.value = trade && trade.price !== undefined && trade.price !== null ? trade.price : '';
   priceInput.addEventListener('input', markDirty);
   priceCell.appendChild(priceInput);
@@ -2630,7 +2726,7 @@ function createTradeRow(trade, dateStr) {
   feeInput.type = 'number';
   feeInput.min = '0';
   feeInput.step = '0.01';
-  feeInput.className = 'trade-fee w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  feeInput.className = 'trade-fee w-full min-w-[6rem] bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
   if (trade && trade.fee !== undefined && trade.fee !== null) {
     const feeNumber = Number(trade.fee);
     if (Number.isFinite(feeNumber)) {
@@ -2671,6 +2767,10 @@ function createTradeRow(trade, dateStr) {
   });
   actionsCell.appendChild(removeButton);
   row.appendChild(actionsCell);
+
+  if (dragManager && typeof dragManager.registerRow === 'function') {
+    dragManager.registerRow(row);
+  }
 
   return row;
 }
@@ -3409,7 +3509,701 @@ function updateTradeIndicators(dateStr, trades) {
   }
 }
 
-  function openManual(dateStr, realized, invested) {
+  
+const DIVIDEND_ACTION_OPTIONS = [
+  'Bank Interest',
+  'Cash Dividend',
+  'Qual Div Reinvest',
+  'Qualified Dividend',
+  'Reinvest Dividend',
+  'Other',
+];
+
+const dividendEditorState = {
+  initialSnapshot: '[]',
+  isDirty: false,
+  unsavedWarning: null,
+  currentDate: null,
+  dragManager: null,
+  columnVisibility: {
+    description: true,
+    quantity: true,
+    price: true,
+    fee: true,
+    time: true,
+  },
+};
+
+function loadDividendColumnPreferences() {
+  try {
+    const stored = localStorage.getItem('bagholder_dividend_columns');
+    if (!stored) {
+      return;
+    }
+    const parsed = JSON.parse(stored);
+    if (parsed && typeof parsed === 'object') {
+      ['description', 'quantity', 'price', 'fee', 'time'].forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(parsed, key)) {
+          dividendEditorState.columnVisibility[key] = !!parsed[key];
+        }
+      });
+    }
+  } catch (error) {
+    // Ignore preference parsing errors
+  }
+}
+
+function saveDividendColumnPreferences() {
+  try {
+    localStorage.setItem('bagholder_dividend_columns', JSON.stringify(dividendEditorState.columnVisibility));
+  } catch (error) {
+    // Ignore persistence errors
+  }
+}
+
+function applyDividendColumnVisibility() {
+  const visibility = dividendEditorState.columnVisibility;
+  const columns = ['description', 'quantity', 'price', 'fee', 'time'];
+  columns.forEach((key) => {
+    const visible = visibility[key];
+    document.querySelectorAll(`.dividend-col-${key}`).forEach((el) => {
+      el.classList.toggle('hidden', !visible);
+    });
+    document.querySelectorAll(`[data-dividend-toggle='${key}']`).forEach((btn) => {
+      btn.classList.toggle('bg-neutral-800', visible);
+      btn.classList.toggle('text-neutral-200', visible);
+      btn.classList.toggle('text-neutral-500', !visible);
+      btn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+    });
+  });
+  saveDividendColumnPreferences();
+}
+
+function getDividendEditorWarningElement() {
+  if (dividendEditorState.unsavedWarning && document.body && document.body.contains(dividendEditorState.unsavedWarning)) {
+    return dividendEditorState.unsavedWarning;
+  }
+  const element = document.getElementById('dividend-unsaved');
+  dividendEditorState.unsavedWarning = element || null;
+  return dividendEditorState.unsavedWarning;
+}
+
+function setDividendEditorDirty(isDirty) {
+  dividendEditorState.isDirty = !!isDirty;
+  const warning = getDividendEditorWarningElement();
+  if (warning) {
+    warning.classList.toggle('hidden', !dividendEditorState.isDirty);
+  }
+}
+
+function clearDividendEditorMessages() {
+  const errorEl = document.getElementById('dividend-error');
+  const successEl = document.getElementById('dividend-success');
+  if (errorEl) {
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+  }
+  if (successEl) {
+    successEl.classList.add('hidden');
+    successEl.textContent = '';
+  }
+}
+
+function showDividendEditorError(message) {
+  const el = document.getElementById('dividend-error');
+  if (!el) {
+    window.alert(message);
+    return;
+  }
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function showDividendEditorSuccess(message) {
+  const el = document.getElementById('dividend-success');
+  if (!el) {
+    return;
+  }
+  el.textContent = message;
+  el.classList.remove('hidden');
+}
+
+function hideDividendEditorSuccess() {
+  const el = document.getElementById('dividend-success');
+  if (el) {
+    el.classList.add('hidden');
+  }
+}
+
+function captureDividendEditorSnapshot() {
+  const tbody = document.getElementById('dividend-table-body');
+  if (!tbody) {
+    return '[]';
+  }
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const normalized = rows.map((row) => {
+    const actionSelect = row.querySelector('.dividend-action');
+    const symbolInput = row.querySelector('.dividend-symbol');
+    const descriptionInput = row.querySelector('.dividend-description');
+    const qtyInput = row.querySelector('.dividend-qty');
+    const priceInput = row.querySelector('.dividend-price');
+    const feeInput = row.querySelector('.dividend-fee');
+    const amountInput = row.querySelector('.dividend-amount');
+    const timeInput = row.querySelector('.dividend-time');
+    return {
+      id: row.dataset.dividendId ? String(row.dataset.dividendId) : '',
+      action: actionSelect ? actionSelect.value : '',
+      symbol: symbolInput ? symbolInput.value : '',
+      description: descriptionInput ? descriptionInput.value : '',
+      qty: qtyInput ? qtyInput.value : '',
+      price: priceInput ? priceInput.value : '',
+      fee: feeInput ? feeInput.value : '',
+      amount: amountInput ? amountInput.value : '',
+      time: timeInput ? timeInput.value : '',
+    };
+  });
+  return JSON.stringify(normalized);
+}
+
+function refreshDividendEditorDirtyState() {
+  const snapshot = captureDividendEditorSnapshot();
+  const isDirty = snapshot !== dividendEditorState.initialSnapshot;
+  setDividendEditorDirty(isDirty);
+  return isDirty;
+}
+
+function resetDividendEditorInitialSnapshot() {
+  dividendEditorState.initialSnapshot = captureDividendEditorSnapshot();
+  setDividendEditorDirty(false);
+}
+
+function updateDividendEmptyState() {
+  const tbody = document.getElementById('dividend-table-body');
+  const message = document.getElementById('dividend-empty-message');
+  if (!tbody || !message) {
+    return;
+  }
+  const hasRows = tbody.querySelector('tr') !== null;
+  message.classList.toggle('hidden', hasRows);
+}
+
+function createDividendEditorHTML() {
+  return `
+    <div id="dividend-editor" class="space-y-3">
+      <p id="dividend-error" class="text-sm text-danger hidden"></p>
+      <p id="dividend-success" class="text-sm text-success hidden"></p>
+      <p id="dividend-unsaved" class="text-xs text-warning hidden">Unsaved changes. Save your dividends to keep them.</p>
+      <div id="dividend-empty-message" class="text-sm text-neutral-400 hidden">No dividends recorded for this date.</div>
+      <div class="flex flex-wrap items-center gap-2 text-xs text-neutral-400" id="dividend-column-toggles">
+        <span class="font-semibold text-neutral-300">Columns:</span>
+        <button type="button" data-dividend-toggle="description" class="dividend-toggle px-2 py-1 rounded border border-neutral-700 text-neutral-500 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600">Description</button>
+        <button type="button" data-dividend-toggle="quantity" class="dividend-toggle px-2 py-1 rounded border border-neutral-700 text-neutral-500 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600">Quantity</button>
+        <button type="button" data-dividend-toggle="price" class="dividend-toggle px-2 py-1 rounded border border-neutral-700 text-neutral-500 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600">Price</button>
+        <button type="button" data-dividend-toggle="fee" class="dividend-toggle px-2 py-1 rounded border border-neutral-700 text-neutral-500 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600">Fee</button>
+        <button type="button" data-dividend-toggle="time" class="dividend-toggle px-2 py-1 rounded border border-neutral-700 text-neutral-500 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600">Time</button>
+      </div>
+      <div class="overflow-x-auto" style="max-height: 20rem; overflow-y: auto;">
+        <table class="min-w-full text-sm text-left text-neutral-200 border border-neutral-800">
+          <thead class="bg-neutral-900 text-neutral-400">
+            <tr>
+              <th class="px-2 py-1 border border-neutral-800 text-center">Order</th>
+              <th class="px-2 py-1 border border-neutral-800">Action</th>
+              <th class="px-2 py-1 border border-neutral-800">Symbol</th>
+              <th class="px-2 py-1 border border-neutral-800 dividend-col-description">Description</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right dividend-col-quantity">Quantity</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right dividend-col-price">Price</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right dividend-col-fee">Fee</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right">Amount</th>
+              <th class="px-2 py-1 border border-neutral-800 text-center dividend-col-time">Time</th>
+              <th class="px-2 py-1 border border-neutral-800 text-right">Remove</th>
+            </tr>
+          </thead>
+          <tbody id="dividend-table-body"></tbody>
+        </table>
+      </div>
+      <div class="space-y-2">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <button type="button" id="add-dividend-row" class="px-3 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-sm">Add dividend</button>
+            <button type="button" id="clear-dividends" class="btn btn-outline-danger px-3 py-1 text-sm">Clear all dividends</button>
+          </div>
+        </div>
+        <span class="text-xs text-neutral-500">Amounts can be positive or negative. Use the column toggles to hide fields you do not track.</span>
+      </div>
+    </div>`;
+}
+
+function createDividendRow(dividend, dateStr, dragManager) {
+  const row = document.createElement('tr');
+  row.className = 'border-b border-neutral-800';
+  if (dividend && dividend.id !== undefined && dividend.id !== null) {
+    row.dataset.dividendId = String(dividend.id);
+  }
+  if (dividend && dividend.sequence !== undefined && dividend.sequence !== null) {
+    row.dataset.dividendSequence = String(dividend.sequence);
+  }
+
+  const markDirty = () => {
+    hideDividendEditorSuccess();
+    refreshDividendEditorDirtyState();
+  };
+
+  const orderCell = document.createElement('td');
+  orderCell.className = 'px-2 py-1 border border-neutral-800 text-center align-middle';
+  const handleButton = document.createElement('button');
+  handleButton.type = 'button';
+  handleButton.className = 'dividend-drag-handle drag-handle inline-flex h-6 w-6 items-center justify-center rounded border border-neutral-700 bg-neutral-900 text-xs text-neutral-300 transition hover:bg-neutral-800 focus:outline-none focus:ring-1 focus:ring-neutral-600';
+  handleButton.innerHTML = '<span aria-hidden="true">☰</span><span class="sr-only">Drag to reorder</span>';
+  orderCell.appendChild(handleButton);
+  row.appendChild(orderCell);
+
+  const actionCell = document.createElement('td');
+  actionCell.className = 'px-2 py-1 border border-neutral-800';
+  const actionSelect = document.createElement('select');
+  actionSelect.className = 'dividend-action bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100';
+  const normalizedAction = dividend && dividend.action ? String(dividend.action).trim() : '';
+  const options = new Set(DIVIDEND_ACTION_OPTIONS);
+  if (normalizedAction && !options.has(normalizedAction)) {
+    options.add(normalizedAction);
+  }
+  Array.from(options).forEach((label) => {
+    const option = document.createElement('option');
+    option.value = label;
+    option.textContent = label;
+    actionSelect.appendChild(option);
+  });
+  actionSelect.value = normalizedAction || DIVIDEND_ACTION_OPTIONS[0];
+  actionSelect.addEventListener('change', markDirty);
+  actionCell.appendChild(actionSelect);
+  row.appendChild(actionCell);
+
+  const symbolCell = document.createElement('td');
+  symbolCell.className = 'px-2 py-1 border border-neutral-800';
+  const symbolInput = document.createElement('input');
+  symbolInput.type = 'text';
+  symbolInput.className = 'dividend-symbol w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 uppercase';
+  symbolInput.value = dividend && dividend.symbol ? dividend.symbol : '';
+  symbolInput.autocomplete = 'off';
+  symbolInput.spellcheck = false;
+  symbolInput.addEventListener('input', markDirty);
+  symbolCell.appendChild(symbolInput);
+  row.appendChild(symbolCell);
+
+  const descriptionCell = document.createElement('td');
+  descriptionCell.className = 'px-2 py-1 border border-neutral-800 dividend-col-description';
+  const descriptionInput = document.createElement('input');
+  descriptionInput.type = 'text';
+  descriptionInput.className = 'dividend-description w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100';
+  descriptionInput.value = dividend && dividend.description ? dividend.description : '';
+  descriptionInput.addEventListener('input', markDirty);
+  descriptionCell.appendChild(descriptionInput);
+  row.appendChild(descriptionCell);
+
+  const qtyCell = document.createElement('td');
+  qtyCell.className = 'px-2 py-1 border border-neutral-800 text-right dividend-col-quantity';
+  const qtyInput = document.createElement('input');
+  qtyInput.type = 'number';
+  qtyInput.step = '0.0001';
+  qtyInput.min = '0';
+  qtyInput.inputMode = 'decimal';
+  qtyInput.className = 'dividend-qty w-full min-w-[6rem] bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  qtyInput.value = dividend && dividend.qty !== undefined && dividend.qty !== null ? dividend.qty : '';
+  qtyInput.addEventListener('input', markDirty);
+  qtyCell.appendChild(qtyInput);
+  row.appendChild(qtyCell);
+
+  const priceCell = document.createElement('td');
+  priceCell.className = 'px-2 py-1 border border-neutral-800 text-right dividend-col-price';
+  const priceInput = document.createElement('input');
+  priceInput.type = 'number';
+  priceInput.step = '0.0001';
+  priceInput.min = '0';
+  priceInput.inputMode = 'decimal';
+  priceInput.className = 'dividend-price w-full min-w-[6rem] bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  priceInput.value = dividend && dividend.price !== undefined && dividend.price !== null ? dividend.price : '';
+  priceInput.addEventListener('input', markDirty);
+  priceCell.appendChild(priceInput);
+  row.appendChild(priceCell);
+
+  const feeCell = document.createElement('td');
+  feeCell.className = 'px-2 py-1 border border-neutral-800 text-right dividend-col-fee';
+  const feeInput = document.createElement('input');
+  feeInput.type = 'number';
+  feeInput.step = '0.01';
+  feeInput.min = '0';
+  feeInput.inputMode = 'decimal';
+  feeInput.className = 'dividend-fee w-full min-w-[6rem] bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  if (dividend && dividend.fee !== undefined && dividend.fee !== null && Number.isFinite(Number(dividend.fee))) {
+    feeInput.value = Number(dividend.fee) === 0 ? '' : String(dividend.fee);
+  }
+  feeInput.addEventListener('input', markDirty);
+  feeCell.appendChild(feeInput);
+  row.appendChild(feeCell);
+
+  const amountCell = document.createElement('td');
+  amountCell.className = 'px-2 py-1 border border-neutral-800 text-right';
+  const amountInput = document.createElement('input');
+  amountInput.type = 'number';
+  amountInput.step = '0.01';
+  amountInput.inputMode = 'decimal';
+  amountInput.className = 'dividend-amount w-full min-w-[6rem] bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-right';
+  amountInput.value = dividend && dividend.amount !== undefined && dividend.amount !== null ? dividend.amount : '';
+  amountInput.addEventListener('input', markDirty);
+  amountCell.appendChild(amountInput);
+  row.appendChild(amountCell);
+
+  const timeCell = document.createElement('td');
+  timeCell.className = 'px-2 py-1 border border-neutral-800 text-center dividend-col-time';
+  const timeInput = document.createElement('input');
+  timeInput.type = 'time';
+  timeInput.step = '1';
+  timeInput.className = 'dividend-time w-full bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-100 text-center';
+  timeInput.value = dividend && dividend.time ? dividend.time : '';
+  timeInput.addEventListener('change', markDirty);
+  timeInput.addEventListener('input', markDirty);
+  timeCell.appendChild(timeInput);
+  row.appendChild(timeCell);
+
+  const removeCell = document.createElement('td');
+  removeCell.className = 'px-2 py-1 border border-neutral-800 text-right';
+  const removeButton = document.createElement('button');
+  removeButton.type = 'button';
+  removeButton.className = 'remove-dividend-row btn btn-outline-danger px-2 py-1 text-xs';
+  removeButton.textContent = 'Remove';
+  removeButton.addEventListener('click', () => {
+    hideDividendEditorSuccess();
+    row.remove();
+    updateDividendEmptyState();
+    refreshDividendEditorDirtyState();
+  });
+  removeCell.appendChild(removeButton);
+  row.appendChild(removeCell);
+
+  if (dragManager && typeof dragManager.registerRow === 'function') {
+    dragManager.registerRow(row);
+  }
+
+  return row;
+}
+
+function setupDividendEditor(dividends, dateStr, options = {}) {
+  clearDividendEditorMessages();
+  loadDividendColumnPreferences();
+  const tbody = document.getElementById('dividend-table-body');
+  if (!tbody) {
+    return;
+  }
+
+  tbody.innerHTML = '';
+  dividendEditorState.dragManager = createTableDragManager(tbody, {
+    handleSelector: '.dividend-drag-handle',
+    onReorder: () => {
+      hideDividendEditorSuccess();
+      refreshDividendEditorDirtyState();
+    },
+  });
+
+  (dividends || []).forEach((dividend) => {
+    tbody.appendChild(createDividendRow(dividend, dateStr, dividendEditorState.dragManager));
+  });
+
+  const addButton = document.getElementById('add-dividend-row');
+  if (addButton) {
+    addButton.onclick = () => {
+      hideDividendEditorSuccess();
+      tbody.appendChild(
+        createDividendRow(
+          { action: DIVIDEND_ACTION_OPTIONS[0], symbol: '', description: '', qty: '', price: '', fee: '', amount: '', time: '' },
+          dateStr,
+          dividendEditorState.dragManager,
+        ),
+      );
+      updateDividendEmptyState();
+      refreshDividendEditorDirtyState();
+    };
+  }
+
+  const clearButton = document.getElementById('clear-dividends');
+  if (clearButton) {
+    clearButton.onclick = () => {
+      hideDividendEditorSuccess();
+      clearDividends(dateStr);
+    };
+  }
+
+  const toggleButtons = document.querySelectorAll('[data-dividend-toggle]');
+  toggleButtons.forEach((button) => {
+    button.onclick = () => {
+      const key = button.dataset.dividendToggle;
+      if (!key) {
+        return;
+      }
+      dividendEditorState.columnVisibility[key] = !dividendEditorState.columnVisibility[key];
+      applyDividendColumnVisibility();
+    };
+  });
+
+  updateDividendEmptyState();
+  applyDividendColumnVisibility();
+
+  dividendEditorState.unsavedWarning = document.getElementById('dividend-unsaved');
+  dividendEditorState.currentDate = dateStr;
+  if (options && typeof options.initialSnapshotOverride === 'string') {
+    dividendEditorState.initialSnapshot = options.initialSnapshotOverride;
+    refreshDividendEditorDirtyState();
+  } else {
+    resetDividendEditorInitialSnapshot();
+  }
+
+  const modal = getModalController();
+  if (modal) {
+    modal.beforeClose = () => {
+      const dirty = refreshDividendEditorDirtyState();
+      if (!dirty) {
+        return true;
+      }
+      const confirmClose = window.confirm('You have unsaved dividend changes. Discard them?');
+      if (!confirmClose) {
+        return false;
+      }
+      return true;
+    };
+  }
+}
+
+function openDividends(dateStr) {
+  fetch('/api/dividends/' + dateStr)
+    .then((response) => {
+      if (!response.ok) {
+        return response.json().catch(() => ({})).then((data) => {
+          const message = data && data.detail ? data.detail : 'Failed to load dividends.';
+          throw new Error(message);
+        });
+      }
+      return response.json();
+    })
+    .then((js) => {
+      const modal = getModalController();
+      if (!modal) {
+        return;
+      }
+      modal.title = 'Dividends ' + dateStr;
+      modal.body = createDividendEditorHTML();
+      modal.saveLabel = 'Save dividends';
+      modal.closeLabel = 'Close';
+      modal.save = () => saveDividends(dateStr);
+      modal.open = true;
+      setTimeout(() => setupDividendEditor(js.dividends || [], dateStr), 0);
+    })
+    .catch((err) => {
+      const modal = getModalController();
+      if (!modal) {
+        return;
+      }
+      modal.title = 'Dividends ' + dateStr;
+      modal.body = `<p class="text-sm text-danger">${err.message || 'Failed to load dividends.'}</p>`;
+      modal.save = null;
+      modal.open = true;
+    });
+}
+
+function saveDividends(dateStr) {
+  const modal = getModalController();
+  if (!modal) {
+    return;
+  }
+  const tbody = document.getElementById('dividend-table-body');
+  if (!tbody) {
+    return;
+  }
+
+  clearDividendEditorMessages();
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const dividends = [];
+  let hasError = false;
+
+  rows.forEach((row, index) => {
+    const actionSelect = row.querySelector('.dividend-action');
+    const symbolInput = row.querySelector('.dividend-symbol');
+    const descriptionInput = row.querySelector('.dividend-description');
+    const qtyInput = row.querySelector('.dividend-qty');
+    const priceInput = row.querySelector('.dividend-price');
+    const feeInput = row.querySelector('.dividend-fee');
+    const amountInput = row.querySelector('.dividend-amount');
+    const timeInput = row.querySelector('.dividend-time');
+
+    const symbol = symbolInput ? symbolInput.value.trim().toUpperCase() : '';
+    const description = descriptionInput ? descriptionInput.value.trim() : '';
+    const qtyRaw = qtyInput ? qtyInput.value.trim() : '';
+    const priceRaw = priceInput ? priceInput.value.trim() : '';
+    const feeRaw = feeInput ? feeInput.value.trim() : '';
+    const amountRaw = amountInput ? amountInput.value.trim() : '';
+    const timeRaw = timeInput ? timeInput.value.trim() : '';
+
+    const isEmpty = !symbol && !description && !qtyRaw && !priceRaw && !feeRaw && !amountRaw && !timeRaw;
+    if (isEmpty) {
+      row.classList.remove('bg-danger-soft');
+      return;
+    }
+
+    let qty = 0;
+    if (qtyRaw) {
+      qty = parseFloat(normalizeNumberString(qtyRaw));
+      if (!Number.isFinite(qty) || qty < 0) {
+        row.classList.add('bg-danger-soft');
+        hasError = true;
+        return;
+      }
+    }
+
+    let price = 0;
+    if (priceRaw) {
+      price = parseFloat(normalizeNumberString(priceRaw));
+      if (!Number.isFinite(price) || price < 0) {
+        row.classList.add('bg-danger-soft');
+        hasError = true;
+        return;
+      }
+    }
+
+    let fee = 0;
+    if (feeRaw) {
+      fee = parseFloat(normalizeNumberString(feeRaw));
+      if (!Number.isFinite(fee) || fee < 0) {
+        row.classList.add('bg-danger-soft');
+        hasError = true;
+        return;
+      }
+    }
+
+    const amount = parseFloat(normalizeNumberString(amountRaw));
+    if (!Number.isFinite(amount)) {
+      row.classList.add('bg-danger-soft');
+      hasError = true;
+      return;
+    }
+
+    const timeValue = timeRaw ? normalizeTradeTime(timeRaw) : '';
+    if (timeRaw && !timeValue) {
+      row.classList.add('bg-danger-soft');
+      hasError = true;
+      return;
+    }
+
+    row.classList.remove('bg-danger-soft');
+    dividends.push({
+      id: row.dataset.dividendId ? Number(row.dataset.dividendId) : null,
+      action: actionSelect ? actionSelect.value : DIVIDEND_ACTION_OPTIONS[0],
+      symbol: symbol,
+      description,
+      qty: qtyRaw ? qty : 0,
+      price: priceRaw ? price : 0,
+      fee: feeRaw ? fee : 0,
+      amount,
+      time: timeValue,
+      sequence: index,
+    });
+  });
+
+  if (hasError) {
+    showDividendEditorError('Please correct highlighted dividends or remove empty rows before saving.');
+    return;
+  }
+
+  modal.saving = true;
+
+  fetch('/api/dividends/' + dateStr, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dividends }),
+  })
+    .then((response) => {
+      if (!response.ok) {
+        return response.json().catch(() => ({})).then((data) => {
+          const message = data && data.detail ? data.detail : 'Failed to save dividends.';
+          throw new Error(message);
+        });
+      }
+      return response.json();
+    })
+    .then((data) => {
+      const saved = data && Array.isArray(data.dividends) ? data.dividends : [];
+      setupDividendEditor(saved, dateStr);
+      showDividendEditorSuccess('Dividends saved.');
+      modal.shouldReloadOnClose = true;
+      updateDividendIndicators(dateStr, saved);
+    })
+    .catch((err) => {
+      showDividendEditorError(err.message || 'Failed to save dividends.');
+    })
+    .finally(() => {
+      modal.saving = false;
+    });
+}
+
+function clearDividends(dateStr) {
+  if (!dateStr) {
+    return;
+  }
+  const modal = getModalController();
+  if (!modal) {
+    return;
+  }
+  const confirmed = window.confirm(`Clear all dividends for ${dateStr}? This action cannot be undone.`);
+  if (!confirmed) {
+    return;
+  }
+  modal.saving = true;
+  clearDividendEditorMessages();
+  fetch('/api/dividends/' + dateStr, { method: 'DELETE' })
+    .then((response) => {
+      if (!response.ok) {
+        return response.json().catch(() => ({})).then((data) => {
+          const message = data && data.detail ? data.detail : 'Failed to clear dividends.';
+          throw new Error(message);
+        });
+      }
+      return response.json();
+    })
+    .then((data) => {
+      setupDividendEditor([], dateStr);
+      showDividendEditorSuccess('All dividends cleared for this date.');
+      updateDividendIndicators(dateStr, []);
+      modal.shouldReloadOnClose = true;
+    })
+    .catch((err) => {
+      showDividendEditorError(err && err.message ? err.message : 'Failed to clear dividends.');
+    })
+    .finally(() => {
+      modal.saving = false;
+    });
+}
+
+function updateDividendIndicators(dateStr, dividends) {
+  const cell = document.querySelector(`[data-day-cell='${dateStr}']`);
+  if (!cell) {
+    return;
+  }
+  const trigger = cell.querySelector("button[aria-label='View dividends']");
+  if (!trigger) {
+    return;
+  }
+  const count = Array.isArray(dividends) ? dividends.length : 0;
+  trigger.classList.toggle('icon-translucent', count === 0);
+  let badge = trigger.querySelector('.dividend-count-badge');
+  if (count > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'dividend-count-badge absolute -top-1 -right-1 min-w-[1.25rem] rounded-full text-[10px] font-semibold px-1 text-center';
+      trigger.appendChild(badge);
+    }
+    badge.textContent = String(count);
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
+function openManual(dateStr, realized, invested) {
     const modal = getModalController();
     if (!modal) return;
 

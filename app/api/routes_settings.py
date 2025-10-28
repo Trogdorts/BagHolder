@@ -438,6 +438,12 @@ _THINKORSWIM_IMPORT_ERRORS = {
     "file_too_large": "The uploaded file exceeds the allowed size.",
 }
 
+_SCHWAB_IMPORT_ERRORS = {
+    "no_activity": "No trades or dividends were detected in the uploaded file.",
+    "invalid_format": "Unsupported file format.",
+    "file_too_large": "The uploaded file exceeds the allowed size.",
+}
+
 _LOG_EXPORT_ERRORS = {
     "missing": "No log file is available yet. Generate activity and try again.",
 }
@@ -604,6 +610,9 @@ def settings_page(request: Request, db: Session = Depends(get_session)):
     thinkorswim_error_message = _resolve_import_error(
         params.get("thinkorswim_error"), _THINKORSWIM_IMPORT_ERRORS, cfg
     )
+    schwab_error_message = _resolve_import_error(
+        params.get("schwab_error"), _SCHWAB_IMPORT_ERRORS, cfg
+    )
     log_error_message = _resolve_message(params.get("log_error"), _LOG_EXPORT_ERRORS)
     account_status_message = _resolve_message(params.get("account_status"), _ACCOUNT_STATUS_MESSAGES)
     account_error_message = _resolve_message(params.get("account_error"), _ACCOUNT_ERROR_MESSAGES)
@@ -656,6 +665,7 @@ def settings_page(request: Request, db: Session = Depends(get_session)):
         "backup_error_message": backup_error_message,
         "trade_csv_error_message": trade_csv_error_message,
         "thinkorswim_error_message": thinkorswim_error_message,
+        "schwab_error_message": schwab_error_message,
         "color_groups": color_groups,
         "color_defaults": color_defaults,
         "debug_logging_enabled": debug_logging_enabled,
