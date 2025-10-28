@@ -3,6 +3,7 @@ import io
 import logging
 import math
 import os
+import re
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,7 @@ from app.core.config import AppConfig
 from app.core.database import get_session
 from app.core.models import (
     DailySummary,
+    Dividend,
     Meta,
     NoteDaily,
     NoteMonthly,
@@ -144,6 +146,116 @@ class TradeUpdate(BaseModel):
 
 class TradeUpdatePayload(BaseModel):
     trades: List[TradeUpdate] = Field(default_factory=list)
+
+
+class DividendUpdate(BaseModel):
+    id: Optional[int] = None
+    action: str
+    symbol: Optional[str] = ""
+    description: Optional[str] = ""
+    qty: Optional[float] = 0.0
+    price: Optional[float] = 0.0
+    fee: Optional[float] = 0.0
+    amount: float
+    time: Optional[str] = None
+    sequence: Optional[int] = None
+
+    @field_validator("action")
+    @classmethod
+    def normalize_action(cls, value: str) -> str:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("Action is required")
+        cleaned = re.sub(r"\s+", " ", text)
+        parts = []
+        for part in cleaned.split(" "):
+            token = part.strip()
+            if not token:
+                continue
+            if token.isupper() and len(token) <= 3:
+                parts.append(token)
+            else:
+                parts.append(token.capitalize())
+        normalized = " ".join(parts)
+        if not normalized:
+            raise ValueError("Action is required")
+        return normalized
+
+    @field_validator("symbol")
+    @classmethod
+    def normalize_symbol(cls, value: Optional[str]) -> str:
+        if value in (None, ""):
+            return ""
+        text = str(value).strip().upper()
+        text = re.sub(r"[^A-Z0-9.]+", "", text)
+        return text
+
+    @field_validator("description")
+    @classmethod
+    def normalize_description(cls, value: Optional[str]) -> str:
+        if value in (None, ""):
+            return ""
+        text = str(value).strip()
+        return re.sub(r"\s+", " ", text)
+
+    @field_validator("qty", "price", "fee", mode="before")
+    @classmethod
+    def normalize_optional_positive(cls, value: Optional[float]) -> float:
+        if value in (None, ""):
+            return 0.0
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Must be a number") from exc
+        if number < 0:
+            raise ValueError("Must be zero or greater")
+        return number
+
+    @field_validator("amount", mode="before")
+    @classmethod
+    def normalize_amount(cls, value: Optional[float]) -> float:
+        if value in (None, ""):
+            raise ValueError("Amount is required")
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Amount must be a number") from exc
+        return number
+
+    @field_validator("time", mode="before")
+    @classmethod
+    def normalize_time(cls, value: Optional[str]) -> str:
+        if value in (None, ""):
+            return ""
+        text = str(value).strip()
+        if not text:
+            return ""
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                parsed = datetime.strptime(text, fmt)
+                if fmt == "%H:%M":
+                    return parsed.strftime("%H:%M")
+                return parsed.strftime("%H:%M:%S")
+            except ValueError:
+                continue
+        raise ValueError("Time must be in HH:MM or HH:MM:SS format")
+
+    @field_validator("sequence", mode="before")
+    @classmethod
+    def normalize_sequence(cls, value: Optional[int]) -> Optional[int]:
+        if value in (None, ""):
+            return None
+        try:
+            number = int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Sequence must be an integer") from exc
+        if number < 0:
+            raise ValueError("Sequence must be zero or greater")
+        return number
+
+
+class DividendUpdatePayload(BaseModel):
+    dividends: List[DividendUpdate] = Field(default_factory=list)
 
 
 class SimulationRequest(BaseModel):
@@ -322,6 +434,27 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 }
             )
 
+    dividend_rows = (
+        db.query(Dividend)
+        .filter(Dividend.date >= start, Dividend.date <= end)
+        .order_by(Dividend.date.asc(), Dividend.sequence.asc(), Dividend.id.asc())
+        .all()
+    )
+    dividends_by_day: Dict[str, List[Dict[str, Any]]] = {}
+    for entry in dividend_rows:
+        dividends_by_day.setdefault(entry.date, []).append(
+            {
+                "id": entry.id,
+                "symbol": entry.symbol or "",
+                "action": entry.action or "",
+                "description": entry.description or "",
+                "qty": float(entry.qty or 0.0),
+                "price": float(entry.price or 0.0),
+                "fee": float(entry.fee or 0.0),
+                "amount": float(entry.amount or 0.0),
+            }
+        )
+
     # Calculate weekly aggregates inline
     cal = calendar.Calendar(firstweekday=0)  # Monday=0 or Sunday=6; we'll keep 0
     weeks = []
@@ -416,7 +549,9 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
             else:
                 unrealized_value = month_invested_average if month_invested_samples else 0.0
             day_trades = trades_by_day.get(day_key, [])
+            day_dividends = dividends_by_day.get(day_key, [])
             has_trades = bool(day_trades)
+            has_dividends = bool(day_dividends)
             has_sell_trade = any(
                 (trade.get("action") or "").upper() == "SELL" for trade in day_trades
             )
@@ -453,6 +588,8 @@ def calendar_view(year: int, month: int, request: Request, db: Session = Depends
                 "is_weekend": is_weekend,
                 "trades": day_trades,
                 "has_trades": has_trades,
+                "dividends": day_dividends,
+                "has_dividends": has_dividends,
                 "in_rolling": rolling_start_date <= d <= month_end_date,
                 "belongs_to_year": d.year == year,
             })
@@ -777,6 +914,131 @@ def save_trades_for_day(
         "ok": True,
         "trades": response_trades,
         "summary": daily_map.get(date_str),
+    }
+
+
+@router.get("/api/dividends/{date_str}")
+def get_dividends_for_day(date_str: str, db: Session = Depends(get_session)):
+    rows = (
+        db.query(Dividend)
+        .filter(Dividend.date == date_str)
+        .order_by(Dividend.sequence.asc(), Dividend.id.asc())
+        .all()
+    )
+    return {
+        "dividends": [
+            {
+                "id": row.id,
+                "action": row.action or "",
+                "symbol": row.symbol or "",
+                "description": row.description or "",
+                "qty": float(row.qty or 0.0),
+                "price": float(row.price or 0.0),
+                "fee": float(row.fee or 0.0),
+                "amount": float(row.amount or 0.0),
+                "time": row.time or "",
+                "sequence": int(row.sequence or 0),
+            }
+            for row in rows
+        ]
+    }
+
+
+@router.post("/api/dividends/{date_str}")
+def save_dividends_for_day(
+    date_str: str,
+    payload: DividendUpdatePayload,
+    db: Session = Depends(get_session),
+):
+    existing = (
+        db.query(Dividend)
+        .filter(Dividend.date == date_str)
+        .order_by(Dividend.sequence.asc(), Dividend.id.asc())
+        .all()
+    )
+    existing_map = {row.id: row for row in existing}
+    seen_ids: set[int] = set()
+
+    for sequence_index, update in enumerate(payload.dividends):
+        entry = None
+        if update.id is not None:
+            entry = existing_map.get(update.id)
+            if entry is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Dividend {update.id} was not found for {date_str}.",
+                )
+            seen_ids.add(update.id)
+        else:
+            entry = Dividend(date=date_str)
+            db.add(entry)
+
+        entry.action = update.action
+        entry.symbol = update.symbol or ""
+        entry.description = update.description or ""
+        entry.qty = float(update.qty or 0.0)
+        entry.price = float(update.price or 0.0)
+        entry.fee = float(update.fee or 0.0)
+        entry.amount = float(update.amount)
+        entry.time = update.time or ""
+        entry.sequence = sequence_index
+
+    for row in existing:
+        if row.id not in seen_ids:
+            db.delete(row)
+
+    db.flush()
+
+    updated_rows = (
+        db.query(Dividend)
+        .filter(Dividend.date == date_str)
+        .order_by(Dividend.sequence.asc(), Dividend.id.asc())
+        .all()
+    )
+    response = [
+        {
+            "id": row.id,
+            "action": row.action or "",
+            "symbol": row.symbol or "",
+            "description": row.description or "",
+            "qty": float(row.qty or 0.0),
+            "price": float(row.price or 0.0),
+            "fee": float(row.fee or 0.0),
+            "amount": float(row.amount or 0.0),
+            "time": row.time or "",
+            "sequence": int(row.sequence or 0),
+        }
+        for row in updated_rows
+    ]
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "dividends": response,
+    }
+
+
+@router.delete("/api/dividends/{date_str}")
+def clear_dividends_for_day(
+    date_str: str,
+    db: Session = Depends(get_session),
+):
+    rows = (
+        db.query(Dividend)
+        .filter(Dividend.date == date_str)
+        .order_by(Dividend.sequence.asc(), Dividend.id.asc())
+        .all()
+    )
+    deleted = 0
+    for row in rows:
+        db.delete(row)
+        deleted += 1
+    db.commit()
+    return {
+        "ok": True,
+        "deleted": deleted,
+        "dividends": [],
     }
 
 

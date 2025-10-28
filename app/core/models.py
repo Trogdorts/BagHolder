@@ -23,6 +23,31 @@ class Trade(Base):
     # Composite uniqueness to prevent duplicate imports
     __table_args__ = (UniqueConstraint("date", "symbol", "action", "qty", "price", "amount", name="uix_trade_dedup"),)
 
+
+class Dividend(Base):
+    __tablename__ = "dividends"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    date: Mapped[str] = mapped_column(String, index=True)  # YYYY-MM-DD
+    symbol: Mapped[str] = mapped_column(String, default="", nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    action: Mapped[str] = mapped_column(String, default="", nullable=False)
+    qty: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    price: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    fee: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    time: Mapped[str] = mapped_column(String, default="", nullable=False)
+    sequence: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    __table_args__ = (
+        UniqueConstraint(
+            "date",
+            "symbol",
+            "action",
+            "amount",
+            "sequence",
+            name="uix_dividend_dedup",
+        ),
+    )
+
 class DailySummary(Base):
     __tablename__ = "daily_summary"
     date: Mapped[str] = mapped_column(String, primary_key=True)  # YYYY-MM-DD

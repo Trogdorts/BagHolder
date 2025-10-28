@@ -38,11 +38,26 @@ _HEADER_ALIASES = {
     "trade_price": "price",
     "execution_price": "price",
     "fill_price": "price",
+    "time": "time",
+    "trade_time": "time",
+    "execution_time": "time",
+    "timestamp": "time",
     "amount": "amount",
     "value": "amount",
     "total": "amount",
     "net_amount": "amount",
     "proceeds": "amount",
+    "fee": "fee",
+    "fees": "fee",
+    "fees_comm": "fee",
+    "fees_commission": "fee",
+    "fees_commissions": "fee",
+    "fees___comm": "fee",
+    "fees_and_comm": "fee",
+    "commission": "fee",
+    "commissions": "fee",
+    "description": "description",
+    "symbol_description": "symbol_description",
     "note": "notes",
     "notes": "notes",
     "day_note": "notes",
@@ -72,6 +87,46 @@ _ACTION_ALIASES = {
     "SOLD": "SELL",
     "SELL_SHORT": "SELL",
 }
+
+
+def _parse_time(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    for fmt in ("%H:%M:%S", "%H:%M"):
+        try:
+            parsed = datetime.strptime(text, fmt)
+            if fmt == "%H:%M":
+                return parsed.strftime("%H:%M")
+            return parsed.strftime("%H:%M:%S")
+        except ValueError:
+            continue
+    return ""
+
+
+def _normalize_description(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    return re.sub(r"\s+", " ", text)
+
+
+def _split_symbol_description(value: Optional[str]) -> tuple[str, str]:
+    if not value:
+        return "", ""
+    text = str(value).strip()
+    if not text:
+        return "", ""
+    parts = re.split(r"[\s\u00A0]+", text)
+    if not parts:
+        return "", ""
+    symbol = _sanitize_symbol(parts[0])
+    description = " ".join(part.strip() for part in parts[1:] if part.strip())
+    return symbol, description
 
 
 def _decode_content(data: bytes) -> str:
@@ -186,6 +241,18 @@ def parse_trade_csv(content: bytes) -> List[Dict[str, Any]]:
             continue
 
         symbol_value = _sanitize_symbol(values.get("symbol"))
+        description_value = _normalize_description(values.get("description"))
+        if not symbol_value and values.get("symbol_description"):
+            alt_symbol, alt_description = _split_symbol_description(values.get("symbol_description"))
+            if alt_symbol:
+                symbol_value = alt_symbol
+            if not description_value and alt_description:
+                description_value = _normalize_description(alt_description)
+        elif symbol_value and not description_value and values.get("symbol_description"):
+            _, alt_description = _split_symbol_description(values.get("symbol_description"))
+            if alt_description:
+                description_value = _normalize_description(alt_description)
+
         if not symbol_value:
             continue
 
@@ -196,6 +263,8 @@ def parse_trade_csv(content: bytes) -> List[Dict[str, Any]]:
         qty_value = _parse_number(values.get("qty"))
         amount_value = _parse_number(values.get("amount"))
         price_value = _parse_number(values.get("price"))
+        fee_value = _parse_number(values.get("fee"))
+        time_value = _parse_time(values.get("time"))
 
         if qty_value is None or qty_value == 0:
             continue
@@ -220,6 +289,12 @@ def parse_trade_csv(content: bytes) -> List[Dict[str, Any]]:
             "price": float(price_value),
             "amount": float(amount_value),
         }
+        if description_value:
+            row_data["description"] = description_value
+        if fee_value is not None:
+            row_data["fee"] = float(fee_value)
+        if time_value:
+            row_data["time"] = time_value
         if include_notes:
             row_data["note"] = values.get("notes", "")
 
