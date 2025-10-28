@@ -8,7 +8,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.core.models import DailySummary, Trade
-from app.services.import_thinkorswim import compute_daily_pnl_records
+from app.services.pnl import compute_daily_pnl_records
 
 
 def _coerce_number(value: Any) -> float:
