@@ -94,8 +94,21 @@
       <a href="#contact-support" class="rounded-lg px-3 py-2 font-medium text-neutral-300 transition hover:bg-neutral-900 hover:text-neutral-100">Contact</a>
     </aside>
 
-    <div class="flex flex-col gap-6">
-    <section id="account-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
+    <div class="flex flex-col gap-6" x-data="settingsForm()">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div x-show="hasChanges" x-cloak x-transition.opacity.duration.200ms class="rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 sm:flex-1">
+          You have unsaved changes. Don't forget to save before leaving this page.
+        </div>
+        <button type="submit"
+                form="settings-form"
+                class="btn px-5 py-2 text-sm font-semibold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-60"
+                :class="hasChanges ? 'btn-danger' : 'btn-outline-primary'"
+                :disabled="!hasChanges"
+                :aria-disabled="(!hasChanges).toString()">
+          <span x-text="hasChanges ? 'Save changes' : 'Saved'">Save changes</span>
+        </button>
+      </div>
+      <section id="account-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-neutral-50">Portfolios</h2>
           <p class="text-sm text-neutral-400">Create dedicated data sets, rename them, and switch between portfolios with a click.</p>
@@ -191,20 +204,7 @@
         </div>
     </section>
 
-    <form method="post" action="/settings" id="settings-form" class="flex flex-col gap-6" x-data="settingsForm()" @submit="resetChanges()">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div x-show="hasChanges" x-cloak x-transition.opacity.duration.200ms class="rounded-lg border border-amber-500/60 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 sm:flex-1">
-            You have unsaved changes. Don't forget to save before leaving this page.
-          </div>
-          <button type="submit"
-                  class="btn px-5 py-2 text-sm font-semibold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-60"
-                  :class="hasChanges ? 'btn-danger' : 'btn-outline-primary'"
-                  :disabled="!hasChanges"
-                  :aria-disabled="(!hasChanges).toString()">
-            <span x-text="hasChanges ? 'Save changes' : 'Saved'">Save changes</span>
-          </button>
-        </div>
-
+    <form method="post" action="/settings" id="settings-form" class="flex flex-col gap-6" @submit="resetChanges()">
         <section id="display-settings" class="rounded-2xl border border-neutral-800/70 bg-neutral-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur">
         <header class="mb-4 flex flex-col gap-1">
           <h2 class="text-lg font-semibold text-neutral-50">Appearance &amp; calendar</h2>
