@@ -51,7 +51,6 @@ DEFAULT_CONFIG = {
         "max_length": 4000,
     },
     "import": {
-        "sources": ["thinkorswim"],
         "auto_recalculate": True,
         "backup_before_import": True,
         "accepted_formats": [".csv"],

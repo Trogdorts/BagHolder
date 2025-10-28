@@ -12,7 +12,6 @@ from app.core.config import DEFAULT_CONFIG
 from app.core.database import get_session
 from app.core.logger import get_logger
 from app.core.models import DailySummary, NoteDaily, Trade
-from app.services.import_thinkorswim import parse_thinkorswim_csv
 from app.services.import_trades_csv import parse_trade_csv
 from app.services.trade_summaries import calculate_daily_trade_map, upsert_daily_summaries
 
@@ -358,47 +357,7 @@ async def import_trades(
     return _finalize_trade_import(request, db, inserted)
 
 
-@router.post("/import/thinkorswim")
-async def import_thinkorswim(
-    request: Request,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_session),
-):
-    max_bytes, allowed_formats = _import_config(request)
-    try:
-        content = await _read_upload(file, allowed_formats, max_bytes)
-    except HTTPException as exc:
-        await file.close()
-        query = "file_too_large" if exc.status_code == 413 else "invalid_format"
-        return RedirectResponse(
-            f"/settings?thinkorswim_error={query}#stock-data-import",
-            status_code=303,
-        )
-
-    rows = parse_thinkorswim_csv(content)
-    await file.close()
-
-    if not rows:
-        log.warning(
-            "thinkorswim CSV upload produced no rows (filename=%s)",
-            file.filename,
-        )
-        return RedirectResponse(
-            "/settings?thinkorswim_error=no_trades#stock-data-import",
-            status_code=303,
-        )
-
-    inserted = _persist_trade_rows(db, rows)
-    log.info(
-        "Imported thinkorswim trade CSV (filename=%s, rows=%s, inserted=%s)",
-        file.filename,
-        len(rows),
-        inserted,
-    )
-    return _finalize_trade_import(request, db, inserted)
-
-
-@router.post("/import/thinkorswim/conflicts", response_class=HTMLResponse)
+@router.post("/import/trades/conflicts", response_class=HTMLResponse)
 async def resolve_conflicts(
     request: Request,
     db: Session = Depends(get_session),
