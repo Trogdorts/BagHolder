@@ -69,6 +69,9 @@ DEFAULT_CONFIG = {
         "log_max_bytes": 1_048_576,
         "log_retention": 5,
     },
+    "security": {
+        "session_secret": "",
+    },
 }
 
 @dataclass
