@@ -274,28 +274,34 @@ def test_save_settings_updates_listening_port(tmp_path, monkeypatch):
     app = create_app()
     request = _build_request(app)
 
-    response = save_settings(
-        request,
-        theme="dark",
-        show_text="true",
-        show_trade_count="true",
-        show_percentages="true",
-        show_weekends="false",
-        default_view="latest",
-        listening_port="8123",
-        debug_logging="false",
-        icon_color="#6b7280",
-        primary_color="#2563eb",
-        primary_hover_color="#1d4ed8",
-        success_color="#22c55e",
-        warning_color="#f59e0b",
-        danger_color="#dc2626",
-        danger_hover_color="#b91c1c",
-        trade_badge_color="#34d399",
-        trade_badge_text_color="#111827",
-        note_icon_color="#80cbc4",
-        export_empty_values="zero",
-    )
+    session = db.SessionLocal()
+    try:
+        response = save_settings(
+            request,
+            db=session,
+            theme="dark",
+            show_text="true",
+            show_trade_count="true",
+            show_percentages="true",
+            show_weekends="false",
+            default_view="latest",
+            listening_port="8123",
+            debug_logging="false",
+            icon_color="#6b7280",
+            primary_color="#2563eb",
+            primary_hover_color="#1d4ed8",
+            success_color="#22c55e",
+            warning_color="#f59e0b",
+            danger_color="#dc2626",
+            danger_hover_color="#b91c1c",
+            trade_badge_color="#34d399",
+            trade_badge_text_color="#111827",
+            note_icon_color="#80cbc4",
+            export_empty_values="zero",
+            pnl_method="fifo",
+        )
+    finally:
+        session.close()
 
     assert response.status_code == 303
     assert response.headers["location"] == "/settings"
@@ -315,28 +321,34 @@ def test_save_settings_invalid_port_preserves_existing_value(tmp_path, monkeypat
     request = _build_request(app)
 
     original_port = app.state.config.raw["server"]["port"]
-    response = save_settings(
-        request,
-        theme="dark",
-        show_text="true",
-        show_trade_count="true",
-        show_percentages="true",
-        show_weekends="false",
-        default_view="latest",
-        listening_port="70000",
-        debug_logging="false",
-        icon_color="#6b7280",
-        primary_color="#2563eb",
-        primary_hover_color="#1d4ed8",
-        success_color="#22c55e",
-        warning_color="#f59e0b",
-        danger_color="#dc2626",
-        danger_hover_color="#b91c1c",
-        trade_badge_color="#34d399",
-        trade_badge_text_color="#111827",
-        note_icon_color="#80cbc4",
-        export_empty_values="zero",
-    )
+    session = db.SessionLocal()
+    try:
+        response = save_settings(
+            request,
+            db=session,
+            theme="dark",
+            show_text="true",
+            show_trade_count="true",
+            show_percentages="true",
+            show_weekends="false",
+            default_view="latest",
+            listening_port="70000",
+            debug_logging="false",
+            icon_color="#6b7280",
+            primary_color="#2563eb",
+            primary_hover_color="#1d4ed8",
+            success_color="#22c55e",
+            warning_color="#f59e0b",
+            danger_color="#dc2626",
+            danger_hover_color="#b91c1c",
+            trade_badge_color="#34d399",
+            trade_badge_text_color="#111827",
+            note_icon_color="#80cbc4",
+            export_empty_values="zero",
+            pnl_method="fifo",
+        )
+    finally:
+        session.close()
 
     assert response.status_code == 303
     assert app.state.config.raw["server"]["port"] == original_port

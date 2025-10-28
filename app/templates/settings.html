@@ -847,6 +847,7 @@
       hasChanges: false,
       initialData: '',
       formEl: null,
+      lastConfirmedPnlMethod: '{{ trade_pnl_method }}',
       defaultColors: {{ color_defaults | default({}, true) | tojson | safe }},
       portEditingEnabled: false,
       runningInDocker: {{ 'true' if running_in_docker else 'false' }},
@@ -856,6 +857,11 @@
         this.$watch('showMarketValueSetting', () => this.evaluateChanges());
         this.formEl.addEventListener('input', () => this.evaluateChanges());
         this.formEl.addEventListener('change', () => this.evaluateChanges());
+        const pnlSelect = this.formEl.querySelector('#pnl_method');
+        if (pnlSelect instanceof HTMLSelectElement) {
+          this.lastConfirmedPnlMethod = pnlSelect.value;
+          pnlSelect.addEventListener('change', (event) => this.handlePnlMethodChange(event));
+        }
       },
       serializeForm() {
         if (!this.formEl) {
@@ -920,6 +926,24 @@
           return false;
         }
         return Object.keys(this.defaultColors).every((field) => this.isColorDefault(field));
+      },
+      handlePnlMethodChange(event) {
+        const select = event?.target;
+        if (!(select instanceof HTMLSelectElement)) {
+          return;
+        }
+        const selectedValue = select.value;
+        if (!selectedValue || selectedValue === this.lastConfirmedPnlMethod) {
+          return;
+        }
+        const confirmed = window.confirm(
+          'Changing the realized profit calculation will recalculate your entire portfolio after you save these settings. Continue?'
+        );
+        if (!confirmed) {
+          select.value = this.lastConfirmedPnlMethod;
+          return;
+        }
+        this.lastConfirmedPnlMethod = selectedValue;
       }
     }));
   });
