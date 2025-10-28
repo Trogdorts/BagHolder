@@ -1,7 +1,7 @@
 # BagHolder (Alpha 1)
 
 FastAPI + Jinja2 + HTMX + Alpine.js app to visualize realized performance on a calendar.
-Imports ThinkOrSwim (TOS) Account Statement CSVs. No personally identifying account fields are stored.
+Imports generic trade history CSVs. No personally identifying account fields are stored.
 
 The **Alpha 1** milestone focuses on containerized deployment and smoother
 first-run experiences when provisioning the administrator account.
@@ -90,9 +90,8 @@ like a first-time launch.
 ## Import
 
 - Open **Settings → Stock data importing**
-- Choose **ThinkOrSwim → Account Statement** CSV
-- Only trade fields are persisted: date, symbol, action, qty, price, amount
-- Account numbers or names are discarded in-memory after parsing
+- Upload a CSV with the columns date, symbol, action, qty, price, and amount
+- Only the listed trade fields are persisted
 
 ## Notes
 

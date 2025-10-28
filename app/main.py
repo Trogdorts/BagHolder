@@ -30,13 +30,26 @@ def create_app():
         data_dir = None
     maybe_bootstrap_admin_from_env(data_dir=data_dir)
     debug_logging_enabled = getattr(app.state, "debug_logging_enabled", False)
-    secret_key = os.environ.get("BAGHOLDER_SECRET_KEY")
-    if not secret_key:
-        secret_key = secrets.token_urlsafe(32)
-        log.warning(
-            "BAGHOLDER_SECRET_KEY is not set; generated an ephemeral session secret. "
-            "Set BAGHOLDER_SECRET_KEY to persist sessions across restarts."
-        )
+    secret_key_env = os.environ.get("BAGHOLDER_SECRET_KEY")
+    secret_key: str | None = secret_key_env
+    if not secret_key_env:
+        security_section = cfg.raw.setdefault("security", {})
+        stored_secret = security_section.get("session_secret")
+        if isinstance(stored_secret, str) and stored_secret:
+            secret_key = stored_secret
+        else:
+            secret_key = secrets.token_urlsafe(32)
+            security_section["session_secret"] = secret_key
+            try:
+                cfg.save()
+                log.info(
+                    "Generated a new session secret and stored it in %s", cfg.path
+                )
+            except OSError as exc:
+                log.warning(
+                    "Generated a new session secret but failed to persist it: %s",
+                    exc,
+                )
 
     secure_env = os.environ.get("BAGHOLDER_SESSION_SECURE")
     if secure_env is not None:

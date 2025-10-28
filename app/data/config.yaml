@@ -39,8 +39,6 @@ notes:
   autosave: true
   max_length: 4000
 import:
-  sources:
-  - thinkorswim
   auto_recalculate: true
   backup_before_import: true
   accepted_formats:
@@ -59,3 +57,5 @@ diagnostics:
   debug_logging: true
   log_max_bytes: 1048576
   log_retention: 5
+trades:
+  pnl_method: fifo

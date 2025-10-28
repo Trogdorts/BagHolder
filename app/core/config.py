@@ -51,7 +51,6 @@ DEFAULT_CONFIG = {
         "max_length": 4000,
     },
     "import": {
-        "sources": ["thinkorswim"],
         "auto_recalculate": True,
         "backup_before_import": True,
         "accepted_formats": [".csv"],
@@ -69,6 +68,9 @@ DEFAULT_CONFIG = {
         "debug_logging": False,
         "log_max_bytes": 1_048_576,
         "log_retention": 5,
+    },
+    "security": {
+        "session_secret": "",
     },
 }
 
